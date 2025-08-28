@@ -1,0 +1,48 @@
+---
+title: 'Altadena Boundaries and Tracts'
+author: "Catalyst California"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+library(sf)
+library(highcharter)
+library(rmapshaper)
+library(leaflet)
+library(htmlwidgets)
+
+options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con_alt <- connect_to_db("altadena_recovery_rebuild")
+con_rda <- connect_to_db("rda_shared_data")
+con_fires <- connect_to_db("la_fires")
+
+# Load in shapes
+eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom")
+
+eaton_fire_simple <- eaton_fire%>%
+    st_transform(4326)%>%
+  ms_simplify()
+
+tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk where fire_geoid='Eaton'")
+
+tract_shapes <- st_read(con_rda, query="SELECT * FROM geographies_ca.cb_2023_06_tract_500k") %>%
+  filter(ct_geoid %in% tracts$tract_geoid)
+
+
+```
+
+
+
+```{r map}
+
+
+
+```
