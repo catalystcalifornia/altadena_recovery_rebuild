@@ -14,6 +14,8 @@ library(highcharter)
 library(rmapshaper)
 library(leaflet)
 library(htmlwidgets)
+library(tigris)
+library(tidycensus)
 
 options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
 options(scipen=999)
@@ -28,13 +30,20 @@ con_fires <- connect_to_db("la_fires")
 eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom")
 
 eaton_fire_simple <- eaton_fire%>%
-    st_transform(4326)%>%
-  ms_simplify()
+    st_transform(4326)
 
 tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk where fire_geoid='Eaton'")
 
-tract_shapes <- st_read(con_rda, query="SELECT * FROM geographies_ca.cb_2023_06_tract_500k") %>%
+tract_shapes <- st_read(con_rda, query="SELECT gid, ct_geoid,geom_3310 FROM geographies_ca.cb_2023_06_tract_500k", geom="geom_3310") %>%
   filter(ct_geoid %in% tracts$tract_geoid)
+
+tract_simple <- tract_shapes %>%
+    st_transform(4326) 
+
+lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
+
+altadena_tracts <- lac_tracts %>% filter(GEOID %in% tracts$tract_geoid) %>%
+    st_transform(4326) 
 
 
 ```
@@ -43,6 +52,59 @@ tract_shapes <- st_read(con_rda, query="SELECT * FROM geographies_ca.cb_2023_06_
 
 ```{r map}
 
+leaflet () %>%
+  addTiles() %>%
+  addPolygons(data=eaton_fire_simple,
+              fillColor="red",
+              fillOpacity=0.7,
+              color="white",
+              weight=1,
+              popup=~FIRE_NAME,
+              group="Eaton Fire Perimeter") %>%
+  
+    addPolygons(data=altadena_tracts,
+              fillColor="yellow",
+              fillOpacity=0.7,
+              color="black",
+              weight=2,
+              popup=~GEOID,
+              group="Census Tracts") %>%
+  
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Census Tracts"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+      
+  
+
+```
+
+``` {r census-data}
 
 
+# load census variables
+vars <- load_variables(year = 2022, dataset = "acs5/subject")
+vars_dp05 <- load_variables(2022, "acs5/profile") 
+
+
+#DP05_001 Total Population
+# DP03_0119 Families below poverty level
+# DP03_0062 Median household income
+# DP02_0001 Total Husehoolds
+	
+# DP02_0016 average household size
+# DP04_0001 total housing units
+# DP04_0002 total occupied
+# DP04_0046 owner-occupied
+# DP04_0047 renter occupied
+# 	DP04_0080 value owner-occupied
+# 	DP04_0089 median owner-occupied value
+# DP04_0091 with a mortgage of owner-occupied
+# DP04_0093 monthly owner costs with mortgage
+# 	DP04_0126 occupied units paying rent
+# DP04_0134 median rent
+
+poverty_df <- get_acs(geography = "tract", survey = "acs5", state = "CA",
+                      variables = household_vars, 
+                       year = 2023, geometry = FALSE) 
 ```
