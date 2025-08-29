@@ -33,6 +33,9 @@ fire_shp_4326 <- st_transform(fire_shp, 4326)
 #we first have to filter because transform was taking too long otherwise
 eaton <- fire_shp %>%
   filter(FIRE_NAME == "EATON")
+
+colnames(eaton) <- tolower(colnames(eaton))
+
 fire_shp_3310 <- st_transform(eaton, 3310) 
 
 #### Step 2: Use export function to push to postgres ####
@@ -41,14 +44,14 @@ fire_shp_3310 <- st_transform(eaton, 3310)
 #                table_name= "cal_fire_prmtr_4326", 
 #                geometry_column = "geometry")
 
-# export_shpfile(con=con, df=fire_shp_3310, schema="data",
-#                table_name= "eaton_fire_prmtr_3310",
-#                geometry_column = "geometry")
+export_shpfile(con=con, df=fire_shp_3310, schema="data",
+               table_name= "eaton_fire_prmtr_3310",
+               geometry_column = "geometry")
 
 # dbSendQuery(con, "COMMENT ON TABLE data.cal_fire_prmtr_4326 IS 
 #             'Fire Perimeter data from CAL FIRE eGIS, July 20, 2025 in SRID 4326. 
 #             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_import_fire_perimeter.docx'")
 
-# dbSendQuery(con, "COMMENT ON TABLE data.eaton_fire_prmtr_3310 IS 
-#             'Fire Perimeter data for the Eaton Fire from CAL FIRE eGIS, July 20, 2025 in SRID 3310 
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_import_fire_perimeter.docx'")
+dbSendQuery(con, "COMMENT ON TABLE data.eaton_fire_prmtr_3310 IS
+            'Fire Perimeter data for the Eaton Fire from CAL FIRE eGIS, July 20, 2025 in SRID 3310
+            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_import_fire_perimeter.docx'")
