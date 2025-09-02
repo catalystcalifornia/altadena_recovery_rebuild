@@ -26,24 +26,78 @@ con_alt <- connect_to_db("altadena_recovery_rebuild")
 con_rda <- connect_to_db("rda_shared_data")
 con_fires <- connect_to_db("la_fires")
 
-# Load in shapes
+# Load in shapes ----
+# eaton fire share
 eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom")
 
 eaton_fire_simple <- eaton_fire%>%
     st_transform(4326)
 
+# tract xwalk from la fires project
 tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk where fire_geoid='Eaton'")
 
-tract_shapes <- st_read(con_rda, query="SELECT gid, ct_geoid,geom_3310 FROM geographies_ca.cb_2023_06_tract_500k", geom="geom_3310") %>%
-  filter(ct_geoid %in% tracts$tract_geoid)
-
-tract_simple <- tract_shapes %>%
-    st_transform(4326) 
-
+# get detailed tract boundaries from tigris
 lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
 
+# filter for altadena tracts and join the prc fields from the xwalk
 altadena_tracts <- lac_tracts %>% filter(GEOID %in% tracts$tract_geoid) %>%
-    st_transform(4326) 
+  select(GEOID,NAME,NAMELSAD) %>%
+    st_transform(4326) %>%
+  left_join(tracts %>% select(tract_geoid, prc_tract_area, prc_fire_area), by=c("GEOID"="tract_geoid"))
+
+# Load in census data ----
+# load census variables
+vars <- load_variables(year = 2022, dataset = "acs5/subject")
+vars_dp <- load_variables(2022, "acs5/profile") 
+
+# compared variables used in workbook samples to those in the detailed tables
+# DP05_001 Total Population
+# DP03_0119P Families below poverty level %
+# DP03_0062 Median household income
+# DP04_0001 total housing units
+# DP04_0002 total occupied
+# DP04_0046 owner-occupied
+# DP04_0047 renter occupied
+# DP04_0080 value owner-occupied
+# DP04_0089 median owner-occupied value
+# DP04_0091 with a mortgage of owner-occupied
+# DP04_0093 monthly owner costs with mortgage
+# DP04_0126 occupied units paying rent
+# DP04_0134 median rent
+
+# focus vars for QA
+vars_select <- c("DP05_0001",
+"DP03_0119P",
+"DP03_0062",
+"DP04_0001",
+"DP04_0002",
+"DP04_0046",
+"DP04_0047",
+"DP04_0080",
+"DP04_0089",
+"DP04_0091",
+"DP04_0093",
+"DP04_0126",
+"DP04_0134")
+
+# data dictionary trimmed
+vars_dp_select <- vars_dp %>% filter(name %in% vars_select)
+
+# data pulled
+tract_data <- get_acs(geography = "tract", survey = "acs5", state = "CA",
+                      variables = vars_select, 
+                       year = 2022, geometry = FALSE) 
+
+# filter for altadena tracts and pivot
+altadena_tract_data <- tract_data %>% filter(GEOID %in% altadena_tracts$GEOID) %>% select(-moe)%>%
+  pivot_wider(id_cols=GEOID,names_from=variable,
+              values_from=estimate)
+
+# join to shapes and the prc intersect
+altadena_tracts <- altadena_tracts %>% left_join(altadena_tract_data)
+
+# let's filter to tracts within at least 20% of the fire boundary
+altadena_tracts_subset <- altadena_tracts %>% filter(prc_tract_area>=.10)
 
 
 ```
@@ -59,15 +113,17 @@ leaflet () %>%
               fillOpacity=0.7,
               color="white",
               weight=1,
-              popup=~FIRE_NAME,
+              popup=~fire_name,
               group="Eaton Fire Perimeter") %>%
   
-    addPolygons(data=altadena_tracts,
+    addPolygons(data=altadena_tracts_subset,
               fillColor="yellow",
               fillOpacity=0.7,
               color="black",
               weight=2,
-              popup=~GEOID,
+              popup=~paste0(altadena_tracts_subset$GEOID, "<br>",
+                            altadena_tracts_subset$prc_tract_area, "<br>",
+                            altadena_tracts_subset$prc_fire_area, "<br>"),
               group="Census Tracts") %>%
   
   addLayersControl(
@@ -82,29 +138,5 @@ leaflet () %>%
 ``` {r census-data}
 
 
-# load census variables
-vars <- load_variables(year = 2022, dataset = "acs5/subject")
-vars_dp05 <- load_variables(2022, "acs5/profile") 
 
-
-#DP05_001 Total Population
-# DP03_0119 Families below poverty level
-# DP03_0062 Median household income
-# DP02_0001 Total Husehoolds
-	
-# DP02_0016 average household size
-# DP04_0001 total housing units
-# DP04_0002 total occupied
-# DP04_0046 owner-occupied
-# DP04_0047 renter occupied
-# 	DP04_0080 value owner-occupied
-# 	DP04_0089 median owner-occupied value
-# DP04_0091 with a mortgage of owner-occupied
-# DP04_0093 monthly owner costs with mortgage
-# 	DP04_0126 occupied units paying rent
-# DP04_0134 median rent
-
-poverty_df <- get_acs(geography = "tract", survey = "acs5", state = "CA",
-                      variables = household_vars, 
-                       year = 2023, geometry = FALSE) 
 ```
