@@ -1,0 +1,277 @@
+---
+title: 'Altadena Boundaries and Tracts'
+author: "Catalyst California"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+# Library and environment set up ----
+
+library(sf)
+library(highcharter)
+library(rmapshaper)
+library(leaflet)
+library(htmlwidgets)
+library(tigris)
+library(tidycensus)
+library(stringr)
+library(gt)
+library(showtext)
+library(extrafont)
+
+options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con_alt <- connect_to_db("altadena_recovery_rebuild")
+con_rda <- connect_to_db("rda_shared_data")
+con_fires <- connect_to_db("la_fires")
+
+# Load in shapes ----
+# eaton fire share
+eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom")
+
+eaton_fire_simple <- eaton_fire%>%
+    st_transform(4326)
+
+# tract xwalk from la fires project
+tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk where fire_geoid='Eaton'")
+
+# get detailed tract boundaries from tigris
+lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
+
+# Load in census data ----
+# load census variables
+vars <- load_variables(year = 2022, dataset = "acs5/subject")
+vars_dp <- load_variables(2022, "acs5/profile") 
+
+# compared variables used in workbook samples to those in the detailed tables
+# Demographics
+# DP05_001 Total Population
+# DP05_0079P White, non-hispanic %
+# DP05_0080P Black, non-hispanic %
+# DP03_0119P Families below poverty level %
+# DP03_0062 Median household income
+
+# Housing units
+# DP04_0001 total housing units
+# DP04_0002 total occupied housing units
+# DP04_0046 owner occupied
+# DP04_0047 renter occupied
+
+# Housing units value
+# DP04_0080 value owner-occupied
+# DP04_0089 median owner-occupied value
+# DP04_0091 with a mortgage of owner-occupied
+# DP04_0093 monthly owner costs with mortgage
+# DP04_0126 occupied units paying rent
+# DP04_0134 median rent
+
+# focus vars for QA
+vars_select <- c("DP05_0001",
+                 "DP05_0079P",
+                "DP05_0080P",
+                "DP03_0119P",
+                "DP03_0062",
+                "DP04_0001",
+                "DP04_0002",
+                "DP04_0046",
+                "DP04_0047",
+                "DP04_0080",
+                "DP04_0089",
+                "DP04_0091",
+                "DP04_0093",
+                "DP04_0126",
+                "DP04_0134")
+
+# data dictionary trimmed
+vars_dp_select <- vars_dp %>% filter(name %in% vars_select)
+
+# pull data from tidycensus
+tract_data <- get_acs(geography = "tract", survey = "acs5", state = "CA",
+                      variables = vars_select, 
+                       year = 2022, geometry = FALSE) 
+
+# Pull CHAS data ----
+
+
+```
+
+```{r altadena-data}
+
+# Get data for altadena tracts and clean up a full dataframe
+# filter for altadena tracts and join the prc fields from the xwalk
+altadena_tracts <- lac_tracts %>% filter(GEOID %in% tracts$tract_geoid) %>%
+  select(GEOID,NAME) %>%
+    st_transform(4326) %>%
+  left_join(tracts %>% select(tract_geoid, prc_tract_area, prc_fire_area), by=c("GEOID"="tract_geoid"))
+
+# filter for altadena tracts and pivot
+altadena_tract_data <- tract_data %>% filter(GEOID %in% altadena_tracts$GEOID) %>% select(-moe)%>%
+  pivot_wider(id_cols=GEOID,names_from=variable,
+              values_from=estimate)
+
+# join to shapes and the prc intersect to get one dataframe for altadena
+altadena_tracts <- altadena_tracts %>% left_join(altadena_tract_data)
+
+# let's filter to tracts within at least 10% of the fire boundary 
+altadena_tracts_subset <- altadena_tracts %>% filter(prc_tract_area>=.10) 
+
+```
+
+
+
+
+```{r altadena=map}
+
+# map tracts and check boundaries
+leaflet () %>%
+  addTiles() %>%
+  addPolygons(data=eaton_fire_simple,
+              fillColor="red",
+              fillOpacity=0.7,
+              color="white",
+              weight=1,
+              popup=~fire_name,
+              group="Eaton Fire Perimeter") %>%
+  
+    addPolygons(data=altadena_tracts_subset,
+              fillColor="yellow",
+              fillOpacity=0.7,
+              color="black",
+              weight=2,
+              popup=~paste0(altadena_tracts_subset$GEOID, "<br>",
+                            altadena_tracts_subset$prc_tract_area, "<br>",
+                            altadena_tracts_subset$prc_fire_area, "<br>"),
+              group="Census Tracts") %>%
+  
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Census Tracts"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+      
+# add an indicator for west/east of lake avenue  and clean up table
+altadena_tracts_subset <- altadena_tracts_subset %>%
+  mutate(location=ifelse(GEOID %in% c("06037460301","06037460200","06037461100","06037461000","06037460302"), "West of Lake Ave", "East of Lake Ave")) %>%
+  select(GEOID,NAME,location,everything())%>%
+  mutate(prc_tract_area=100*as.numeric(prc_tract_area),
+         prc_fire_area=100*prc_fire_area) %>%
+    rename(geoid=GEOID,
+         tract=NAME)
+
+
+```
+
+
+```{r styling}
+
+### Table styling ----
+## COLORS ##
+papaya <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+## FONTS ## 
+
+font_add_google("Inter")
+
+# font_import()
+loadfonts(device = "win")
+windowsFonts()
+showtext_auto()
+
+```
+
+```{r census-intersect-table}
+
+### Step 1: Trim table and clean up columns ---
+# select columns
+col_select <- c("tract","location","prc_tract_area")
+order_col <- "prc_tract_area"
+dict <- c("%_tract_in_fire_area"="prc_tract_area")
+title_text <- "Altadena Census Tracts by Location and Fire Perimeter"
+footer_text <- "Catalyst California's calculations based on Eaton Fire Perimeter from January 2025"
+
+# table_function <- function(df,col_select,order_col,dict, title_text, footer_text) {
+#   
+# }
+#   
+df<-altadena_tracts_subset %>%
+  select(all_of(col_select)) %>%
+  st_drop_geometry()%>%
+  arrange(desc(location),!! rlang::sym(order_col))
+
+df <- df %>%
+  rename(!!!dict) %>%
+  rename_with(~ gsub("_", " ", .)) %>%  
+  rename_with(str_to_title) %>%
+  mutate_if(is.numeric, round, digits = 1)
+
+
+table<-df %>%
+  gt()%>%
+  # title
+  tab_header(title=glue::glue(title_text))%>%
+  # any data notes in footer
+  tab_footnote(footnote=footer_text,placement="left") %>%
+  # column widths
+ cols_width(
+    everything() ~ px(150)  # set maximum column width
+  ) %>%
+  opt_align_table_header("center")%>%
+  opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  tab_options(table.background.color=alabaster,
+    column_labels.background.color = "transparent",
+    table.font.size = px(12),
+    column_labels.font.size = px(12),
+    heading.align = "center",
+    table.font.names = "Inter",
+    heading.title.font.size = px(18),
+    heading.border.bottom.color = "transparent",
+    column_labels.border.bottom.width = px(3),
+    column_labels.border.bottom.color = gainsboro,
+    table.border.top.color = "transparent",
+    table.border.bottom.color = "transparent",
+    table.border.bottom.width = px(1),
+    data_row.padding = px(1),
+    footnotes.font.size = px(10),
+    footnotes.border.bottom.color = "transparent",
+    table.align='left')%>%
+  tab_style(style=
+            cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
+   tab_style(style=
+            cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title()) %>%
+  tab_style(style=
+            cell_text(color=meteorite, font=c(google_font(name="Inter"),default_fonts())),locations=cells_body()) %>%
+  opt_css(
+    css = "
+      .gt_title {
+        line-height: 1.1;      /* Controls line spacing */
+        margin-bottom: 0px;    /* Removes extra spacing after title */
+        padding-bottom: 2px;   /* Optional: adjust as needed */
+      }
+    "
+  )
+
+table
+
+gtsave(table, filename="tracts_fire_perimeter.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo")
+
+```
+
+``` {r census-data}
+
+
+
+```
