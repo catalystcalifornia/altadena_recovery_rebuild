@@ -22,6 +22,9 @@ library(stringr)
 library(gt)
 library(showtext)
 library(extrafont)
+library(readxl)
+library(tidyverse)
+library(janitor)
 
 options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
 options(scipen=999)
@@ -42,7 +45,7 @@ eaton_fire_simple <- eaton_fire%>%
 # tract xwalk from la fires project
 tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk where fire_geoid='Eaton'")
 
-# get detailed tract boundaries from tigris
+# get detailed tract boundaries from tigris to match provided maps
 lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
 
 # Load in census data ----
@@ -50,8 +53,8 @@ lac_tracts <- tracts("CA",county="Los Angeles",year=2023)
 vars <- load_variables(year = 2022, dataset = "acs5/subject")
 vars_dp <- load_variables(2022, "acs5/profile") 
 
-# compared variables used in workbook samples to those in the detailed tables
-# Demographics
+# compared variables used in workbook samples to those in the detailed tables, selected key variables to analysis to compare and check
+# Demographics & Economics
 # DP05_001 Total Population
 # DP05_0079P White, non-hispanic %
 # DP05_0080P Black, non-hispanic %
@@ -72,7 +75,7 @@ vars_dp <- load_variables(2022, "acs5/profile")
 # DP04_0126 occupied units paying rent
 # DP04_0134 median rent
 
-# focus vars for QA
+# focus vars for this memo
 vars_select <- c("DP05_0001",
                  "DP05_0079P",
                 "DP05_0080P",
@@ -89,38 +92,109 @@ vars_select <- c("DP05_0001",
                 "DP04_0126",
                 "DP04_0134")
 
-# data dictionary trimmed
+# trim data dictionary for vars of interest so it's easily viewed later
 vars_dp_select <- vars_dp %>% filter(name %in% vars_select)
 
-# pull data from tidycensus
-tract_data <- get_acs(geography = "tract", survey = "acs5", state = "CA",
+# pull data from tidycensus for select vars, 2022 to match provided data
+census_data <- get_acs(geography = "tract", survey = "acs5", state = "CA",
                       variables = vars_select, 
                        year = 2022, geometry = FALSE) 
 
 # Pull CHAS data ----
+# used to compare low to mod income households
+# confirmed in data dictionary that Table 12 matched AMI cutoffs through LA County affordable housing program
+# https://planning.lacounty.gov/wp-content/uploads/2024/05/housing_2024-income-limits-costs.pdf
+
+# data
+chas_data<- read_csv("W:/Data/Housing/HUD/CHAS/2017-2021/2017thru2021-140-csv/140/Table12.csv")
+
+# dictionary for table 12
+chas_dict <- read_excel("W:\\Data\\Housing\\HUD\\CHAS\\2017-2021\\2017thru2021-140-csv\\CHAS data dictionary 17-21.xlsx", sheet = "All Tables") %>%
+  filter(Table=="T12")
+
+# pull subtotal columns for less than 80% HAMFI
+chas_dict_li <- chas_dict %>%
+  clean_names() %>%
+  filter(column_type=='Subtotal') %>%
+  filter(description_3 %in% 
+           c("less than or equal to 50% of HAMFI","greater than 50% but less than 80% of HAMFI"))
+
+# pull subtotal columns for less than 120% HAMFI
+chas_dict_mod <- chas_dict %>%
+  clean_names() %>%
+  filter(column_type=='Subtotal') %>%
+  filter(description_3 %in% 
+           c("greater than 80% but less than 120% of HAMFI"))
+
+# denom columns  
+chas_dict_denom <- chas_dict %>%
+    clean_names() %>%
+  filter(column_type=='Subtotal') %>%
+  filter(description_3=='All' & description_2!='All')
+
+# lets focus on owners too, filter vars for owner vars
+chas_dict_denom_owner <- chas_dict_denom %>% filter(description_1=='Owner occupied')
+
+chas_dict_li_owner <- chas_dict_li %>% filter(description_1=='Owner occupied')
+
+chas_dict_mod_owner <- chas_dict_mod %>% filter(description_1=='Owner occupied')
 
 
 ```
 
 ```{r altadena-data}
 
-# Get data for altadena tracts and clean up a full dataframe
-# filter for altadena tracts and join the prc fields from the xwalk
+# Get the AMI data for altadena tracts ----
+altadena_chas <- chas_data %>%
+  # filter first for county
+  filter(st=='06' & cnty=='037') %>%
+  # select columns of interest
+  select(geoid,name,tract,
+         all_of(chas_dict_li$column_variable_name),
+         all_of(chas_dict_mod$column_variable_name),
+         all_of(chas_dict_denom$column_variable_name))
+
+# clean up geoid and select altadena tracts
+altadena_chas <- altadena_chas %>%
+  mutate(geoid=str_sub(geoid, -11, -1)) %>%
+  filter(geoid %in% tracts$tract_geoid)
+
+# calculate number low income and number low to moderate income
+altadena_chas <- altadena_chas %>%
+  rowwise() %>%
+  mutate(
+    low_to_mod_income=sum(c_across(all_of(chas_dict_mod$column_variable_name))), 
+      low_income=sum(c_across(all_of(chas_dict_li$column_variable_name))), 
+    total_households=sum(c_across(all_of(chas_dict_denom$column_variable_name))),
+    prc_low_or_mod_income=(low_income+low_to_mod_income)/total_households*100) %>%
+  # owner occupied
+  mutate(
+    low_to_mod_income_owners=sum(c_across(all_of(chas_dict_mod_owner$column_variable_name))), 
+      low_income_owners=sum(c_across(all_of(chas_dict_li_owner$column_variable_name))), 
+    owner_households=sum(c_across(all_of(chas_dict_denom_owner$column_variable_name))),
+    prc_low_or_mod_income_owners=(low_income_owners+low_to_mod_income_owners)/ owner_households*100) %>%
+  ungroup()
+
+# Get census data for altadena tracts and clean up a full dataframe ----
+# filter for altadena tracts and pivot
+altadena_census_data <- census_data %>% filter(GEOID %in% tracts$tract_geoid) %>% select(-moe)%>%
+  pivot_wider(id_cols=GEOID,names_from=variable,
+              values_from=estimate)
+
+# Join data and shapes together ----
+# join to shapes and the prc intersect to get one dataframe for altadena
 altadena_tracts <- lac_tracts %>% filter(GEOID %in% tracts$tract_geoid) %>%
   select(GEOID,NAME) %>%
     st_transform(4326) %>%
   left_join(tracts %>% select(tract_geoid, prc_tract_area, prc_fire_area), by=c("GEOID"="tract_geoid"))
 
-# filter for altadena tracts and pivot
-altadena_tract_data <- tract_data %>% filter(GEOID %in% altadena_tracts$GEOID) %>% select(-moe)%>%
-  pivot_wider(id_cols=GEOID,names_from=variable,
-              values_from=estimate)
-
-# join to shapes and the prc intersect to get one dataframe for altadena
-altadena_tracts <- altadena_tracts %>% left_join(altadena_tract_data)
+# join census and chas data
+altadena_tracts_all_data <- altadena_tracts %>% clean_names() %>%
+  left_join(altadena_census_data %>% rename(geoid=GEOID)) %>%
+  left_join(altadena_chas %>% select(geoid,low_to_mod_income:prc_low_or_mod_income_owners))
 
 # let's filter to tracts within at least 10% of the fire boundary 
-altadena_tracts_subset <- altadena_tracts %>% filter(prc_tract_area>=.10) 
+altadena_tracts_subset <- altadena_tracts_all_data %>% filter(prc_tract_area>=.10) 
 
 ```
 
@@ -145,7 +219,7 @@ leaflet () %>%
               fillOpacity=0.7,
               color="black",
               weight=2,
-              popup=~paste0(altadena_tracts_subset$GEOID, "<br>",
+              popup=~paste0(altadena_tracts_subset$geoid, "<br>",
                             altadena_tracts_subset$prc_tract_area, "<br>",
                             altadena_tracts_subset$prc_fire_area, "<br>"),
               group="Census Tracts") %>%
@@ -157,20 +231,19 @@ leaflet () %>%
       
 # add an indicator for west/east of lake avenue  and clean up table
 altadena_tracts_subset <- altadena_tracts_subset %>%
-  mutate(location=ifelse(GEOID %in% c("06037460301","06037460200","06037461100","06037461000","06037460302"), "West of Lake Ave", "East of Lake Ave")) %>%
-  select(GEOID,NAME,location,everything())%>%
+  mutate(location=ifelse(geoid %in% c("06037460301","06037460200","06037461100","06037461000","06037460302"), "West of Lake Ave", "East of Lake Ave")) %>%
+  select(geoid,name,location,everything())%>%
   mutate(prc_tract_area=100*as.numeric(prc_tract_area),
          prc_fire_area=100*prc_fire_area) %>%
-    rename(geoid=GEOID,
-         tract=NAME)
+    rename(tract=name)
 
 
 ```
 
 
-```{r styling}
+```{r table-styling}
 
-### Table styling ----
+# Colors and Fonts ----
 ## COLORS ##
 papaya <- "#F25922"
 peridot <- "#CEEA01"
@@ -191,48 +264,39 @@ loadfonts(device = "win")
 windowsFonts()
 showtext_auto()
 
-```
+# Table function ----
+table_function <- function(df,col_select,order_col,dict, title_text, footer_text,width) {
 
-```{r census-intersect-table}
-
-### Step 1: Trim table and clean up columns ---
-# select columns
-col_select <- c("tract","location","prc_tract_area")
-order_col <- "prc_tract_area"
-dict <- c("%_tract_in_fire_area"="prc_tract_area")
-title_text <- "Altadena Census Tracts by Location and Fire Perimeter"
-footer_text <- "Catalyst California's calculations based on Eaton Fire Perimeter from January 2025"
-
-# table_function <- function(df,col_select,order_col,dict, title_text, footer_text) {
-#   
-# }
-#   
+  # filter dataframe for columns of interest and order the df
 df<-altadena_tracts_subset %>%
   select(all_of(col_select)) %>%
   st_drop_geometry()%>%
   arrange(desc(location),!! rlang::sym(order_col))
 
+  # rename and clean up vars and formatting
 df <- df %>%
   rename(!!!dict) %>%
   rename_with(~ gsub("_", " ", .)) %>%  
-  rename_with(str_to_title) %>%
+  rename(Tract=tract, Location=location) %>%
   mutate_if(is.numeric, round, digits = 1)
 
-
+  # create and style tables
 table<-df %>%
   gt()%>%
+   cols_label(.fn = html) %>%
   # title
   tab_header(title=glue::glue(title_text))%>%
   # any data notes in footer
   tab_footnote(footnote=footer_text,placement="left") %>%
   # column widths
  cols_width(
-    everything() ~ px(150)  # set maximum column width
+    everything() ~ px(width)  # set maximum column width
   ) %>%
   opt_align_table_header("center")%>%
   opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",
+    column_labels.padding=px(0),
     table.font.size = px(12),
     column_labels.font.size = px(12),
     heading.align = "center",
@@ -244,7 +308,7 @@ table<-df %>%
     table.border.top.color = "transparent",
     table.border.bottom.color = "transparent",
     table.border.bottom.width = px(1),
-    data_row.padding = px(1),
+    # data_row.padding = px(1),
     footnotes.font.size = px(10),
     footnotes.border.bottom.color = "transparent",
     table.align='left')%>%
@@ -254,15 +318,50 @@ table<-df %>%
             cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title()) %>%
   tab_style(style=
             cell_text(color=meteorite, font=c(google_font(name="Inter"),default_fonts())),locations=cells_body()) %>%
+   opt_vertical_padding(scale = 0) %>%
   opt_css(
     css = "
       .gt_title {
         line-height: 1.1;      /* Controls line spacing */
         margin-bottom: 0px;    /* Removes extra spacing after title */
-        padding-bottom: 2px;   /* Optional: adjust as needed */
+        padding-bottom: 1px;   /* Optional: adjust as needed */
+      }
+      .gt_column_label {
+      padding-top: 1px !important;
+      padding-bottom: 1px !important;
+      white-space: normal !important;
+      }
+      .gt_column_label div {
+      line-height: 1.1 !important;
+      padding: 0px !important;
+      margin: 0px !important;
+      white-space: normal !important;
+    }
+       .gt_footnote {
+        line-height: 1.1;
+        padding-top: 1px;
+        padding-bottom: 1px;
+        margin-top: 0px;
       }
     "
   )
+}
+
+```
+
+```{r fire-intersect-table}
+# Create table for fire intersection QA ----
+# check of which census tracts included
+
+# function inputs
+col_select <- c("tract","location","prc_tract_area")
+order_col <- "prc_tract_area"
+dict <- c("%_Tract_in_Fire"="prc_tract_area")
+title_text <- "Altadena Tracts by Location and Fire Perimeter"
+footer_text <- "Catalyst California's calculations based on Eaton Fire Perimeter from January 2025. Not based on structures destroyed."
+width <- 110
+
+table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text)
 
 table
 
@@ -270,8 +369,99 @@ gtsave(table, filename="tracts_fire_perimeter.png", path = "W:\\Project\\RDA Tea
 
 ```
 
-``` {r census-data}
+```{r econ-table}
+# Create table for census income QA ----
+# check of census tracts demographics and economics
+# Demographics & Economics
+# DP05_001 Total Population
+# DP05_0079P White, non-hispanic %
+# DP05_0080P Black, non-hispanic %
+# DP03_0119P Families below poverty level %
+# DP03_0062 Median household income
+pop_econ <- c("DP05_0001","DP03_0062","DP03_0119P","DP05_0079P","DP05_0080P")
+
+# function inputs
+col_select <- c("tract","location",pop_econ)
+order_col <- "DP03_0062"
+dict <- c("Total Pop"="DP05_0001",
+          "Median HH Income $"="DP03_0062",
+          "Families Below Poverty %"="DP03_0119P",
+          "White %"="DP05_0079P",
+          "Black %"="DP05_0080P"
+          )
+title_text <- "Altadena Tracts by Location, Median Household Income, and Population"
+footer_text <- "Ordered by Median Household Income. U.S. Census Bureau, American Community Survey, 2018-2022."
+width <- 115
+
+table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
+
+table
+
+gtsave(table, filename="tracts_pop_income.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo")
+
+```
 
 
+```{r housing-table}
+# Create table for housing units and values QA ----
+# check of census tracts housing units and values
+# Housing units
+# DP04_0002 total occupied housing units
+# DP04_0046 owner occupied
+# DP04_0047 renter occupied
+# Housing units value
+# DP04_0089 median owner-occupied value
+# DP04_0091 units with a mortgage of owner-occupied
+# DP04_0093 monthly owner costs with mortgage
+# DP04_0134 median rent
+housing <- c("DP04_0002","DP04_0046","DP04_0091","DP04_0089","DP04_0093","DP04_0047","DP04_0134")
+
+# function inputs
+col_select <- c("tract","location",housing)
+order_col <- "DP04_0093"
+dict <- c("Occupied Housing Units"="DP04_0002",
+          "Owner Occupied #"="DP04_0046",
+          "Owners With Mortgage #"="DP04_0091",
+          "Median Value (Owners) $"="DP04_0089",
+          "Monthly Mortgage Costs $"="DP04_0093",
+          "Renter Occupied #"="DP04_0047",
+          "Median Rent $"="DP04_0134")
+title_text <- "Altadena Tracts by Location, Housing Tenure, and Costs"
+footer_text <- "Ordered by Monthly Mortgage Costs. U.S. Census Bureau, American Community Survey, 2018-2022."
+width <- 120
+
+table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
+
+table
+
+gtsave(table, filename="tracts_housing.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo")
+
+```
+
+```{r chas-table}
+# Create table for area median income figures ----
+# sample of CHAS data for low to moderate income
+
+# function inputs
+col_select <- c("tract","location","total_households","low_to_mod_income","low_income","prc_low_or_mod_income","owner_households","low_income_owners","low_to_mod_income_owners","prc_low_or_mod_income_owners")
+order_col <- "prc_low_or_mod_income"
+dict <- c("Total HH"="total_households",
+          "Low to Mod Income #"="low_to_mod_income",
+          "Low Income #"="low_income",
+           "Low OR Mod Income %"="prc_low_or_mod_income",
+          "Owner HH #"="owner_households",
+          "Low Income Owners #"="low_income_owners",
+          "Low to Mod Income Owners #"="low_to_mod_income_owners",
+                     "Low OR Mod Income Owners %"="prc_low_or_mod_income_owners"
+          )
+title_text <- "Altadena Tracts by Location and Low-Moderate Incomes"
+footer_text <- "Ordered by Percent of Households that are Low OR Moderate Income (under 120% of HUD Area Median Family Income). HUD, Comprehensive Housing Affordability Strategy, 2017-2021."
+width <- 110
+
+table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
+
+table
+
+gtsave(table, filename="tracts_chas_hamfi.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo")
 
 ```
