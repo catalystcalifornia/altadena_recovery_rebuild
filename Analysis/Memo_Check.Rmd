@@ -428,12 +428,12 @@ dict <- c("Occupied Housing Units"="DP04_0002",
           "Owner Occupied #"="DP04_0046",
           "Owners With Mortgage #"="DP04_0091",
           "Median Value (Owners) $"="DP04_0089",
-          "Monthly Mortgage Costs $"="DP04_0093",
+          "Monthly Mortgage $"="DP04_0093",
           "Renter Occupied #"="DP04_0047",
           "Median Rent $"="DP04_0134")
 title_text <- "Altadena Tracts by Location, Housing Tenure, and Costs"
 footer_text <- "Ordered by Monthly Mortgage Costs. U.S. Census Bureau, American Community Survey, 2019-2023."
-width <- 120
+width <- 110
 
 table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
 
@@ -502,6 +502,9 @@ ggsave("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo
 # check type of structures
 table(eaton_damage$structurec,useNA="always")
 
+# filter for altadena just for this text
+eaton_damage <- eaton_damage %>% filter(city=='Altadena')
+
 # filter to get residential structures
 eaton_damage_res <- eaton_damage %>%
   filter(structurec %in% c("Single Residence","Multiple Residence","Mixed Commercial/Residential"))
@@ -518,7 +521,7 @@ eaton_damage_res_damage <- eaton_damage %>% filter(apn %in% eaton_damage_res_apn
   distinct(apn)
 
 nrow(eaton_damage_res_damage)/length(eaton_damage_res_apn)
-# about 59% are damaged in some way at least one structure on property
+# about 71.9% are damaged in some way at least one structure on property
 
 
 
