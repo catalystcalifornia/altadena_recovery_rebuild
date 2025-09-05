@@ -43,6 +43,10 @@ eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310",
 eaton_fire_simple <- eaton_fire%>%
     st_transform(4326)
 
+# damaged structures
+eaton_damage <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_dmg_insp_3310", geom="geom")
+
+
 # tract xwalk from la fires project
 tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk where fire_geoid='Eaton'")
 
@@ -435,7 +439,7 @@ table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_tex
 
 table
 
-gtsave(table, filename="tracts_housing.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo")
+gtsave(table, filename="tracts_housing.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo", vwidth = 5000, vheight = 4000)
 
 ```
 
@@ -488,5 +492,36 @@ map<-ggplot() +
   )
 
 ggsave("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo\\firemap.png", plot = map, width = 8, height = 4, dpi = 300)
+
+```
+
+
+```{r eaton-damage-test}
+# Do a quick calc of the number of residences affected by fire in at least some way at least 1% ----
+
+# check type of structures
+table(eaton_damage$structurec,useNA="always")
+
+# filter to get residential structures
+eaton_damage_res <- eaton_damage %>%
+  filter(structurec %in% c("Single Residence","Multiple Residence","Mixed Commercial/Residential"))
+
+# get unique APNs
+eaton_damage_res_apn <- unique(eaton_damage_res$apn)
+eaton_damage_res_apn <- eaton_damage_res_apn[!is.na(eaton_damage_res_apn)]
+
+# get count of these apns that have some damaged structure on them
+table(eaton_damage$damage,useNA="always")
+
+eaton_damage_res_damage <- eaton_damage %>% filter(apn %in% eaton_damage_res_apn) %>%
+  filter(!damage %in% c("Inaccessible","No Damage")) %>%
+  distinct(apn)
+
+nrow(eaton_damage_res_damage)/length(eaton_damage_res_apn)
+# about 59% are damaged in some way at least one structure on property
+
+
+
+
 
 ```
