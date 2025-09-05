@@ -25,6 +25,7 @@ library(extrafont)
 library(readxl)
 library(tidyverse)
 library(janitor)
+library(ggplot2)
 
 options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
 options(scipen=999)
@@ -50,14 +51,14 @@ lac_tracts <- tracts("CA",county="Los Angeles",year=2023)
 
 # Load in census data ----
 # load census variables
-vars <- load_variables(year = 2022, dataset = "acs5/subject")
-vars_dp <- load_variables(2022, "acs5/profile") 
+vars <- load_variables(year = 2023, dataset = "acs5/subject")
+vars_dp <- load_variables(2023, "acs5/profile") 
 
 # compared variables used in workbook samples to those in the detailed tables, selected key variables to analysis to compare and check
 # Demographics & Economics
 # DP05_001 Total Population
-# DP05_0079P White, non-hispanic %
-# DP05_0080P Black, non-hispanic %
+# DP05_0082P White, non-hispanic %
+# DP05_0083P Black, non-hispanic %
 # DP03_0119P Families below poverty level %
 # DP03_0062 Median household income
 
@@ -77,8 +78,8 @@ vars_dp <- load_variables(2022, "acs5/profile")
 
 # focus vars for this memo
 vars_select <- c("DP05_0001",
-                 "DP05_0079P",
-                "DP05_0080P",
+                 "DP05_0082P",
+                "DP05_0083P",
                 "DP03_0119P",
                 "DP03_0062",
                 "DP04_0001",
@@ -95,10 +96,10 @@ vars_select <- c("DP05_0001",
 # trim data dictionary for vars of interest so it's easily viewed later
 vars_dp_select <- vars_dp %>% filter(name %in% vars_select)
 
-# pull data from tidycensus for select vars, 2022 to match provided data
+# pull data from tidycensus for select vars, 2023 to match provided data
 census_data <- get_acs(geography = "tract", survey = "acs5", state = "CA",
                       variables = vars_select, 
-                       year = 2022, geometry = FALSE) 
+                       year = 2023, geometry = FALSE) 
 
 # Pull CHAS data ----
 # used to compare low to mod income households
@@ -374,11 +375,11 @@ gtsave(table, filename="tracts_fire_perimeter.png", path = "W:\\Project\\RDA Tea
 # check of census tracts demographics and economics
 # Demographics & Economics
 # DP05_001 Total Population
-# DP05_0079P White, non-hispanic %
-# DP05_0080P Black, non-hispanic %
+# DP05_0082P White, non-hispanic %
+# DP05_0083P Black, non-hispanic %
 # DP03_0119P Families below poverty level %
 # DP03_0062 Median household income
-pop_econ <- c("DP05_0001","DP03_0062","DP03_0119P","DP05_0079P","DP05_0080P")
+pop_econ <- c("DP05_0001","DP03_0062","DP03_0119P","DP05_0082P","DP05_0083P")
 
 # function inputs
 col_select <- c("tract","location",pop_econ)
@@ -386,11 +387,11 @@ order_col <- "DP03_0062"
 dict <- c("Total Pop"="DP05_0001",
           "Median HH Income $"="DP03_0062",
           "Families Below Poverty %"="DP03_0119P",
-          "White %"="DP05_0079P",
-          "Black %"="DP05_0080P"
+          "White %"="DP05_0082P",
+          "Black %"="DP05_0083P"
           )
 title_text <- "Altadena Tracts by Location, Median Household Income, and Population"
-footer_text <- "Ordered by Median Household Income. U.S. Census Bureau, American Community Survey, 2018-2022."
+footer_text <- "Ordered by Median Household Income. U.S. Census Bureau, American Community Survey, 2019-2023."
 width <- 115
 
 table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
@@ -427,7 +428,7 @@ dict <- c("Occupied Housing Units"="DP04_0002",
           "Renter Occupied #"="DP04_0047",
           "Median Rent $"="DP04_0134")
 title_text <- "Altadena Tracts by Location, Housing Tenure, and Costs"
-footer_text <- "Ordered by Monthly Mortgage Costs. U.S. Census Bureau, American Community Survey, 2018-2022."
+footer_text <- "Ordered by Monthly Mortgage Costs. U.S. Census Bureau, American Community Survey, 2019-2023."
 width <- 120
 
 table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
@@ -443,25 +444,49 @@ gtsave(table, filename="tracts_housing.png", path = "W:\\Project\\RDA Team\\Alta
 # sample of CHAS data for low to moderate income
 
 # function inputs
-col_select <- c("tract","location","total_households","low_to_mod_income","low_income","prc_low_or_mod_income","owner_households","low_income_owners","low_to_mod_income_owners","prc_low_or_mod_income_owners")
+col_select <- c("tract","location","total_households","low_to_mod_income","low_income","prc_low_or_mod_income","owner_households","prc_low_or_mod_income_owners")
 order_col <- "prc_low_or_mod_income"
 dict <- c("Total HH"="total_households",
           "Low to Mod Income #"="low_to_mod_income",
           "Low Income #"="low_income",
            "Low OR Mod Income %"="prc_low_or_mod_income",
           "Owner HH #"="owner_households",
-          "Low Income Owners #"="low_income_owners",
-          "Low to Mod Income Owners #"="low_to_mod_income_owners",
                      "Low OR Mod Income Owners %"="prc_low_or_mod_income_owners"
           )
 title_text <- "Altadena Tracts by Location and Low-Moderate Incomes"
-footer_text <- "Ordered by Percent of Households that are Low OR Moderate Income (under 120% of HUD Area Median Family Income). HUD, Comprehensive Housing Affordability Strategy, 2017-2021."
-width <- 110
+footer_text <- "Ordered by Percent of Households that are Low OR Moderate Income (under 120% of HUD Area Median Family Income). HUD, Comprehensive Housing Affordability Strategy Data, 2017-2021."
+width <- 115
 
 table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
 
 table
 
 gtsave(table, filename="tracts_chas_hamfi.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo")
+
+```
+
+```{r static-map}
+
+map<-ggplot() +
+  #--- fire boundary ---#
+  geom_sf(data = eaton_fire, fill=papaya, color="#FFFFFF00", alpha=.90) +
+  #--- tracts ---#
+  geom_sf(data = altadena_tracts_subset, fill="#FFFFFF00", color="#3B3B3B") +
+    geom_sf_text(
+    data = altadena_tracts_subset,
+    aes(label = tract),
+    size = 12,
+    fontface = "bold",
+    color = "black"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),  # remove major grid lines
+    axis.text = element_blank(),         # remove lat/lon text labels
+    axis.ticks = element_blank(),        # remove axis ticks
+    axis.title = element_blank()         # optional: remove axis titles
+  )
+
+ggsave("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo\\firemap.png", plot = map, width = 8, height = 4, dpi = 300)
 
 ```
