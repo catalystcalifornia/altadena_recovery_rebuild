@@ -75,7 +75,7 @@ vars_dp <- load_variables(2023, "acs5/profile")
 # Housing units value
 # DP04_0080 value owner-occupied
 # DP04_0089 median owner-occupied value
-# DP04_0091 with a mortgage of owner-occupied
+# DP04_0091 total owner-occupied units with a mortgage
 # DP04_0093 monthly owner costs with mortgage
 # DP04_0126 occupied units paying rent
 # DP04_0134 median rent
@@ -168,15 +168,17 @@ altadena_chas <- altadena_chas %>%
 altadena_chas <- altadena_chas %>%
   rowwise() %>%
   mutate(
-    low_to_mod_income=sum(c_across(all_of(chas_dict_mod$column_variable_name))), 
-      low_income=sum(c_across(all_of(chas_dict_li$column_variable_name))), 
-    total_households=sum(c_across(all_of(chas_dict_denom$column_variable_name))),
+    low_to_mod_income=sum(c_across(all_of(chas_dict_mod$column_variable_name)),na.rm=TRUE), 
+      low_income=sum(c_across(all_of(chas_dict_li$column_variable_name)),na.rm=TRUE), 
+    total_households=sum(c_across(all_of(chas_dict_denom$column_variable_name)),na.rm=TRUE),
+    low_or_mod_income=(low_income+low_to_mod_income),
     prc_low_or_mod_income=(low_income+low_to_mod_income)/total_households*100) %>%
   # owner occupied
   mutate(
-    low_to_mod_income_owners=sum(c_across(all_of(chas_dict_mod_owner$column_variable_name))), 
-      low_income_owners=sum(c_across(all_of(chas_dict_li_owner$column_variable_name))), 
-    owner_households=sum(c_across(all_of(chas_dict_denom_owner$column_variable_name))),
+    low_to_mod_income_owners=sum(c_across(all_of(chas_dict_mod_owner$column_variable_name)),na.rm=TRUE), 
+      low_income_owners=sum(c_across(all_of(chas_dict_li_owner$column_variable_name)),na.rm=TRUE), 
+    owner_households=sum(c_across(all_of(chas_dict_denom_owner$column_variable_name)),na.rm=TRUE),
+    low_or_mod_income_owners=(low_income_owners+low_to_mod_income_owners),
     prc_low_or_mod_income_owners=(low_income_owners+low_to_mod_income_owners)/ owner_households*100) %>%
   ungroup()
 
@@ -270,7 +272,7 @@ windowsFonts()
 showtext_auto()
 
 # Table function ----
-table_function <- function(df,col_select,order_col,dict, title_text, footer_text,width) {
+table_function <- function(df,col_select,order_col,dict, title_text, footer_text) {
 
   # filter dataframe for columns of interest and order the df
 df<-altadena_tracts_subset %>%
@@ -293,10 +295,10 @@ table<-df %>%
   tab_header(title=glue::glue(title_text))%>%
   # any data notes in footer
   tab_footnote(footnote=footer_text,placement="left") %>%
-  # column widths
- cols_width(
-    everything() ~ px(width)  # set maximum column width
-  ) %>%
+ #  # column widths
+ # cols_width(
+ #    everything() ~ px(width)  # set maximum column width
+ #  ) %>%
   opt_align_table_header("center")%>%
   opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
@@ -364,11 +366,11 @@ order_col <- "prc_tract_area"
 dict <- c("%_Tract_in_Fire"="prc_tract_area")
 title_text <- "Altadena Tracts by Location and Fire Perimeter"
 footer_text <- "Catalyst California's calculations based on Eaton Fire Perimeter from January 2025. Not based on structures destroyed."
-width <- 110
 
-table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text)
+table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text) %>%
+  tab_options(.,container.height=400)
 
-table
+table 
 
 gtsave(table, filename="tracts_fire_perimeter.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo")
 
@@ -395,10 +397,11 @@ dict <- c("Total Pop"="DP05_0001",
           "Black %"="DP05_0083P"
           )
 title_text <- "Altadena Tracts by Location, Median Household Income, and Population"
-footer_text <- "Ordered by Median Household Income. U.S. Census Bureau, American Community Survey, 2019-2023."
-width <- 115
+footer_text <- "Ordered by Median Household Income. Pop=population. HH=Households. U.S. Census Bureau, American Community Survey, 2019-2023."
+# width <- 115
 
-table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
+table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text)%>%
+  tab_options(.,container.width=672)
 
 table
 
@@ -416,7 +419,7 @@ gtsave(table, filename="tracts_pop_income.png", path = "W:\\Project\\RDA Team\\A
 # DP04_0047 renter occupied
 # Housing units value
 # DP04_0089 median owner-occupied value
-# DP04_0091 units with a mortgage of owner-occupied
+# DP04_0091 total owner-occupied units with a mortgage
 # DP04_0093 monthly owner costs with mortgage
 # DP04_0134 median rent
 housing <- c("DP04_0002","DP04_0046","DP04_0091","DP04_0089","DP04_0093","DP04_0047","DP04_0134")
@@ -424,22 +427,22 @@ housing <- c("DP04_0002","DP04_0046","DP04_0091","DP04_0089","DP04_0093","DP04_0
 # function inputs
 col_select <- c("tract","location",housing)
 order_col <- "DP04_0093"
-dict <- c("Occupied Housing Units"="DP04_0002",
+dict <- c("Occupied Units"="DP04_0002",
           "Owner Occupied #"="DP04_0046",
-          "Owners With Mortgage #"="DP04_0091",
-          "Median Value (Owners) $"="DP04_0089",
+          "Owners With a Mortgage #"="DP04_0091",
+          "Median Value $"="DP04_0089",
           "Monthly Mortgage $"="DP04_0093",
           "Renter Occupied #"="DP04_0047",
           "Median Rent $"="DP04_0134")
 title_text <- "Altadena Tracts by Location, Housing Tenure, and Costs"
-footer_text <- "Ordered by Monthly Mortgage Costs. U.S. Census Bureau, American Community Survey, 2019-2023."
-width <- 110
+footer_text <- "Median value is the median value of owner occupied housing units. Ordered by Monthly Mortgage Costs. U.S. Census Bureau, American Community Survey, 2019-2023."
 
-table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
+table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text)%>%
+  tab_options(.,container.width=672)
 
 table
 
-gtsave(table, filename="tracts_housing.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo", vwidth = 5000, vheight = 4000)
+gtsave(table, filename="tracts_housing.png", path = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Deliverables\\Memo")
 
 ```
 
@@ -448,20 +451,20 @@ gtsave(table, filename="tracts_housing.png", path = "W:\\Project\\RDA Team\\Alta
 # sample of CHAS data for low to moderate income
 
 # function inputs
-col_select <- c("tract","location","total_households","low_to_mod_income","low_income","prc_low_or_mod_income","owner_households","prc_low_or_mod_income_owners")
+col_select <- c("tract","location","total_households","low_or_mod_income","prc_low_or_mod_income","owner_households","low_or_mod_income_owners","prc_low_or_mod_income_owners")
 order_col <- "prc_low_or_mod_income"
 dict <- c("Total HH"="total_households",
-          "Low to Mod Income #"="low_to_mod_income",
-          "Low Income #"="low_income",
-           "Low OR Mod Income %"="prc_low_or_mod_income",
+          "Low or Mod Income #"="low_or_mod_income",
+           "Low or Mod Income %"="prc_low_or_mod_income",
           "Owner HH #"="owner_households",
-                     "Low OR Mod Income Owners %"="prc_low_or_mod_income_owners"
+                    "Low or Mod Income Owners #"="low_or_mod_income_owners",
+                     "Low or Mod Income Owners %"="prc_low_or_mod_income_owners"
           )
 title_text <- "Altadena Tracts by Location and Low-Moderate Incomes"
-footer_text <- "Ordered by Percent of Households that are Low OR Moderate Income (under 120% of HUD Area Median Family Income). HUD, Comprehensive Housing Affordability Strategy Data, 2017-2021."
-width <- 115
+footer_text <- "Ordered by Percent of Households that are Low or Moderate Income (under 120% of HUD Area Median Family Income). HH=Households. HUD, Comprehensive Housing Affordability Strategy Data, 2017-2021."
 
-table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text,width)
+table<-table_function(altadena_tracts_subset,col_select,order_col,dict,title_text,footer_text)%>%
+  tab_options(.,container.width=672)
 
 table
 
