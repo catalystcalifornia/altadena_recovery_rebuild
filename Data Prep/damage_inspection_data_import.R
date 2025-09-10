@@ -37,4 +37,6 @@ colnames(fire_shp_3310) <- tolower(colnames(fire_shp_3310))
 # 
 # dbSendQuery(con, "COMMENT ON TABLE data.eaton_fire_dmg_insp_3310 IS
 #             'Damage Inspection data for the Eaton Fire from CAL FIRE eGIS, June 2, 2025 in SRID 3310
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_import_dmg_insp.docx'")
+#             Data imported on 9-4-25
+#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_import_dmg_insp.docx
+#             Source: https://gis.data.ca.gov/datasets/CALFIRE-Forestry::california-fire-perimeters-all/explore'")
