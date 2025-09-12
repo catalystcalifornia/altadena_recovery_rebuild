@@ -1,0 +1,175 @@
+---
+title: 'Altadena Boundaries and Destroyed Properties'
+subtitle: "Operationalizing Boundaries and Definitions"
+author: "Catalyst California"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    css: "W:\\RDA Team\\R\\cc_brandguide.css"
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+<!-- link to Google Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+# Library and environment set up ----
+
+library(sf)
+# library(highcharter)
+library(rmapshaper)
+library(leaflet)
+library(htmlwidgets)
+library(tigris)
+# library(tidycensus)
+library(stringr)
+library(showtext)
+library(extrafont)
+library(readxl)
+library(tidyverse)
+library(janitor)
+# library(ggplot2)
+# options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
+options(scipen=999)
+
+# Colors and Fonts ----
+## COLORS ##
+papaya <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+## FONTS ## 
+
+font_add_google("Inter")
+
+# font_import()
+loadfonts(device = "win")
+windowsFonts()
+showtext_auto()
+
+# Load in shapes ----
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con_alt <- connect_to_db("altadena_recovery_rebuild")
+con_rda <- connect_to_db("rda_shared_data")
+con_fires <- connect_to_db("la_fires")
+
+# eaton fire shape
+eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom")
+
+eaton_fire_simple <- eaton_fire%>%
+    st_transform(4326)
+
+# damaged structures database
+eaton_damage <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_dmg_insp_3310", geom="geom")
+
+# filter for only damaged parcels and simplify
+damaged_parcels_simple <- eaton_damage %>%
+  filter(!damage %in% c("Inaccessible","No Damage")) %>%
+  transform(4326)
+
+# tract xwalk from la fires project
+tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk where fire_geoid='Eaton'")
+
+# get detailed tract boundaries from tigris to match provided maps
+lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
+
+# join to shapes and the prc intersect to get one dataframe for altadena and simplify/reduce
+altadena_tracts <- lac_tracts %>% filter(GEOID %in% tracts$tract_geoid) %>%
+  select(GEOID,NAME) %>%
+    st_transform(4326) %>%
+  left_join(tracts %>% select(tract_geoid, prc_tract_area, prc_fire_area), by=c("GEOID"="tract_geoid")) %>%
+  # limit to tracts over 5% in burn radious
+  filter(prc_tract_area>=.05)
+
+names(altadena_tracts ) <- tolower(names(altadena_tracts ))
+
+# add an indicator for west/east of lake avenue  and clean up table
+altadena_tracts <- altadena_tracts %>%
+  mutate(location=ifelse(geoid %in% c("06037460301","06037460200","06037461100","06037461000","06037460302","06037461300"), "West of Lake Ave", "East of Lake Ave")) %>%
+  select(geoid,name,location,everything())%>%
+  mutate(prc_tract_area=100*as.numeric(prc_tract_area),
+         prc_fire_area=100*prc_fire_area) 
+
+
+
+```
+
+```{r altadena-map}
+
+# map damaged parcels and check boundaries we want to use against tracts
+
+# Create a color palette based on the damage level
+table(damaged_parcels_simple$damage,useNA='always')
+
+# need a factor level first
+damaged_parcels_simple$damage_ordered <- factor(
+      damaged_parcels_simple$damage,
+      levels = c("Affected (1-9%)", "Minor (10-25%)", "Major (26-50%)", "Destroyed (>50%)") # Define the order of levels
+    )
+    
+# colors
+# affected - FF9873
+# minor - FA7B4D
+# major - F25922
+# destroyed - DF4007
+
+pal <- colorFactor(palette = c("#FF9873", "#FA7B4D", "#F25922","#DF4007"), domain = damaged_parcels_simple$damage_ordered)
+table(damaged_parcels_simple$damage_ordered,useNA='always')
+
+leaflet () %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(data=eaton_fire_simple,
+              fillColor=papaya,
+              fillOpacity=0.7,
+              color="white",
+              weight=1,
+              popup=~fire_name,
+              group="Eaton Fire Perimeter") %>%
+    addPolygons(data=altadena_tracts,
+              fillColor=peridot,
+              fillOpacity=0.7,
+              color="black",
+              weight=2,
+              popup=~name,
+              group="Census Tracts") %>%
+      addCircleMarkers(data=damaged_parcels_simple,
+        lng = ~longitude,
+        lat = ~latitude,
+        color = ~pal(damage_ordered), # Color based on category
+        radius = 3,
+        fillOpacity = 1,
+        popup = ~damage, # Optional: Add a popup
+        group="Damaged Properties"
+      ) %>%
+      # addLegend(
+      #   position = "bottomright",
+      #   pal = pal,
+      #   values = ~damage_parcels_simple$damage_ordered,
+      #   title = "Damage level"
+      # ) %>%
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Census Tracts","Damaged Properties"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+      
+
+
+
+```
+
+
+```{r table-styling}
+
+
+```
