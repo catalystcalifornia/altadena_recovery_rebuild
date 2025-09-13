@@ -84,6 +84,10 @@ tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk wher
 # get detailed tract boundaries from tigris to match provided maps
 lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
 
+# get city boundaries from tigris
+lac_places <- places(state="CA", year=2023)
+lac_places <- lac_places %>% st_transform(4326)
+
 # join to shapes and the prc intersect to get one dataframe for altadena and simplify/reduce
 altadena_tracts <- lac_tracts %>% filter(GEOID %in% tracts$tract_geoid) %>%
   select(GEOID,NAME) %>%
@@ -96,7 +100,8 @@ names(altadena_tracts ) <- tolower(names(altadena_tracts ))
 
 # add an indicator for west/east of lake avenue  and clean up table
 altadena_tracts <- altadena_tracts %>%
-  mutate(location=ifelse(geoid %in% c("06037460301","06037460200","06037461100","06037461000","06037460302","06037461300"), "West of Lake Ave", "East of Lake Ave")) %>%
+  mutate(location=ifelse(geoid %in% c("06037460301","06037460200","06037461100","06037461000","06037460302","06037461300"), 
+                         "West of Lake Ave", "East of Lake Ave"))%>%
   select(geoid,name,location,everything())%>%
   mutate(prc_tract_area=100*as.numeric(prc_tract_area),
          prc_fire_area=100*prc_fire_area) 
@@ -124,42 +129,54 @@ damaged_parcels_simple$damage_ordered <- factor(
 # major - F25922
 # destroyed - DF4007
 
-pal <- colorFactor(palette = c("#FF9873", "#FA7B4D", "#F25922","#DF4007"), domain = damaged_parcels_simple$damage_ordered)
+pal <- colorFactor(palette = c("#F9C787", "#FF9E0D", "#E76C30","#DF4007"), domain = damaged_parcels_simple$damage_ordered)
 table(damaged_parcels_simple$damage_ordered,useNA='always')
 
 leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(data=eaton_fire_simple,
-              fillColor=papaya,
-              fillOpacity=0.7,
-              color="white",
-              weight=1,
+              fillColor="white",
+              fillOpacity=0,
+              color=meteorite,
+              weight=2,
               popup=~fire_name,
               group="Eaton Fire Perimeter") %>%
     addPolygons(data=altadena_tracts,
-              fillColor=peridot,
-              fillOpacity=0.7,
-              color="black",
+              fillColor="white",
+              fillOpacity=0,
+              color=ccblue,
               weight=2,
               popup=~name,
               group="Census Tracts") %>%
+      addPolygons(data=lac_places,
+              fillColor="white",
+              fillOpacity=0,
+              color=peridot,
+              weight=1,
+              popup=~NAME,
+              group="Cities") %>%
       addCircleMarkers(data=damaged_parcels_simple,
         lng = ~longitude,
         lat = ~latitude,
-        color = ~pal(damage_ordered), # Color based on category
-        radius = 3,
+        fillColor = ~pal(damage_ordered), # Color based on category
+        radius = 1,
+        stroke=TRUE,
+        # fill=TRUE,
         fillOpacity = 1,
+        color=gainsboro,
+        weight=.5,
+        opacity=.5,
         popup = ~damage, # Optional: Add a popup
         group="Damaged Properties"
       ) %>%
-      # addLegend(
-      #   position = "bottomright",
-      #   pal = pal,
-      #   values = ~damage_parcels_simple$damage_ordered,
-      #   title = "Damage level"
-      # ) %>%
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = damaged_parcels_simple$damage_ordered,
+        title = "Damage level"
+      ) %>%
   addLayersControl(
-          overlayGroups = c("Eaton Fire Perimeter", "Census Tracts","Damaged Properties"),
+          overlayGroups = c("Eaton Fire Perimeter", "Census Tracts","Damaged Properties","Cities"),
         options = layersControlOptions(collapsed = FALSE)
   )
       
