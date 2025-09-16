@@ -135,19 +135,16 @@ lac_places_subset <- lac_places_subset %>%
 altadena_tracts <- altadena_tracts %>%
     st_transform(4326)
 
-
-
-
 ```
 
-The following explores how to define Altadena boundaries and damage categories for this mapping project. We explore CalFire's Damage Inspection Database to evaluate structure and damage combinations for the parcels that were assessed for damage. We also map the damage data, census tracts, cities, and the Eaton Fire burn area to evaluate the best boundaries to use East and West of Lake Avenue.
+The following explores how to define Altadena boundaries and damage categories. We explore CalFire's Damage Inspection Database to evaluate structure and damage combinations for the parcels in or near the Eaton Fire burn area. We also map the damaged data, census tracts, cities, and burn area to evaluate the best boundaries to use East and West of Lake Avenue for future comparisons about housing stock.
 
 
 # Structure Categories
 
-CalFire's database identifies the category of the structure assessed, e.g., commercial, infrastructure, residential. This table shows the different categories of structures assessed and their damage levels.
+CalFire's database identifies the category of the structure assessed, e.g., commercial, infrastructure, residential. This table shows the different categories of assessed structures and their damage levels. This table does not account for unique property parcels. In other words, a property could have a minor structure and a single residence, each with their own category and damage level.
 
-```{r damaged-properties}
+```{r structures}
 
 # explore damaged property characteristics
 
@@ -158,22 +155,25 @@ damaged_parcels_simple$damage_ordered <- factor(
       labels = c("Inaccessible","No Damage", "Affected","Minor","Major","Destroyed")
     )
 
+# look at damage level by structure category
 damaged_parcels_simple %>% st_drop_geometry() %>%
-  tabyl(structurec,damage_ordered) %>%
+  rename(Category=structurec) %>%
+  tabyl(Category,damage_ordered) %>%
   adorn_totals(c("row","col")) %>%
   adorn_percentages("row")   %>%
-  adorn_pct_formatting(digits = 1) %>%
+  adorn_pct_formatting(digits = 0) %>%
   adorn_ns() %>% 
   kable()
 
-# explore structuret and c combined
+# explore structuret and c combined - how do they relate?
 structure_type_cat <- table(damaged_parcels_simple$structuret,  damaged_parcels_simple$structurec) %>% as.data.frame()
 # structuret for most part nests within structure c
 
 # let's check if any apns have multiple structure categories other than other minor structure
 unique_parcel_count <- length(unique(damaged_parcels_simple$apn))
-# 11068, use this to make sure we don't go over this number
+# 11068, use this to make sure we don't go over or under this number when checking for duplicates
 
+# unique parcels by apn and address
 unique_parcels_addresses <- damaged_parcels_simple %>%
   st_drop_geometry() %>%
   group_by(apn, streetnumb, streetname, streettype, city) %>%
@@ -196,24 +196,26 @@ dup_parcels <- unique_parcels_addresses %>%
 # But even ones with some structures destroyed and others not, have misfortunate/calamity status see 5751021036
 # 2601 DOVE CREEK LN, NO A still has misfortune/calamity status approved https://portal.assessor.lacounty.gov/parceldetail/5751021004
 
-# let's map single family residences with different damage levels
-# let's map multifamily residences with different damage levels
-# let's map apns with mixed used separately -- do we include these?
+# let's explore and map single family residences with different damage levels
+# let's explore and map multifamily residences with different damage levels
 
 ```
 
 ## Properties with Mixed Structure Categories
-CalFire damage data is at the structure or building level, meaning that each separate structure on a property is given a different structure category and damage assessment. To analyze the data, we will need to identify how best to categorize mixed properties.
+CalFire damage data is provided at the structure or building level. In other words, each separate structure on a property is given a different structure category and damage assessment. To analyze the data, we will need to identify how best to categorize mixed properties.
 
-Some properties may have mixed structure types, e.g., both a single residence and commercial use. This table shows the combination categories for unique parcel numbers with multiple structure categories. Assessor data will help us filter for parcels currently being used for residential in cases like these where multiple categories are recorded. Most cases with two or more category types are due to a minor structure and a single or multiple residence. Other minor structures tend to be garages from our mapping checks online. Rather than developing a typology with CalFire's data, we will select residential properties based on use codes from the L.A. County Assessor's office. 
+Some properties may have mixed structure types, e.g., both a single residence and commercial use. This table shows the combination categories for unique parcels with multiple structures and structure categories. L.A. County Assessor data will help us filter for parcels currently being used for residential or mixed use in cases like these where multiple categories are recorded. 
 
-```{r}
-# go back to structure types, how can we filter for structures that are residential? What are the combinations?
+Most cases with two or more category types are due to a minor structure and a single or multiple residence. Minor structures tend to be garages from our mapping checks online. Rather than developing a typology from CalFire's data, we will select residential properties based on use codes from the L.A. County Assessor's office. We will largely be focusing on properties with residential use codes, but may included mixed-use properties if we are able to distinguish the square footage/units lost particular to the residential part.
+
+```{r structures-mixed}
+
+# first go back to structure types, how can we filter for structures that are residential? What are the combinations? Or do we rely on assessor data?
 # create a single address field
 damaged_parcels_simple <- damaged_parcels_simple %>%
   mutate(full_address=paste0(streetnumb, " ", streetname, " ", streettype, ", ", city))
 
-# get a list of parcels with different damage levels and structure categories
+# get a list of parcels with different damage levels and structure categories, keep addresses
 unique_parcels <- damaged_parcels_simple %>%
   st_drop_geometry() %>%
   group_by(apn) %>%
@@ -234,6 +236,7 @@ unique_parcels$structure_category_list <- lapply(unique_parcels$structure_catego
 # sort list of damage for easier grouping later
 unique_parcels$damage_type_list <- lapply(unique_parcels$damage_type_list,sort)
 
+# properties with combined structure category types--what are the combos?
 unique_parcels %>%
   st_drop_geometry() %>%
   filter(structure_category_count>=2) %>%
@@ -243,21 +246,24 @@ group_by(structure_category_list) %>%
   ungroup() %>%
   select(structure_category_label, count) %>%
   arrange(count) %>%
+  rename(Categories=structure_category_label,
+         Count=count) %>%
   kable()
 
-# approximately less than 50 have some sort of mix with residential/nonresidential/infrastructure
+# approximately less than 50 have some sort of mix with residential/nonresidential/infrastructure, most are either residential or commercial
+# we'll probably just use assessor data to filter for use codes of residential, might look for mixed commercial but we may be unable to distinguish unit size lost for those unless it's easy to distinguish the unit size lost separate from commercial square footage
 
 
 ```
 
 
 
-# Properties with Mixed Damage Levels
-Each structure on a property is given a separate damage level. One property could have a structure marked as 'Destroyed' and another structure marked as 'No Damage'.
-How do we treat these mixed damage level properties?
+# Damage Categories
+Each structure on a property is given a separate damage level. One property could have a structure marked as 'Destroyed' and another structure marked as 'No Damage'. We will need to analyze the properties lost to the fire and in need of rebuilding. To do this, we will need to determine a typology for categorizing a property as lost. L.A. County Assessor data that includes the property square footage and units is provided at the parcel level, which would make matching CalFire's structure-level damage data challenging. Instead, we will use CalFire's damage data to distinguish between residential parcels still standing and not in need of rebuilding versus those that are significantly damaged or destroyed and in need of rebuilding.
 
-This first table shows the combination of damage levels for properties with at least one residential use and two or more damage levels. The majoried of mixed damage levels include Destroyed + Affected or Destroyed + No Damage. The next most common are Affected + No Damage.
-```{r map-single-residential-properties-multiple-damage}
+This first table shows the combination of damage levels for properties with at least one residential use and two or more damage levels. The majority of mixed damage levels include Destroyed and Affected or Destroyed and No Damage. The next most common are Affected and No Damage.
+
+```{r damage}
 
 # what's the target list to include
 target <- list("Mixed Commercial/Residential","Multiple Residence","Single Residence")
@@ -270,7 +276,7 @@ df_any_res <- unique_parcels %>%
   filter(target_check == TRUE)
 
 
-# tabulate the combo damage levels
+# tabulate the combo damage levels for some residential use properties
 df_any_res %>%
   st_drop_geometry() %>%
   group_by(damage_type_list) %>%
@@ -278,7 +284,9 @@ df_any_res %>%
             damage_type_label=toString(unlist(unique(damage_type_list)))) %>%
   ungroup() %>%
   select(damage_type_label, count) %>%
-  arrange(count) %>%
+  rename('Damage Type'=damage_type_label,
+         Count=count) %>%
+  arrange(Count) %>%
   kable()
 
 # take out a couple of records that are inaccessible & no damage
@@ -290,8 +298,9 @@ unique_parcels <- unique_parcels %>%
 
 
 ## Single Residences with Multiple Damage Levels
-This map plots the properties labeled as single residences that have multiple damage levels. This is mapped to evaluate whether these properties with mixed damage levels are liveable or not. How should they be treated in the analysis?
-```{r}
+This map plots the properties labeled as single residences that have multiple damage levels. This is mapped to evaluate whether these properties with mixed damage levels are liveable or not.
+
+```{r single-mixed}
 
 # what's the target list for this map -- have to include other minor structure due to detached garages
 target <- list("Single Residence", "Other Minor Structure")
@@ -306,15 +315,15 @@ df_single <- unique_parcels %>%
 # there are a couple of apns with just other minor structure but they appear to be single family from the parcel maps: see 5751001003
 # https://portal.assessor.lacounty.gov/parceldetail/5751001003
 
-# tabulate the combo damage levels
-df_single %>%
-  st_drop_geometry() %>%
-group_by(damage_type_list) %>%
-  summarize(count=n(),
-            damage_type_label=toString(unlist(unique(damage_type_list)))) %>%
-  ungroup() %>%
-  select(damage_type_label, count) %>%
-  arrange(count)
+# # tabulate the combo damage levels
+# df_single %>%
+#   st_drop_geometry() %>%
+# group_by(damage_type_list) %>%
+#   summarize(count=n(),
+#             damage_type_label=toString(unlist(unique(damage_type_list)))) %>%
+#   ungroup() %>%
+#   select(damage_type_label, count) %>%
+#   arrange(count)
 # Mostly 
 # Affected (1-9%), No Damage	182			
 # Affected (1-9%), Destroyed (>50%)	216			
@@ -344,7 +353,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               color=meteorite,
               weight=2.5,
               opacity=1,
-              popup=~fire_name,
+              popup=~"Eaton Fire Burn Area",
               group="Eaton Fire Perimeter") %>%
       addPolygons(data=lac_places_subset,
               fillColor="white",
@@ -386,52 +395,45 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 
 ```
 
-I randomly selected 5 properties from the list to explore their damage combos. Most even with only affected damage still have misfortune and calamity status approved for their tax bills.
+I randomly selected 5 properties from the list to explore their damage combinations. Most even with only affected damage still have misfortune or calamity status approved for their tax bills. This is a status that property owners can apply for to receive a temporary reduction on their property taxes.
+
 ```{r}
 # randomly select some parcels to test
 sample <- sample_n(df_single,5)
-# retrieved parcels below
+# retrieved parcels below - this will produce a random list of 5 each time
+# qa should focus on five people, not trying to reproduce the same 5
 
 ```
 
-Parcel Number: 5835017027
+* Parcel Number: 5835017027
+  Notes: A standing house with destroyed structures behind it and calamity status approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5835017027
 
-Notes: A standing house with destroyed structures behind it and calamity status approved.
+* Parcel Number: 5840022039
+  Notes: Property looks completely destroyed though it's only marked as Affected and No Damage. Calamity status is approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5840022039
 
-https://portal.assessor.lacounty.gov/parceldetail/5835017027
+* Parcel Number: 5857014006
+  Notes: Unclear what structured on the property has been affected. Calamity status approved. Marked as Affected and No Damage.
+  https://portal.assessor.lacounty.gov/parceldetail/5857014006
 
-Parcel Number: 5840022039
+* Parcel Number: 5845031013
+  Notes: Garage is destroyed. Unclear how house is damaged. Calamity status is approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5845031013
 
-Notes: Looks completely destroyed though it's only marked as Affected and No Damage. Calamity status is approved.
-
-https://portal.assessor.lacounty.gov/parceldetail/5840022039
-
-Parcel Number: 5857014006
-
-Notes: Unclear what structured on the property has been affected. Calamity status approved. Marked as Affected and No Damage.
-
-https://portal.assessor.lacounty.gov/parceldetail/5857014006
-
-Parcel Number: 5845031013
-
-Notes: Garage is destroyed. Unclear how house is damaged. Calamity status is approved.
-
-https://portal.assessor.lacounty.gov/parceldetail/5845031013
-
-Parcel Number: 5828008010
-
-Notes: Minor damage noted, but garage and house seem fully intact. House is a block from Lincoln Avenue. Calamity status approved.
-
-https://portal.assessor.lacounty.gov/parceldetail/5828008010
+* Parcel Number: 5828008010
+  Notes: Minor damage noted, but garage and house seem fully intact. House is a block from Lincoln Avenue. Calamity status is approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5828008010
 
 ## Multiple Residences with Multiple Damage Levels
 This map plots the properties labeled as multiple residences that have multiple damage levels. A few that have no or affected damage are noteably outside of the fire perimeter.
-```{r}
+
+```{r multiple-mixed}
 
 # what's the target list for this map -- have to include other minor structure due to detached garages
 target <- list("Multiple Residence", "Other Minor Structure")
 
-# filter for parcels that have more than 2 damage levels and that are single residences
+# filter for parcels that have more than 2 damage levels and that are multiple residences
 df_multiple <- unique_parcels %>%
   filter(damage_type_count>=2) %>%
   mutate(target_check = map_lgl(structure_category_list, ~any(!(. %in% target)))) %>%
@@ -439,7 +441,6 @@ df_multiple <- unique_parcels %>%
   filter(target_check == FALSE)
 
 # take out those only labels as other minor structure--they would have been mapped in previous one
-# take out a couple of records that are inaccessible & no damage
 df_multiple <- df_multiple %>%
   filter(!as.character(structure_category_list) == 'Other Minor Structure')
 
@@ -473,7 +474,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               color=meteorite,
               weight=2.5,
               opacity=1,
-              popup=~fire_name,
+              popup=~"Eaton Fire Burn Area",
               group="Eaton Fire Perimeter") %>%
       addPolygons(data=lac_places_subset,
               fillColor="white",
@@ -514,53 +515,47 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 
 
 ```
-I randomly selected 5 properties from the list to explore their damage combination. Most even with only affected damage still have misfortune and calamity status approved for their tax bills.
+I randomly selected 5 properties from the list to explore their damage combination. Most even with only affected damage still have misfortune and calamity status approved for their tax bills. Importantly, sometimes CalFire's database assigns the same parcel numbers to condominiums or multi-family properties that may have separate parcel numbers in L.A. County Assessor data. To join the two data sources, we will need to join points from CalFire's data to parcel polygons from the L.A. County Assessor, or join properties by a combination of address and parcel number.
+
 ```{r}
 # randomly select some parcels to test
 sample <- sample_n(df_multiple,5)
 # retrieved parcels below
 ```
 
-Parcel Number: 5840015030
+* Parcel Number: 5840015030
+  Notes: Condo with a couple of destroyed buildings on it and calamity status approved. In this case, all 5 structures share the same parcel number.
+  https://portal.assessor.lacounty.gov/parceldetail/5840015030
 
-Notes: Condo with a couple of destroyed buildings on it and calamity status approved. All 5 structures share the same parcel number.
+* Parcel Number: 5853008008
+  Notes: Multi-family property with three units. Property is outside of the burn area. Calamity status is approved, but the units seem to be intact. They are noted as sustaining no or affected damage.
+  https://portal.assessor.lacounty.gov/parceldetail/5853008008
 
-https://portal.assessor.lacounty.gov/parceldetail/5840015030
+* Parcel Number: 5845016006
+  Notes: Multi-family property with three units. Calamity status is approved and the property is completely gone.
+  https://portal.assessor.lacounty.gov/parceldetail/5845016006
 
-Parcel Number: 5853008008
+* Parcel Number: 5751008029
+  Notes: Condo complex with one building destroyed. Calamity status is approved, and property is delinquent on taxes. Complex is all on one parcel.
+  https://portal.assessor.lacounty.gov/parceldetail/5751008029
 
-Notes: Mulit-family property with three units. Property is outside of burn area. Calamity status is approved, but the units seem to be intact. They are noted as sustaining no or affected damage.
-
-https://portal.assessor.lacounty.gov/parceldetail/5853008008
-
-Parcel Number: 5845016006
-
-Notes: Multi-family property with three units. Calamity status is approved and the property is completely gone.
-
-https://portal.assessor.lacounty.gov/parceldetail/5845016006
-
-Parcel Number: 5751008029
-
-Notes: Condo complex with one building destroyed. Calamity status is approved, and property is delinquent on taxes. Complex is all on one parcel.
-
-https://portal.assessor.lacounty.gov/parceldetail/5751008029
-
-Parcel Number: 5844001010
-
-Notes: Multi-family property with one building destroyed and calamity status approved.
-
-https://portal.assessor.lacounty.gov/parceldetail/5844001010 
+* Parcel Number: 5844001010
+  Notes: Multi-family property with one building destroyed and calamity status approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5844001010 
 
 
 # Proposed Damage Categories
 To focus on properties that sustained greater damage and make the data findings more easily interpretable (by including fewer categories), we can group damage levels as follows:
 
-* No Damage, Inaccessible, Affected alone or in combination in each other would be considered as Little to No Damage.
-* Minor Damage alone or in combination with No Damage, Inaccessible, or Affected would be considered Some Damage.
-* Major Damage or Destroyed alone or in combination with another category would be considered Significant Damage or Destroyed.
+* Little to No Damage: No Damage, Inaccessible, or Affected (1-9%) alone or in combination with each other.
+
+* Some Damage: Minor Damage (10-25%) alone or in combination with No Damage, Inaccessible, or Affected. This could also be grouped with the Little to No Damage category.
+
+* Significant Damage or Destroyed: Major Damage (26-50%) or Destroyed (>50%) alone or in combination with another category.
 
 ## Little to No Damage
 These properties with at least some residential use would be considered as little to no damage. They sustained no or affected damage.
+
 ```{r}
 
 # what's the target list 
@@ -572,7 +567,7 @@ df_no_damage <- df_any_res %>%
   # filter for only parcels where no other damage type turns up
   filter(target_check == FALSE)
 
-# filter for these properties to mape
+# filter for these properties to map
 df_map <- damaged_parcels_simple %>%
   filter(apn %in% df_no_damage$apn)
 
@@ -586,7 +581,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               color=meteorite,
               weight=2.5,
               opacity=1,
-              popup=~fire_name,
+              popup=~"Eaton Fire Burn Area",
               group="Eaton Fire Perimeter") %>%
       addPolygons(data=lac_places_subset,
               fillColor="white",
@@ -629,7 +624,8 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 
 
 ## Some Damage
-These properties with at least some residential use would be considered as sustaining some damage. They sustained at most minor damage (10-25%) and more than affected damage (1-9%).
+These properties with at least some residential use would be considered as sustaining some damage. They sustained at most minor damage (10-25%). These properties could also be combined with Little to No Damage.
+
 ```{r}
 
 # what's the target list 
@@ -641,7 +637,7 @@ df_some_damage <- df_any_res %>%
   # filter for only parcels where no other damage type turns up
   filter(target_check == FALSE)
 
-# filter for these properties to map and exclude the ones from the first 
+# filter for these properties to map and exclude the ones from the first list of little to no damage
 df_map <- damaged_parcels_simple %>%
   filter(apn %in% df_some_damage$apn) %>%
   filter(!apn %in% df_no_damage$apn) 
@@ -656,7 +652,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               color=meteorite,
               weight=2.5,
               opacity=1,
-              popup=~fire_name,
+              popup=~"Eaton Fire Burn Area",
               group="Eaton Fire Perimeter") %>%
       addPolygons(data=lac_places_subset,
               fillColor="white",
@@ -699,6 +695,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 
 ## Significant Damage or Destroyed
 These properties with at least some residential use would be considered as sustaining significant damage or were destroyed. They sustained at least major damage (26-50%).
+
 ```{r}
 
 # what's the target list 
@@ -710,7 +707,7 @@ df_destroyed <- df_any_res %>%
   # filter for only parcels where at least one of these damage levels turns up
   filter(target_check == TRUE)
 
-# filter for these properties to map and exclude the ones from the first 
+# filter for these properties to map 
 df_map <- damaged_parcels_simple %>%
   filter(apn %in% df_destroyed$apn)
 
@@ -724,7 +721,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               color=meteorite,
               weight=2.5,
               opacity=1,
-              popup=~fire_name,
+              popup=~"Eaton Fire Burn Area",
               group="Eaton Fire Perimeter") %>%
       addPolygons(data=lac_places_subset,
               fillColor="white",
@@ -765,14 +762,16 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 
 ```
 
-# Eaton Fire Boundary Compared to Damaged/Destroyed Properties, Cities, and Tract Boundaries
-Map only displays residential or mixed use properties that sustained at least an "affected (1-9%)" damage level. Kinneloa Mesa did not sustain any damage. Notably, some properties marked as destroyed fall just slightly outside of the burn area, meaning when selecting parcels from the Assessor data to analyze, we might need to rely on parcel numbers or addresses to select parcels rather than joins to the burn area. The burn area might intersect with the parcel boundaries. Only parcels in the burn area or sustaining at least some damage would be included in the detailed analysis.
+# Eaton Fire Boundary Compared to Damaged Properties, Cities, and Tract Boundaries
+This map displays residential or mixed use properties that sustained at least an affected (1-9%) damage level. The purpose of this map is to confirm boundaries for analysis, e.g., West Altadena to include the burn area West of Lake Avenue and East Altadena/Pasadena to include the burn area East of Lake Avenue and West of Michillinda.
+
+Kinneloa Mesa did not sustain any damage so it would largely not be included in the analysis. Notably, some properties marked as destroyed fall just slightly outside of the burn area. The burn area might intersect with the parcel boundaries - data we are in progress of receiving. Only parcels in the burn area or sustaining at least some damage would be included in the detailed analysis. We can choose to include or not include properties that sustained at least a little damage but are outside of the official burn area.
 
 ```{r altadena-map}
 
 # map damaged parcels and check boundaries we want to use against tracts and places
 
-# for purpose of boundary mapping, let's just map properties that were damaged, regardless if they are duplicates and let's focus on residential propertieis
+# for purpose of boundary mapping, let's just map properties that were damaged, regardless if they are duplicates and let's focus on residential properties
 only_damaged_parcels <- damaged_parcels_simple %>%
   filter(!damage %in% c("No Damage", "Inaccessible")) %>%
   filter(structurec %in% c("Mixed Commercial/Residential","Multiple Residence","Single Residence","Other Minor Structure"))
