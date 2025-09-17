@@ -1,0 +1,852 @@
+---
+title: 'Altadena Boundaries and Destroyed Properties'
+subtitle: "Operationalizing Boundaries and Damage Categories"
+author: "Catalyst California"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    css: "W:\\RDA Team\\R\\cc_brandguide.css"
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+<!-- link to Google Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+# Library and environment set up ----
+
+library(sf)
+library(dplyr)
+# library(highcharter)
+library(rmapshaper)
+library(leaflet)
+library(htmlwidgets)
+library(tigris)
+# library(tidycensus)
+library(stringr)
+library(showtext)
+library(extrafont)
+library(readxl)
+library(tidyverse)
+library(janitor)
+library(flextable)
+library(kableExtra)
+# library(ggplot2)
+# options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
+options(scipen=999)
+
+# Colors and Fonts ----
+## COLORS ##
+papaya <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+## FONTS ## 
+
+font_add_google("Inter")
+
+# font_import()
+loadfonts(device = "win")
+windowsFonts()
+showtext_auto()
+
+# Load in and prep shapes ----
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con_alt <- connect_to_db("altadena_recovery_rebuild")
+con_rda <- connect_to_db("rda_shared_data")
+con_fires <- connect_to_db("la_fires")
+
+# eaton fire shape -
+eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom")
+
+
+# damaged structures database -
+eaton_damage <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_dmg_insp_3310", geom="geom")
+
+## filter for only damaged parcels and simplify
+damaged_parcels_simple <- eaton_damage %>%
+  transform(4326)
+
+
+# tract xwalk from la fires project -
+tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk where fire_geoid='Eaton'")
+
+
+# get detailed tract boundaries from tigris to match provided maps -
+lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
+
+## join to lafire xwalk to get prc intersect and detailed tract shapes in one dataframe for altadena
+altadena_tracts <- lac_tracts %>% filter(GEOID %in% tracts$tract_geoid) %>% select(GEOID,NAME) %>%
+  left_join(tracts %>% select(tract_geoid, prc_tract_area, prc_fire_area), by=c("GEOID"="tract_geoid")) %>%
+  # limit to tracts over 5% in burn radius
+  filter(prc_tract_area>=.05)
+
+# add an indicator for west/east of lake avenue  and clean up table
+names(altadena_tracts ) <- tolower(names(altadena_tracts ))
+
+altadena_tracts <- altadena_tracts %>%
+  mutate(location=ifelse(geoid %in% c("06037460301","06037460200","06037461100","06037461000","06037460302","06037461300"), 
+                         "West of Lake Ave", "East of Lake Ave"))%>%
+  select(geoid,name,location,everything())%>%
+  mutate(prc_tract_area=100*as.numeric(prc_tract_area),
+         prc_fire_area=100*prc_fire_area) 
+
+
+# get city boundaries from tigris for mapping -
+lac_places <- places(state="CA", year=2023)
+
+## reduce to places around altadena which requires a spatial join with census tracts
+## check geometries
+st_crs(altadena_tracts)
+st_crs(lac_places)
+## 4269 which is a coordinate reference system but not a projection, we need to transform to a projection
+
+altadena_tracts <- altadena_tracts %>% st_transform(3310)
+lac_places <- lac_places %>% st_transform(3310)
+
+st_crs(lac_places)
+## now its a projection
+
+## subset places to those in/around tracts
+lac_places_subset <- lac_places[altadena_tracts, op=st_intersects]
+
+## clean up column names
+names(lac_places_subset) <- tolower(names(lac_places_subset))
+
+
+# Make sure all polygons are in 4326
+eaton_fire <- eaton_fire %>%
+    st_transform(4326)
+
+lac_places_subset <- lac_places_subset %>%
+    st_transform(4326)
+
+altadena_tracts <- altadena_tracts %>%
+    st_transform(4326)
+
+```
+
+The following explores how to define Altadena boundaries and damage categories. We explore CalFire's Damage Inspection Database to evaluate structure and damage combinations for the parcels in or near the Eaton Fire burn area. We also map the damaged data, census tracts, cities, and burn area to evaluate the best boundaries to use East and West of Lake Avenue for future comparisons about housing stock.
+
+
+# Structure Categories
+
+CalFire's database identifies the category of the structure assessed, e.g., commercial, infrastructure, residential. This table shows the different categories of assessed structures and their damage levels. This table does not account for unique property parcels. In other words, a property could have a minor structure and a single residence, each with their own category and damage level.
+
+```{r structures}
+
+# explore damaged property characteristics
+
+# need a factor level first
+damaged_parcels_simple$damage_ordered <- factor(
+      damaged_parcels_simple$damage,
+      levels = c("Inaccessible","No Damage", "Affected (1-9%)", "Minor (10-25%)", "Major (26-50%)", "Destroyed (>50%)"), # Define the order of levels
+      labels = c("Inaccessible","No Damage", "Affected","Minor","Major","Destroyed")
+    )
+
+# look at damage level by structure category
+damaged_parcels_simple %>% st_drop_geometry() %>%
+  rename(Category=structurec) %>%
+  tabyl(Category,damage_ordered) %>%
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("row")   %>%
+  adorn_pct_formatting(digits = 0) %>%
+  adorn_ns() %>% 
+  kable()
+
+# explore structuret and c combined - how do they relate?
+structure_type_cat <- table(damaged_parcels_simple$structuret,  damaged_parcels_simple$structurec) %>% as.data.frame()
+# structuret for most part nests within structure c
+
+# let's check if any apns have multiple structure categories other than other minor structure
+unique_parcel_count <- length(unique(damaged_parcels_simple$apn))
+# 11068, use this to make sure we don't go over or under this number when checking for duplicates
+
+# unique parcels by apn and address
+unique_parcels_addresses <- damaged_parcels_simple %>%
+  st_drop_geometry() %>%
+  group_by(apn, streetnumb, streetname, streettype, city) %>%
+  summarise(structure_count=n(),
+            structure_category_list = list(unique(structurec)),
+            structure_type_list = list(unique(structuret)),
+            damage_types_list=list(unique(damage))) %>%
+  ungroup()
+# grouping by addresses and apn resulted still in duplicate records, why?
+# there are 11520 records here
+# let's check where there are duplicates
+
+dup_parcels <- unique_parcels_addresses %>%
+  group_by(apn) %>%
+  summarise(address_count=n()) %>%
+  filter(address_count>=2) %>%
+  ungroup () %>%
+  left_join(unique_parcels_addresses)
+# ones with the most duplicates are condos or larger multifamily properties
+# But even ones with some structures destroyed and others not, have misfortunate/calamity status see 5751021036
+# 2601 DOVE CREEK LN, NO A still has misfortune/calamity status approved https://portal.assessor.lacounty.gov/parceldetail/5751021004
+
+# let's explore and map single family residences with different damage levels
+# let's explore and map multifamily residences with different damage levels
+
+```
+
+## Properties with Mixed Structure Categories
+CalFire damage data is provided at the structure or building level. In other words, each separate structure on a property is given a different structure category and damage assessment. To analyze the data, we will need to identify how best to categorize mixed properties.
+
+Some properties may have mixed structure types, e.g., both a single residence and commercial use. This table shows the combination categories for unique parcels with multiple structures and structure categories. L.A. County Assessor data will help us filter for parcels currently being used for residential or mixed use in cases like these where multiple categories are recorded. 
+
+Most cases with two or more category types are due to a minor structure and a single or multiple residence. Minor structures tend to be garages from our mapping checks online. Rather than developing a typology from CalFire's data, we will select residential properties based on use codes from the L.A. County Assessor's office. We will largely be focusing on properties with residential use codes, but may included mixed-use properties if we are able to distinguish the square footage/units lost particular to the residential part.
+
+```{r structures-mixed}
+
+# first go back to structure types, how can we filter for structures that are residential? What are the combinations? Or do we rely on assessor data?
+# create a single address field
+damaged_parcels_simple <- damaged_parcels_simple %>%
+  mutate(full_address=paste0(streetnumb, " ", streetname, " ", streettype, ", ", city))
+
+# get a list of parcels with different damage levels and structure categories, keep addresses
+unique_parcels <- damaged_parcels_simple %>%
+  st_drop_geometry() %>%
+  group_by(apn) %>%
+  summarise(structure_count=n(),
+            structure_category_list = list(unique(structurec)),
+            structure_category_count=length(unique(structure_category_list[[1]])),
+            structure_type_list = list(unique(structuret)),
+            structure_type_count=length(unique(structure_type_list[[1]])),
+            damage_type_list=list(unique(damage)),
+            damage_type_count=length(unique(damage_type_list[[1]])),
+            address_list = list(unique(full_address)),
+            address_count=length(unique(address_list[[1]]))) %>%
+  ungroup()
+
+# sort list of structure category for easier grouping later
+unique_parcels$structure_category_list <- lapply(unique_parcels$structure_category_list,sort)
+
+# sort list of damage for easier grouping later
+unique_parcels$damage_type_list <- lapply(unique_parcels$damage_type_list,sort)
+
+# properties with combined structure category types--what are the combos?
+unique_parcels %>%
+  st_drop_geometry() %>%
+  filter(structure_category_count>=2) %>%
+group_by(structure_category_list) %>%
+  summarize(count=n(),
+            structure_category_label=toString(unlist(unique(structure_category_list)))) %>%
+  ungroup() %>%
+  select(structure_category_label, count) %>%
+  arrange(count) %>%
+  rename(Categories=structure_category_label,
+         Count=count) %>%
+  kable()
+
+# approximately less than 50 have some sort of mix with residential/nonresidential/infrastructure, most are either residential or commercial
+# we'll probably just use assessor data to filter for use codes of residential, might look for mixed commercial but we may be unable to distinguish unit size lost for those unless it's easy to distinguish the unit size lost separate from commercial square footage
+
+
+```
+
+
+
+# Damage Categories
+Each structure on a property is given a separate damage level. One property could have a structure marked as 'Destroyed' and another structure marked as 'No Damage'. We will need to analyze the properties lost to the fire and in need of rebuilding. To do this, we will need to determine a typology for categorizing a property as lost. L.A. County Assessor data that includes the property square footage and units is provided at the parcel level, which would make matching CalFire's structure-level damage data challenging. Instead, we will use CalFire's damage data to distinguish between residential parcels still standing and not in need of rebuilding versus those that are significantly damaged or destroyed and in need of rebuilding.
+
+This first table shows the combination of damage levels for properties with at least one residential use and two or more damage levels. The majority of mixed damage levels include Destroyed and Affected or Destroyed and No Damage. The next most common are Affected and No Damage.
+
+```{r damage}
+
+# what's the target list to include
+target <- list("Mixed Commercial/Residential","Multiple Residence","Single Residence")
+
+# filter for parcels that have more than 2 damage levels and that have at least one identified residential use
+df_any_res <- unique_parcels %>%
+  filter(damage_type_count>=2) %>%
+  mutate(target_check = map_lgl(structure_category_list, ~any((. %in% target)))) %>%
+  # filter for only parcels where at least one category is in our list
+  filter(target_check == TRUE)
+
+
+# tabulate the combo damage levels for some residential use properties
+df_any_res %>%
+  st_drop_geometry() %>%
+  group_by(damage_type_list) %>%
+  summarize(count=n(),
+            damage_type_label=toString(unlist(unique(damage_type_list)))) %>%
+  ungroup() %>%
+  select(damage_type_label, count) %>%
+  rename('Damage Type'=damage_type_label,
+         Count=count) %>%
+  arrange(Count) %>%
+  kable()
+
+# take out a couple of records that are inaccessible & no damage
+unique_parcels <- unique_parcels %>%
+  filter(!as.character(damage_type_list) == 'c("Inaccessible", "No Damage")')
+# 11066 records left
+
+```
+
+
+## Single Residences with Multiple Damage Levels
+This map plots the properties labeled as single residences that have multiple damage levels. This is mapped to evaluate whether these properties with mixed damage levels are liveable or not.
+
+```{r single-mixed}
+
+# what's the target list for this map -- have to include other minor structure due to detached garages
+target <- list("Single Residence", "Other Minor Structure")
+
+# filter for parcels that have more than 2 damage levels and that are single residences
+df_single <- unique_parcels %>%
+  filter(damage_type_count>=2) %>%
+  mutate(target_check = map_lgl(structure_category_list, ~any(!(. %in% target)))) %>%
+  # filter for only parcels where category is in our target list--excludes any case where at least one category doesn't meet our list
+  filter(target_check == FALSE)
+
+# there are a couple of apns with just other minor structure but they appear to be single family from the parcel maps: see 5751001003
+# https://portal.assessor.lacounty.gov/parceldetail/5751001003
+
+# # tabulate the combo damage levels
+# df_single %>%
+#   st_drop_geometry() %>%
+# group_by(damage_type_list) %>%
+#   summarize(count=n(),
+#             damage_type_label=toString(unlist(unique(damage_type_list)))) %>%
+#   ungroup() %>%
+#   select(damage_type_label, count) %>%
+#   arrange(count)
+# Mostly 
+# Affected (1-9%), No Damage	182			
+# Affected (1-9%), Destroyed (>50%)	216			
+# Destroyed (>50%), No Damage	387	
+
+# revise factor level for this map and others from now on -- using original dataframe for mapping that is ungrouped so we can see locations and distinctions
+damaged_parcels_simple$damage_ordered <- factor(
+      damaged_parcels_simple$damage,
+      levels = c("Inaccessible","No Damage", "Affected (1-9%)", "Minor (10-25%)", "Major (26-50%)", "Destroyed (>50%)"), # Define the order of levels
+      labels = c("Inaccessible","No Damage", "Affected","Minor","Major","Destroyed")
+    )
+
+pal <- colorFactor(palette = c("#6F6F6F","#909078","#177FEB", "#4886BD", "#CC983F","#FF9E0D"), domain = damaged_parcels_simple$damage_ordered)
+
+
+# filter for these properties single resident properties
+df_map <- damaged_parcels_simple %>%
+  filter(apn %in% df_single$apn)
+
+
+leaflet () %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+    setView(-118.104631, 34.185104, zoom = 12) %>%
+  addPolygons(data=eaton_fire,
+              fillColor="white",
+              fillOpacity=0,
+              color=meteorite,
+              weight=2.5,
+              opacity=1,
+              popup=~"Eaton Fire Burn Area",
+              group="Eaton Fire Perimeter") %>%
+      addPolygons(data=lac_places_subset,
+              fillColor="white",
+              fillOpacity=0,
+              color=peridot,
+              weight=1.5,
+              opacity=1,
+              popup=~name,
+              group="Cities") %>%
+      addCircleMarkers(data=df_map,
+        lng = ~longitude,
+        lat = ~latitude,
+        fillColor = ~pal(damage_ordered), # Color based on category
+        radius = 2,
+        stroke=TRUE,
+        # fill=TRUE,
+        fillOpacity = 1,
+        color=gainsboro,
+        weight=.5,
+        opacity=.5,
+        popup = ~paste0(damage,"</br>",
+                        "Parcel #: ", apn, "</br>",
+                        "Structure Category: ", structurec, "</br>",
+                        "Address: ", full_address, "</br>",
+                        "City: ", city),
+        group="Single Residences with Multiple Damage Levels"
+      ) %>%
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = df_map$damage_ordered,
+        title = "Damage level"
+      ) %>%
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Single Residences with Multiple Damage Levels","Cities"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+
+
+```
+
+I randomly selected 5 properties from the list to explore their damage combinations. Most even with only affected damage still have misfortune or calamity status approved for their tax bills. This is a status that property owners can apply for to receive a temporary reduction on their property taxes.
+
+```{r}
+# randomly select some parcels to test
+sample <- sample_n(df_single,5)
+# retrieved parcels below - this will produce a random list of 5 each time
+# qa should focus on five people, not trying to reproduce the same 5
+
+```
+
+* Parcel Number: 5835017027
+  Notes: A standing house with destroyed structures behind it and calamity status approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5835017027
+
+* Parcel Number: 5840022039
+  Notes: Property looks completely destroyed though it's only marked as Affected and No Damage. Calamity status is approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5840022039
+
+* Parcel Number: 5857014006
+  Notes: Unclear what structured on the property has been affected. Calamity status approved. Marked as Affected and No Damage.
+  https://portal.assessor.lacounty.gov/parceldetail/5857014006
+
+* Parcel Number: 5845031013
+  Notes: Garage is destroyed. Unclear how house is damaged. Calamity status is approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5845031013
+
+* Parcel Number: 5828008010
+  Notes: Minor damage noted, but garage and house seem fully intact. House is a block from Lincoln Avenue. Calamity status is approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5828008010
+
+## Multiple Residences with Multiple Damage Levels
+This map plots the properties labeled as multiple residences that have multiple damage levels. A few that have no or affected damage are noteably outside of the fire perimeter.
+
+```{r multiple-mixed}
+
+# what's the target list for this map -- have to include other minor structure due to detached garages
+target <- list("Multiple Residence", "Other Minor Structure")
+
+# filter for parcels that have more than 2 damage levels and that are multiple residences
+df_multiple <- unique_parcels %>%
+  filter(damage_type_count>=2) %>%
+  mutate(target_check = map_lgl(structure_category_list, ~any(!(. %in% target)))) %>%
+  # filter for only parcels where category is in our target list--excludes any case where at least one category doesn't meet our list
+  filter(target_check == FALSE)
+
+# take out those only labels as other minor structure--they would have been mapped in previous one
+df_multiple <- df_multiple %>%
+  filter(!as.character(structure_category_list) == 'Other Minor Structure')
+
+
+# # tabulate the combo damage levels
+# df_multiple %>%
+#   st_drop_geometry() %>%
+# group_by(damage_type_list) %>%
+#   summarize(count=n(),
+#             damage_type_label=toString(unlist(unique(damage_type_list)))) %>%
+#   ungroup() %>%
+#   select(damage_type_label, count) %>%
+#   arrange(count)
+# Mostly 
+# Destroyed (>50%), Major (26-50%)	3			
+# Affected (1-9%), Destroyed (>50%), No Damage	3			
+# Destroyed (>50%), No Damage	6			
+# Affected (1-9%), No Damage	6	
+
+# filter for these properties multiple resident properties
+df_map <- damaged_parcels_simple %>%
+  filter(apn %in% df_multiple$apn)
+
+
+leaflet () %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+    setView(-118.104631, 34.185104, zoom = 12) %>%
+  addPolygons(data=eaton_fire,
+              fillColor="white",
+              fillOpacity=0,
+              color=meteorite,
+              weight=2.5,
+              opacity=1,
+              popup=~"Eaton Fire Burn Area",
+              group="Eaton Fire Perimeter") %>%
+      addPolygons(data=lac_places_subset,
+              fillColor="white",
+              fillOpacity=0,
+              color=peridot,
+              weight=1.5,
+              opacity=1,
+              popup=~name,
+              group="Cities") %>%
+      addCircleMarkers(data=df_map,
+        lng = ~longitude,
+        lat = ~latitude,
+        fillColor = ~pal(damage_ordered), # Color based on category
+        radius = 2,
+        stroke=TRUE,
+        # fill=TRUE,
+        fillOpacity = 1,
+        color=gainsboro,
+        weight=.5,
+        opacity=.5,
+        popup = ~paste0(damage,"</br>",
+                        "Parcel #: ", apn, "</br>",
+                        "Structure Category: ", structurec, "</br>",
+                        "Address: ", full_address, "</br>",
+                        "City: ", city),
+        group="Multiple Residences with Multiple Damage Levels"
+      ) %>%
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = df_map$damage_ordered,
+        title = "Damage level"
+      ) %>%
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Multiple Residences with Multiple Damage Levels","Cities"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+
+
+```
+I randomly selected 5 properties from the list to explore their damage combination. Most even with only affected damage still have misfortune and calamity status approved for their tax bills. Importantly, sometimes CalFire's database assigns the same parcel numbers to condominiums or multi-family properties that may have separate parcel numbers in L.A. County Assessor data. To join the two data sources, we will need to join points from CalFire's data to parcel polygons from the L.A. County Assessor, or join properties by a combination of address and parcel number.
+
+```{r}
+# randomly select some parcels to test
+sample <- sample_n(df_multiple,5)
+# retrieved parcels below
+```
+
+* Parcel Number: 5840015030
+  Notes: Condo with a couple of destroyed buildings on it and calamity status approved. In this case, all 5 structures share the same parcel number.
+  https://portal.assessor.lacounty.gov/parceldetail/5840015030
+
+* Parcel Number: 5853008008
+  Notes: Multi-family property with three units. Property is outside of the burn area. Calamity status is approved, but the units seem to be intact. They are noted as sustaining no or affected damage.
+  https://portal.assessor.lacounty.gov/parceldetail/5853008008
+
+* Parcel Number: 5845016006
+  Notes: Multi-family property with three units. Calamity status is approved and the property is completely gone.
+  https://portal.assessor.lacounty.gov/parceldetail/5845016006
+
+* Parcel Number: 5751008029
+  Notes: Condo complex with one building destroyed. Calamity status is approved, and property is delinquent on taxes. Complex is all on one parcel.
+  https://portal.assessor.lacounty.gov/parceldetail/5751008029
+
+* Parcel Number: 5844001010
+  Notes: Multi-family property with one building destroyed and calamity status approved.
+  https://portal.assessor.lacounty.gov/parceldetail/5844001010 
+
+
+# Proposed Damage Categories
+To focus on properties that sustained greater damage and make the data findings more easily interpretable (by including fewer categories), we can group damage levels as follows:
+
+* Little to No Damage: No Damage, Inaccessible, or Affected (1-9%) alone or in combination with each other.
+
+* Some Damage: Minor Damage (10-25%) alone or in combination with No Damage, Inaccessible, or Affected. This could also be grouped with the Little to No Damage category.
+
+* Significant Damage or Destroyed: Major Damage (26-50%) or Destroyed (>50%) alone or in combination with another category.
+
+## Little to No Damage
+These properties with at least some residential use would be considered as little to no damage. They sustained no or affected damage.
+
+```{r}
+
+# what's the target list 
+target <- list("No Damage", "Inaccessible", "Affected (1-9%)")
+
+# filter for parcels that only have these damage levels
+df_no_damage <- df_any_res %>%
+  mutate(target_check = map_lgl(damage_type_list, ~any(!(. %in% target)))) %>%
+  # filter for only parcels where no other damage type turns up
+  filter(target_check == FALSE)
+
+# filter for these properties to map
+df_map <- damaged_parcels_simple %>%
+  filter(apn %in% df_no_damage$apn)
+
+
+leaflet () %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+    setView(-118.104631, 34.185104, zoom = 12) %>%
+  addPolygons(data=eaton_fire,
+              fillColor="white",
+              fillOpacity=0,
+              color=meteorite,
+              weight=2.5,
+              opacity=1,
+              popup=~"Eaton Fire Burn Area",
+              group="Eaton Fire Perimeter") %>%
+      addPolygons(data=lac_places_subset,
+              fillColor="white",
+              fillOpacity=0,
+              color=peridot,
+              weight=1.5,
+              opacity=1,
+              popup=~name,
+              group="Cities") %>%
+      addCircleMarkers(data=df_map,
+        lng = ~longitude,
+        lat = ~latitude,
+        fillColor = ~pal(damage_ordered), # Color based on category
+        radius = 2,
+        stroke=TRUE,
+        # fill=TRUE,
+        fillOpacity = 1,
+        color=gainsboro,
+        weight=.5,
+        opacity=.5,
+        popup = ~paste0(damage,"</br>",
+                        "Parcel #: ", apn, "</br>",
+                        "Structure Category: ", structurec, "</br>",
+                        "Address: ", full_address, "</br>",
+                        "City: ", city),
+        group="Residences with Little to No Damage"
+      ) %>%
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = df_map$damage_ordered,
+        title = "Damage level"
+      ) %>%
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Residences with Little to No Damage","Cities"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+
+```
+
+
+## Some Damage
+These properties with at least some residential use would be considered as sustaining some damage. They sustained at most minor damage (10-25%). These properties could also be combined with Little to No Damage.
+
+```{r}
+
+# what's the target list 
+target <- list("No Damage", "Inaccessible", "Affected (1-9%)","Minor (10-25%)")
+
+# filter for parcels that only have these damage levels
+df_some_damage <- df_any_res %>%
+  mutate(target_check = map_lgl(damage_type_list, ~any(!(. %in% target)))) %>%
+  # filter for only parcels where no other damage type turns up
+  filter(target_check == FALSE)
+
+# filter for these properties to map and exclude the ones from the first list of little to no damage
+df_map <- damaged_parcels_simple %>%
+  filter(apn %in% df_some_damage$apn) %>%
+  filter(!apn %in% df_no_damage$apn) 
+
+
+leaflet () %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+    setView(-118.104631, 34.185104, zoom = 12) %>%
+  addPolygons(data=eaton_fire,
+              fillColor="white",
+              fillOpacity=0,
+              color=meteorite,
+              weight=2.5,
+              opacity=1,
+              popup=~"Eaton Fire Burn Area",
+              group="Eaton Fire Perimeter") %>%
+      addPolygons(data=lac_places_subset,
+              fillColor="white",
+              fillOpacity=0,
+              color=peridot,
+              weight=1.5,
+              opacity=1,
+              popup=~name,
+              group="Cities") %>%
+      addCircleMarkers(data=df_map,
+        lng = ~longitude,
+        lat = ~latitude,
+        fillColor = ~pal(damage_ordered), # Color based on category
+        radius = 2,
+        stroke=TRUE,
+        # fill=TRUE,
+        fillOpacity = 1,
+        color=gainsboro,
+        weight=.5,
+        opacity=.5,
+        popup = ~paste0(damage,"</br>",
+                        "Parcel #: ", apn, "</br>",
+                        "Structure Category: ", structurec, "</br>",
+                        "Address: ", full_address, "</br>",
+                        "City: ", city),
+        group="Residences with Some Damage"
+      ) %>%
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = df_map$damage_ordered,
+        title = "Damage level"
+      ) %>%
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Residences with Some Damage","Cities"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+
+```
+
+## Significant Damage or Destroyed
+These properties with at least some residential use would be considered as sustaining significant damage or were destroyed. They sustained at least major damage (26-50%).
+
+```{r}
+
+# what's the target list 
+target <- list("Destroyed (>50%)", "Major (26-50%)")
+
+# filter for parcels that only have these damage levels
+df_destroyed <- df_any_res %>%
+  mutate(target_check = map_lgl(damage_type_list, ~any((. %in% target)))) %>%
+  # filter for only parcels where at least one of these damage levels turns up
+  filter(target_check == TRUE)
+
+# filter for these properties to map 
+df_map <- damaged_parcels_simple %>%
+  filter(apn %in% df_destroyed$apn)
+
+
+leaflet () %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+    setView(-118.104631, 34.185104, zoom = 12) %>%
+  addPolygons(data=eaton_fire,
+              fillColor="white",
+              fillOpacity=0,
+              color=meteorite,
+              weight=2.5,
+              opacity=1,
+              popup=~"Eaton Fire Burn Area",
+              group="Eaton Fire Perimeter") %>%
+      addPolygons(data=lac_places_subset,
+              fillColor="white",
+              fillOpacity=0,
+              color=peridot,
+              weight=1.5,
+              opacity=1,
+              popup=~name,
+              group="Cities") %>%
+      addCircleMarkers(data=df_map,
+        lng = ~longitude,
+        lat = ~latitude,
+        fillColor = ~pal(damage_ordered), # Color based on category
+        radius = 2,
+        stroke=TRUE,
+        # fill=TRUE,
+        fillOpacity = 1,
+        color=gainsboro,
+        weight=.5,
+        opacity=.5,
+        popup = ~paste0(damage,"</br>",
+                        "Parcel #: ", apn, "</br>",
+                        "Structure Category: ", structurec, "</br>",
+                        "Address: ", full_address, "</br>",
+                        "City: ", city),
+        group="Residences with Some Damage"
+      ) %>%
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = df_map$damage_ordered,
+        title = "Damage level"
+      ) %>%
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Residences with Some Damage","Cities"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+
+```
+
+# Eaton Fire Boundary Compared to Damaged Properties, Cities, and Tract Boundaries
+This map displays residential or mixed use properties that sustained at least an affected (1-9%) damage level. The purpose of this map is to confirm boundaries for analysis, e.g., West Altadena to include the burn area West of Lake Avenue and East Altadena/Pasadena to include the burn area East of Lake Avenue and West of Michillinda.
+
+Kinneloa Mesa did not sustain any damage so it would largely not be included in the analysis. Notably, some properties marked as destroyed fall just slightly outside of the burn area. The burn area might intersect with the parcel boundaries - data we are in progress of receiving. Only parcels in the burn area or sustaining at least some damage would be included in the detailed analysis. We can choose to include or not include properties that sustained at least a little damage but are outside of the official burn area.
+
+```{r altadena-map}
+
+# map damaged parcels and check boundaries we want to use against tracts and places
+
+# for purpose of boundary mapping, let's just map properties that were damaged, regardless if they are duplicates and let's focus on residential properties
+only_damaged_parcels <- damaged_parcels_simple %>%
+  filter(!damage %in% c("No Damage", "Inaccessible")) %>%
+  filter(structurec %in% c("Mixed Commercial/Residential","Multiple Residence","Single Residence","Other Minor Structure"))
+
+# revise factor level
+only_damaged_parcels$damage_ordered <- factor(
+      only_damaged_parcels$damage,
+      levels = c("Affected (1-9%)", "Minor (10-25%)", "Major (26-50%)", "Destroyed (>50%)"), # Define the order of levels
+      labels = c("Affected","Minor","Major","Destroyed")
+    )
+
+# Create a color palette based on the damage level
+# table(only_damaged_parcels$damage,useNA='always') # get values again to assign colors
+
+pal <- colorFactor(palette = c("#177FEB", "#4886BD", "#CC983F","#FF9E0D"), domain = only_damaged_parcels$damage_ordered)
+# table(only_damaged_parcels$damage_ordered,useNA='always')
+
+leaflet () %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+    setView(-118.104631, 34.185104, zoom = 12) %>%
+  addPolygons(data=eaton_fire,
+              fillColor="white",
+              fillOpacity=0,
+              color=meteorite,
+              weight=2.5,
+              opacity=1,
+              popup=~"Eaton Fire Burn Area",
+              group="Eaton Fire Perimeter") %>%
+    addPolygons(data=altadena_tracts,
+              fillColor="white",
+              fillOpacity=0,
+              color=black,
+              weight=1,
+              opacity=1,
+              popup=~name,
+              group="Census Tracts") %>%
+      addPolygons(data=lac_places_subset,
+              fillColor="white",
+              fillOpacity=0,
+              color=peridot,
+              weight=1.5,
+              opacity=1,
+              popup=~name,
+              group="Cities") %>%
+      addCircleMarkers(data=only_damaged_parcels,
+        lng = ~longitude,
+        lat = ~latitude,
+        fillColor = ~pal(damage_ordered), # Color based on category
+        radius = 2,
+        stroke=TRUE,
+        # fill=TRUE,
+        fillOpacity = 1,
+        color=gainsboro,
+        weight=.5,
+        opacity=.5,
+        popup = ~paste0(damage,"</br>",
+                        "Parcel #: ", apn, "</br>",
+                        "Structure Category: ", structurec, "</br>",
+                        "Address: ", full_address, "</br>",
+                        "City: ", city),
+                        # Optional: Add a popup
+        group="Damaged Properties"
+      ) %>%
+      addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = only_damaged_parcels$damage_ordered,
+        title = "Damage level"
+      ) %>%
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Perimeter", "Census Tracts","Damaged Properties","Cities"),
+        options = layersControlOptions(collapsed = FALSE)
+  )
+      
+
+
+
+```
