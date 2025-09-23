@@ -72,7 +72,8 @@ eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310",
 
 
 # damaged structures database -
-eaton_damage <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_dmg_insp_3310", geom="geom")
+eaton_damage <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_dmg_insp_3310", geom="geom") %>% rename(structurec=structure_category,                                                              structuret=structure_type,
+                                                                                                              apn=apn_parcel)
 
 ## filter for only damaged parcels and simplify
 damaged_parcels_simple <- eaton_damage %>%
@@ -176,7 +177,7 @@ unique_parcel_count <- length(unique(damaged_parcels_simple$apn))
 # unique parcels by apn and address
 unique_parcels_addresses <- damaged_parcels_simple %>%
   st_drop_geometry() %>%
-  group_by(apn, streetnumb, streetname, streettype, city) %>%
+  group_by(apn, street_number, street_name, street_type, city) %>%
   summarise(structure_count=n(),
             structure_category_list = list(unique(structurec)),
             structure_type_list = list(unique(structuret)),
@@ -213,7 +214,7 @@ Most cases with two or more category types are due to a minor structure and a si
 # first go back to structure types, how can we filter for structures that are residential? What are the combinations? Or do we rely on assessor data?
 # create a single address field
 damaged_parcels_simple <- damaged_parcels_simple %>%
-  mutate(full_address=paste0(streetnumb, " ", streetname, " ", streettype, ", ", city))
+  mutate(full_address=paste0(street_number, " ", street_name, " ", street_type, ", ", city))
 
 # get a list of parcels with different damage levels and structure categories, keep addresses
 unique_parcels <- damaged_parcels_simple %>%
