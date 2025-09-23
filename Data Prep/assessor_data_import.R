@@ -412,22 +412,22 @@ target_ains_vector <- ains$ain
 # # shp file
 # export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_sept2025", srid = "", geometry_type = "", geometry_column = "geometry")
 # # csv
-table_name <- "assessor_data_sept2025"
-schema <- "data"
-indicator <- "to add"
-source <- "Los Angeles County Assessor"
-qa_filepath <- "to add"
-table_comment <- paste0(indicator, source)
-dbWriteTable(con, Id(schema, table_name), ains,
-             overwrite = FALSE, row.names = FALSE)
-
-# Comment on table and columns
-column_names <- colnames(jan_ains) 
-column_comments <- c(
-  "to add",
-)
-
-add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# table_name <- "assessor_data_sept2025"
+# schema <- "data"
+# indicator <- "to add"
+# source <- "Los Angeles County Assessor"
+# qa_filepath <- "to add"
+# table_comment <- paste0(indicator, source)
+# dbWriteTable(con, Id(schema, table_name), ains,
+#              overwrite = FALSE, row.names = FALSE)
+# 
+# # Comment on table and columns
+# column_names <- colnames(jan_ains) 
+# column_comments <- c(
+#   "to add",
+# )
+# 
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
 ##### Compare to Jan 2025 data #####
@@ -476,11 +476,11 @@ length(unique(all_results$ain)) # 66096
 # frequency table of situs 'city_state' field
 jan_city_results <- as.data.frame(table(all_results$city_state, useNA = "ifany"))
 
-# export results to csv (keeping all columns for QA)
-write.csv(all_results,
-          file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_jan_2025.csv",
-          row.names=FALSE,
-          fileEncoding = "UTF-8")
+# # export results to csv (keeping all columns for QA)
+# write.csv(all_results,
+#           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_jan_2025.csv",
+#           row.names=FALSE,
+#           fileEncoding = "UTF-8")
 
 
 ##### Filter parcel shpfile #####
@@ -493,12 +493,12 @@ jan_shp_path <- "D:/temp_extract/Assessor Data/Assr Data 20250106/parcel.shp"
 # Convert your AINs to a vector for filtering
 target_jan_ains <- jan_ains$ain
 
-# Filter assessor parcels that match Altadena/Pasadena/Sierra Madre AINs
-filtered_parcels <- batch_filter_shapefile(
-  shp_path=jan_shp_path,
-  target_ains=target_jan_ains,
-  chunk_size = 5000,
-  ain_column = "AIN")
+# # Filter assessor parcels that match Altadena/Pasadena/Sierra Madre AINs
+# filtered_parcels <- batch_filter_shapefile(
+#   shp_path=jan_shp_path,
+#   target_ains=target_jan_ains,
+#   chunk_size = 5000,
+#   ain_column = "AIN")
 
 quick_check <- head(filtered_parcels, 10)
 
@@ -507,24 +507,58 @@ filtered_parcels <- filtered_parcels %>%
   rename(geometry=`_ogr_geometry_`)
 
 ##### Export Jan 2025 data #####
-# Filtered shp file
-export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_jan2025", srid = "", geometry_type = "", geometry_column = "geometry")
+# # Filtered shp file
+# export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_jan2025", srid = "", geometry_type = "", geometry_column = "geometry")
+# 
+# # Filtered csv file
+# table_name <- "assessor_data_jan2025"
+# schema <- "data"
+# indicator <- "to add"
+# source <- "Los Angeles County Assessor"
+# qa_filepath <- "to add"
+# table_comment <- paste0(indicator, source)
+# dbWriteTable(con, Id(schema, table_name), jan_ains,
+#              overwrite = FALSE, row.names = FALSE)
+# 
+# # Comment on table and columns
+# column_names <- colnames(jan_ains) 
+# column_comments <- c(
+#   "to add",
+# )
+# 
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
-# Filtered csv file
-table_name <- "assessor_data_jan2025"
-schema <- "data"
-indicator <- "to add"
-source <- "Los Angeles County Assessor"
-qa_filepath <- "to add"
-table_comment <- paste0(indicator, source)
-dbWriteTable(con, Id(schema, table_name), jan_ains,
-             overwrite = FALSE, row.names = FALSE)
+##### Compare Sept to Jan AINS and parcels #####
+# AINs
+sept_only_ains <- anti_join(ains, jan_ains, by="ain") %>%
+  select(ain) 
 
-# Comment on table and columns
-column_names <- colnames(jan_ains) 
-column_comments <- c(
-  "to add",
-)
+jan_only_ains <- anti_join(jan_ains, ains, by="ain") %>%
+  select(ain) 
 
-add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+all_ains <- rbind(ains, jan_ains) %>%
+  select(ain) %>%
+  distinct() %>%
+  mutate(source_data = 
+           case_when(ain %in% sept_only_ains$ain ~ "sept only",
+                     ain %in% jan_only_ains$ain ~ "jan only",
+                     .default = "both"))
+
+# Parcels
+sept_parcels <- st_read(con, query='SELECT "AIN" FROM data.assessor_parcels_sept2025') %>%
+  st_drop_geometry()
+
+jan_parcels <- st_read(con, query='SELECT "AIN" FROM data.assessor_parcels_jan2025') %>%
+  st_drop_geometry()
+
+# Add columns to check if AIN has parcel match
+all_ains <- all_ains %>%
+  mutate(sept_parcel_match = ifelse(ain %in% sept_parcels$AIN, "yes", "no"),
+         jan_parcel_match = ifelse(ain %in% jan_parcels$AIN, "yes", "no"))
+
+# # export results to csv (for QA)
+# write.csv(all_ains,
+#           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/jan_sept_ain_comparison.csv",
+#           row.names=FALSE,
+#           fileEncoding = "UTF-8")
 
