@@ -412,6 +412,22 @@ target_ains_vector <- ains$ain
 # # shp file
 # export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_sept2025", srid = "", geometry_type = "", geometry_column = "geometry")
 # # csv
+table_name <- "assessor_data_sept2025"
+schema <- "data"
+indicator <- "to add"
+source <- "Los Angeles County Assessor"
+qa_filepath <- "to add"
+table_comment <- paste0(indicator, source)
+dbWriteTable(con, Id(schema, table_name), ains,
+             overwrite = FALSE, row.names = FALSE)
+
+# Comment on table and columns
+column_names <- colnames(jan_ains) 
+column_comments <- c(
+  "to add",
+)
+
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
 ##### Compare to Jan 2025 data #####
@@ -495,4 +511,20 @@ filtered_parcels <- filtered_parcels %>%
 export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_jan2025", srid = "", geometry_type = "", geometry_column = "geometry")
 
 # Filtered csv file
+table_name <- "assessor_data_jan2025"
+schema <- "data"
+indicator <- "to add"
+source <- "Los Angeles County Assessor"
+qa_filepath <- "to add"
+table_comment <- paste0(indicator, source)
+dbWriteTable(con, Id(schema, table_name), jan_ains,
+             overwrite = FALSE, row.names = FALSE)
+
+# Comment on table and columns
+column_names <- colnames(jan_ains) 
+column_comments <- c(
+  "to add",
+)
+
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
