@@ -239,8 +239,7 @@ batch_process_assessor_data <- function(csv_file, target_cities, chunk_size = 10
 
 ##### Filter parcel shpfile #####
 # read in results and keep only AIN
-ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_sept_2025.csv") %>%
-  select(ain)
+ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_sept_2025.csv")
 
 # Explore Sept parcel shpfile
 shp_path <- "D:/temp_extract/Assessor Data/Assr Data 20250902/parcels.shp"
@@ -271,11 +270,12 @@ batch_filter_shapefile <- function(shp_path, target_ains, chunk_size = 10000, ai
   cat("Target AINs count:", length(target_ains), "\n")
   cat("Chunk size:", chunk_size, "\n\n")
   
+  file_name <- gsub(".shp", "",basename(shp_path))
   # Convert target AINs to character for consistent matching
   target_ains <- as.character(target_ains)
   
   # Get total feature count
-  total_count <- st_read(shp_path, query="SELECT COUNT(*) as count FROM parcels")$count[1]
+  total_count <- st_read(shp_path, query=paste0("SELECT COUNT(*) as count FROM ", file_name))$count[1]
   cat("Total features in shapefile:", total_count, "\n")
   
   # Calculate number of chunks
@@ -296,7 +296,7 @@ batch_filter_shapefile <- function(shp_path, target_ains, chunk_size = 10000, ai
     
     tryCatch({
       # SQL query with LIMIT and OFFSET (scientific notation now disabled)
-      sql_query <- paste0("SELECT * FROM parcels LIMIT ", chunk_size, " OFFSET ", offset)
+      sql_query <- paste0("SELECT * FROM ", file_name," LIMIT ", chunk_size, " OFFSET ", offset)
       
       # Read chunk using LIMIT/OFFSET
       chunk_data <- st_read(shp_path, query = sql_query, quiet = TRUE)
@@ -407,5 +407,92 @@ target_ains_vector <- ains$ain
 # # minor clean up before export
 # filtered_parcels <- filtered_parcels %>%
 #   rename(geometry=`_ogr_geometry_`)
-# 
+
+# ##### Export Sept 2025 data #####
+# # shp file
 # export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_sept2025", srid = "", geometry_type = "", geometry_column = "geometry")
+# # csv
+
+
+##### Compare to Jan 2025 data #####
+# Jan CSVs to batch process
+jan_csv_1 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 1.csv"
+jan_csv_2 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 2.csv"
+jan_csv_3 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 3.csv"
+
+jan_1_results <- batch_process_assessor_data(
+  csv_file=jan_csv_1,
+  target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+  chunk_size = 10000,
+  debug_cities=TRUE)
+
+jan_2_results <- batch_process_assessor_data(
+  csv_file=jan_csv_2,
+  target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+  chunk_size = 10000,
+  debug_cities=TRUE)
+
+jan_3_results <- batch_process_assessor_data(
+  csv_file=jan_csv_3,
+  target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+  chunk_size = 10000,
+  debug_cities=TRUE)
+
+# Combine results 
+all_results <- rbind(jan_1_results, jan_2_results, jan_3_results)
+
+# remove results tables to save space
+rm(jan_1_results)
+rm(jan_2_results)
+rm(jan_3_results)
+gc()
+
+##### Do an initial review of results (e.g., ensure unique IDs, note data quality issues, etc.)
+# first column name has weird symbols ("ï»¿AIN"), bad practice of spaces in column names throughout
+colnames(all_results)
+colnames(all_results)[1] <- "AIN"
+colnames(all_results) <- gsub(" ", "_", tolower(colnames(all_results)))
+colnames(all_results)
+
+# unique AIN for each row
+length(unique(all_results$ain)) # 66096
+
+# frequency table of situs 'city_state' field
+jan_city_results <- as.data.frame(table(all_results$city_state, useNA = "ifany"))
+
+# export results to csv (keeping all columns for QA)
+write.csv(all_results,
+          file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_jan_2025.csv",
+          row.names=FALSE,
+          fileEncoding = "UTF-8")
+
+
+##### Filter parcel shpfile #####
+# read in results and keep only AIN
+jan_ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_jan_2025.csv") 
+
+# Explore Sept parcel shpfile
+jan_shp_path <- "D:/temp_extract/Assessor Data/Assr Data 20250106/parcel.shp"
+
+# Convert your AINs to a vector for filtering
+target_jan_ains <- jan_ains$ain
+
+# Filter assessor parcels that match Altadena/Pasadena/Sierra Madre AINs
+filtered_parcels <- batch_filter_shapefile(
+  shp_path=jan_shp_path,
+  target_ains=target_jan_ains,
+  chunk_size = 5000,
+  ain_column = "AIN")
+
+quick_check <- head(filtered_parcels, 10)
+
+# minor clean up before export
+filtered_parcels <- filtered_parcels %>%
+  rename(geometry=`_ogr_geometry_`)
+
+##### Export Jan 2025 data #####
+# Filtered shp file
+export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_jan2025", srid = "", geometry_type = "", geometry_column = "geometry")
+
+# Filtered csv file
+
