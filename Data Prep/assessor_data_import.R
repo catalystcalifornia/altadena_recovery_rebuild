@@ -397,16 +397,18 @@ target_ains_vector <- ains$ain
 
 # # Filter assessor parcels that match Altadena/Pasadena/Sierra Madre AINs
 # filtered_parcels <- batch_filter_shapefile(
-#   shp_path=shp_path, 
-#   target_ains=target_ains_vector, 
-#   chunk_size = 5000, 
+#   shp_path=shp_path,
+#   target_ains=target_ains_vector,
+#   chunk_size = 5000,
 #   ain_column = "AIN")
-# 
-# quick_check <- head(filtered_parcels, 10)
-# 
-# # minor clean up before export
-# filtered_parcels <- filtered_parcels %>%
-#   rename(geometry=`_ogr_geometry_`)
+
+quick_check <- head(filtered_parcels, 10)
+
+# minor clean up before export
+filtered_parcels <- filtered_parcels %>%
+  rename(geometry=`_ogr_geometry_`)
+
+colnames(filtered_parcels) <- tolower(colnames(filtered_parcels))
 
 # ##### Export Sept 2025 data #####
 # # shp file
@@ -436,46 +438,46 @@ jan_csv_1 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 1.csv"
 jan_csv_2 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 2.csv"
 jan_csv_3 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 3.csv"
 
-jan_1_results <- batch_process_assessor_data(
-  csv_file=jan_csv_1,
-  target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
-  chunk_size = 10000,
-  debug_cities=TRUE)
-
-jan_2_results <- batch_process_assessor_data(
-  csv_file=jan_csv_2,
-  target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
-  chunk_size = 10000,
-  debug_cities=TRUE)
-
-jan_3_results <- batch_process_assessor_data(
-  csv_file=jan_csv_3,
-  target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
-  chunk_size = 10000,
-  debug_cities=TRUE)
-
-# Combine results 
-all_results <- rbind(jan_1_results, jan_2_results, jan_3_results)
-
-# remove results tables to save space
-rm(jan_1_results)
-rm(jan_2_results)
-rm(jan_3_results)
-gc()
-
-##### Do an initial review of results (e.g., ensure unique IDs, note data quality issues, etc.)
-# first column name has weird symbols ("ï»¿AIN"), bad practice of spaces in column names throughout
-colnames(all_results)
-colnames(all_results)[1] <- "AIN"
-colnames(all_results) <- gsub(" ", "_", tolower(colnames(all_results)))
-colnames(all_results)
-
-# unique AIN for each row
-length(unique(all_results$ain)) # 66096
-
-# frequency table of situs 'city_state' field
-jan_city_results <- as.data.frame(table(all_results$city_state, useNA = "ifany"))
-
+# jan_1_results <- batch_process_assessor_data(
+#   csv_file=jan_csv_1,
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   chunk_size = 10000,
+#   debug_cities=TRUE)
+# 
+# jan_2_results <- batch_process_assessor_data(
+#   csv_file=jan_csv_2,
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   chunk_size = 10000,
+#   debug_cities=TRUE)
+# 
+# jan_3_results <- batch_process_assessor_data(
+#   csv_file=jan_csv_3,
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   chunk_size = 10000,
+#   debug_cities=TRUE)
+# 
+# # Combine results 
+# all_results <- rbind(jan_1_results, jan_2_results, jan_3_results)
+# 
+# # remove results tables to save space
+# rm(jan_1_results)
+# rm(jan_2_results)
+# rm(jan_3_results)
+# gc()
+# 
+# ##### Do an initial review of results (e.g., ensure unique IDs, note data quality issues, etc.)
+# # first column name has weird symbols ("ï»¿AIN"), bad practice of spaces in column names throughout
+# colnames(all_results)
+# colnames(all_results)[1] <- "AIN"
+# colnames(all_results) <- gsub(" ", "_", tolower(colnames(all_results)))
+# colnames(all_results)
+# 
+# # unique AIN for each row
+# length(unique(all_results$ain)) # 66096
+# 
+# # frequency table of situs 'city_state' field
+# jan_city_results <- as.data.frame(table(all_results$city_state, useNA = "ifany"))
+# 
 # # export results to csv (keeping all columns for QA)
 # write.csv(all_results,
 #           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_jan_2025.csv",
@@ -494,17 +496,19 @@ jan_shp_path <- "D:/temp_extract/Assessor Data/Assr Data 20250106/parcel.shp"
 target_jan_ains <- jan_ains$ain
 
 # # Filter assessor parcels that match Altadena/Pasadena/Sierra Madre AINs
-# filtered_parcels <- batch_filter_shapefile(
-#   shp_path=jan_shp_path,
-#   target_ains=target_jan_ains,
-#   chunk_size = 5000,
-#   ain_column = "AIN")
+filtered_parcels <- batch_filter_shapefile(
+  shp_path=jan_shp_path,
+  target_ains=target_jan_ains,
+  chunk_size = 5000,
+  ain_column = "AIN")
 
 quick_check <- head(filtered_parcels, 10)
 
 # minor clean up before export
 filtered_parcels <- filtered_parcels %>%
   rename(geometry=`_ogr_geometry_`)
+
+colnames(filtered_parcels) <- tolower(colnames(filtered_parcels))
 
 ##### Export Jan 2025 data #####
 # # Filtered shp file
@@ -545,10 +549,10 @@ all_ains <- rbind(ains, jan_ains) %>%
                      .default = "both"))
 
 # Parcels
-sept_parcels <- st_read(con, query='SELECT "AIN" FROM data.assessor_parcels_sept2025') %>%
+sept_parcels <- st_read(con, query='SELECT ain FROM data.assessor_parcels_sept2025') %>%
   st_drop_geometry()
 
-jan_parcels <- st_read(con, query='SELECT "AIN" FROM data.assessor_parcels_jan2025') %>%
+jan_parcels <- st_read(con, query='SELECT ain FROM data.assessor_parcels_jan2025') %>%
   st_drop_geometry()
 
 # Add columns to check if AIN has parcel match
