@@ -829,7 +829,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 # Eaton Fire Boundary Compared to Damaged Properties, Cities, and Tract Boundaries
 This map displays residential or mixed use properties that sustained at least an affected (1-9%) damage level. The purpose of this map is to confirm boundaries for analysis, e.g., West Altadena to include the burn area West of Lake Avenue and East Altadena/Pasadena to include the burn area East of Lake Avenue and West of Michillinda.
 
-Kinneloa Mesa did not sustain any damage so it would largely not be included in the analysis. Notably, some properties marked as destroyed fall just slightly outside of the burn area. The burn area might intersect with the parcel boundaries - data we are in progress of receiving. Only parcels in the burn area or sustaining at least some damage would be included in the detailed analysis. We can choose to include or not include properties that sustained at least a little damage but are outside of the official burn area.
+Kinneloa Mesa did not sustain any damage so it would largely not be included in the analysis. Notably, some properties marked as destroyed fall just slightly outside of the burn area. CalFire's notes in their documentation that they assessor parcels within 100 feet of the fire perimeter. We would include any parcel evaluated by CalFire in the analysis even those that are outside of the official burn area. We could also draw boundaries that encompass more of Altadena to evaluate the housing stock before and after, e.g., for all of the Altadena community--what was the housing makeup before even outside of the fire perimeter vs. what were the properties impacted?
 
 ```{r altadena-map}
 
