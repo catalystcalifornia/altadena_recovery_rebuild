@@ -164,7 +164,8 @@ damaged_parcels_simple %>% st_drop_geometry() %>%
   adorn_percentages("row")   %>%
   adorn_pct_formatting(digits = 0) %>%
   adorn_ns() %>% 
-  kable()
+  kable() %>%
+  column_spec(2:7, width='25mm')
 
 # explore structuret and c combined - how do they relate?
 structure_type_cat <- table(damaged_parcels_simple$structuret,  damaged_parcels_simple$structurec) %>% as.data.frame()
@@ -192,10 +193,17 @@ dup_parcels <- unique_parcels_addresses %>%
   summarise(address_count=n()) %>%
   filter(address_count>=2) %>%
   ungroup () %>%
-  left_join(unique_parcels_addresses)
-# ones with the most duplicates are condos or larger multifamily properties
+  left_join(unique_parcels_addresses)%>%
+  arrange(desc(address_count))
+
+View(dup_parcels)
+# ones with the most duplicate addresses on a single parcel are condos or larger multifamily properties
 # But even ones with some structures destroyed and others not, have misfortunate/calamity status see 5751021036
 # 2601 DOVE CREEK LN, NO A still has misfortune/calamity status approved https://portal.assessor.lacounty.gov/parceldetail/5751021004
+# APN coded as single family, but is a condo --
+# Coded in CalFire as 5833019042, but this parcel was deleted. An example address on that parcel is 155 E PALM ST - https://portal.assessor.lacounty.gov/parceldetail/5833019043
+
+# like other data, single residences have highest prevalence in duplicates--though some of these are still condos and some may be ADUs where there are 2 addresses recorded in CalFire https://portal.assessor.lacounty.gov/parceldetail/5751012006
 
 # let's explore and map single family residences with different damage levels
 # let's explore and map multifamily residences with different damage levels
@@ -229,7 +237,12 @@ unique_parcels <- damaged_parcels_simple %>%
             damage_type_count=length(unique(damage_type_list[[1]])),
             address_list = list(unique(full_address)),
             address_count=length(unique(address_list[[1]]))) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(mixed_damage=ifelse(damage_type_count<2, "One Damage Type",
+                             "Two or More"))
+
+# check recoding of mixed damage category, looks good
+# table(unique_parcels$damage_type_count,unique_parcels$mixed_damage)
 
 # sort list of structure category for easier grouping later
 unique_parcels$structure_category_list <- lapply(unique_parcels$structure_category_list,sort)
@@ -263,6 +276,44 @@ group_by(structure_category_list) %>%
 Each structure on a property is given a separate damage level. One property could have a structure marked as 'Destroyed' and another structure marked as 'No Damage'. We will need to analyze the properties lost to the fire and in need of rebuilding. To do this, we will need to determine a typology for categorizing a property as lost. L.A. County Assessor data that includes the property square footage and units is provided at the parcel level, which would make matching CalFire's structure-level damage data challenging. Instead, we will use CalFire's damage data to distinguish between residential parcels still standing and not in need of rebuilding versus those that are significantly damaged or destroyed and in need of rebuilding.
 
 This first table shows the combination of damage levels for properties with at least one residential use and two or more damage levels. The majority of mixed damage levels include Destroyed and Affected or Destroyed and No Damage. The next most common are Affected and No Damage.
+
+```{r}
+# what percentage of each structure category has mixed damage levels just for any residential use
+# what's the target list to include
+target <- list("Mixed Commercial/Residential","Multiple Residence","Single Residence")
+
+# filter for parcels that have at least one identified residential use
+df_any_res_all <- unique_parcels %>%
+  mutate(target_check = map_lgl(structure_category_list, ~any((. %in% target)))) %>%
+  # filter for only parcels where at least one category is in our list
+  filter(target_check == TRUE)
+
+df_any_res_all %>%
+  st_drop_geometry() %>%
+  group_by(structure_category_list, mixed_damage) %>%
+  summarize(Count=n()) %>%
+  ungroup() %>%
+  group_by(structure_category_list) %>%
+  mutate(Percent=Count/sum(Count)) %>%
+  ungroup() %>%
+  rename('Structure Categories'=structure_category_list,
+         'Single or Mixed Damage'=mixed_damage) %>%
+  kable()
+
+# look at damage level by structure category
+df_any_res_all  %>% st_drop_geometry() %>%
+  group_by(structure_category_list) %>%
+  mutate(`Structure Category`=toString(unlist(unique(structure_category_list)))) %>%
+  tabyl(`Structure Category`, mixed_damage) %>%
+  adorn_totals(c("row","col")) %>%
+  adorn_percentages("row")   %>%
+  adorn_pct_formatting(digits = 0) %>%
+  adorn_ns() %>%
+  kable() 
+
+
+
+```
 
 ```{r damage}
 
@@ -548,19 +599,19 @@ sample <- sample_n(df_multiple,5)
 # Proposed Damage Categories
 To focus on properties that sustained greater damage and make the data findings more easily interpretable (by including fewer categories), we can group damage levels as follows:
 
-* Little to No Damage: No Damage, Inaccessible, or Affected (1-9%) alone or in combination with each other.
+* No Damage: No Damage, Inaccessible. Properties that have no damage recorded on any structure.
 
-* Some Damage: Minor Damage (10-25%) alone or in combination with No Damage, Inaccessible, or Affected. This could also be grouped with the Little to No Damage category.
+* Some Damage: Affected (1-9%) or Minor Damage (10-25%) alone or in combination with No Damage or Inaccessible.
 
 * Significant Damage or Destroyed: Major Damage (26-50%) or Destroyed (>50%) alone or in combination with another category.
 
-## Little to No Damage
-These properties with at least some residential use would be considered as little to no damage. They sustained no or affected damage.
+## No Damage
+These properties sustained no damage. It includes "inaccessible" but only 40 properties total were rated as inaccessible.
 
 ```{r}
 
 # what's the target list 
-target <- list("No Damage", "Inaccessible", "Affected (1-9%)")
+target <- list("No Damage", "Inaccessible")
 
 # filter for parcels that only have these damage levels
 df_no_damage <- df_any_res %>%
@@ -608,7 +659,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
                         "Structure Category: ", structurec, "</br>",
                         "Address: ", full_address, "</br>",
                         "City: ", city),
-        group="Residences with Little to No Damage"
+        group="Residences with No Damage"
       ) %>%
       addLegend(
         position = "bottomright",
@@ -617,7 +668,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
         title = "Damage level"
       ) %>%
   addLayersControl(
-          overlayGroups = c("Eaton Fire Perimeter", "Residences with Little to No Damage","Cities"),
+          overlayGroups = c("Eaton Fire Perimeter", "Residences with No Damage","Cities"),
         options = layersControlOptions(collapsed = FALSE)
   )
 
@@ -625,7 +676,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 
 
 ## Some Damage
-These properties with at least some residential use would be considered as sustaining some damage. They sustained at most minor damage (10-25%). These properties could also be combined with Little to No Damage.
+These properties with at least some residential use would be considered as sustaining some damage. They sustained at least affected damage (1-8%) and at most minor damage (10-25%).
 
 ```{r}
 
