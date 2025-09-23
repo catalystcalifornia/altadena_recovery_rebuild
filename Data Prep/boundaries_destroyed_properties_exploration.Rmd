@@ -273,9 +273,9 @@ group_by(structure_category_list) %>%
 
 
 # Damage Categories
-Each structure on a property is given a separate damage level. One property could have a structure marked as 'Destroyed' and another structure marked as 'No Damage'. We will need to analyze the properties lost to the fire and in need of rebuilding. To do this, we will need to determine a typology for categorizing a property as lost. L.A. County Assessor data that includes the property square footage and units is provided at the parcel level, which would make matching CalFire's structure-level damage data challenging. Instead, we will use CalFire's damage data to distinguish between residential parcels still standing and not in need of rebuilding versus those that are significantly damaged or destroyed and in need of rebuilding.
+Each structure on a property is given a separate damage level. One property could have a structure marked as 'Destroyed' and another structure marked as 'No Damage'. We will need to analyze the properties lost to the fire and in need of rebuilding. To do this, we will need to determine a typology for categorizing a property as lost. L.A. County Assessor data that includes the property square footage and units is provided at the parcel level, which would make matching CalFire's structure-level damage data challenging. Instead, we will use CalFire's damage data to distinguish between residential parcels still standing and not in need of significant rebuilding versus those that are significantly damaged or destroyed and in need of rebuilding.
 
-This first table shows the combination of damage levels for properties with at least one residential use and two or more damage levels. The majority of mixed damage levels include Destroyed and Affected or Destroyed and No Damage. The next most common are Affected and No Damage.
+This first table shows the percentage of properties with combined damage levels by combined structure category. Only 9% of unique parcels in CalFire's database have two or more damage types, but this percentage increases for certain categories. For instance, 16% of single residences with a minor structure on the property have mixed damage levels. 
 
 ```{r}
 # what percentage of each structure category has mixed damage levels just for any residential use
@@ -287,18 +287,6 @@ df_any_res_all <- unique_parcels %>%
   mutate(target_check = map_lgl(structure_category_list, ~any((. %in% target)))) %>%
   # filter for only parcels where at least one category is in our list
   filter(target_check == TRUE)
-
-df_any_res_all %>%
-  st_drop_geometry() %>%
-  group_by(structure_category_list, mixed_damage) %>%
-  summarize(Count=n()) %>%
-  ungroup() %>%
-  group_by(structure_category_list) %>%
-  mutate(Percent=Count/sum(Count)) %>%
-  ungroup() %>%
-  rename('Structure Categories'=structure_category_list,
-         'Single or Mixed Damage'=mixed_damage) %>%
-  kable()
 
 # look at damage level by structure category
 df_any_res_all  %>% st_drop_geometry() %>%
@@ -315,13 +303,15 @@ df_any_res_all  %>% st_drop_geometry() %>%
 
 ```
 
+This second table shows the combination of damage levels for properties with at least one residential use and two or more damage levels. The majority of mixed damage levels include Destroyed and Affected or Destroyed and No Damage. The next most common are Affected and No Damage.
+
 ```{r damage}
 
 # what's the target list to include
 target <- list("Mixed Commercial/Residential","Multiple Residence","Single Residence")
 
 # filter for parcels that have more than 2 damage levels and that have at least one identified residential use
-df_any_res <- unique_parcels %>%
+df_any_res_mixed <- unique_parcels %>%
   filter(damage_type_count>=2) %>%
   mutate(target_check = map_lgl(structure_category_list, ~any((. %in% target)))) %>%
   # filter for only parcels where at least one category is in our list
@@ -329,7 +319,7 @@ df_any_res <- unique_parcels %>%
 
 
 # tabulate the combo damage levels for some residential use properties
-df_any_res %>%
+df_any_res_mixed %>%
   st_drop_geometry() %>%
   group_by(damage_type_list) %>%
   summarize(count=n(),
@@ -394,7 +384,6 @@ pal <- colorFactor(palette = c("#6F6F6F","#909078","#177FEB", "#4886BD", "#CC983
 # filter for these properties single resident properties
 df_map <- damaged_parcels_simple %>%
   filter(apn %in% df_single$apn)
-
 
 leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
@@ -597,7 +586,7 @@ sample <- sample_n(df_multiple,5)
 
 
 # Proposed Damage Categories
-To focus on properties that sustained greater damage and make the data findings more easily interpretable (by including fewer categories), we can group damage levels as follows:
+To focus on residential properties that sustained greater damage and make the data findings more easily interpretable (by including fewer categories), we can group damage levels as follows:
 
 * No Damage: No Damage, Inaccessible. Properties that have no damage recorded on any structure.
 
@@ -614,7 +603,7 @@ These properties sustained no damage. It includes "inaccessible" but only 40 pro
 target <- list("No Damage", "Inaccessible")
 
 # filter for parcels that only have these damage levels
-df_no_damage <- df_any_res %>%
+df_no_damage <- df_any_res_all %>%
   mutate(target_check = map_lgl(damage_type_list, ~any(!(. %in% target)))) %>%
   # filter for only parcels where no other damage type turns up
   filter(target_check == FALSE)
@@ -623,7 +612,15 @@ df_no_damage <- df_any_res %>%
 df_map <- damaged_parcels_simple %>%
   filter(apn %in% df_no_damage$apn)
 
+# unique parcel count
+unique_count <- length(unique(df_map$apn))
 
+```
+
+A total of `r unique_count` unique parcels fall into this category.
+
+
+```{r}
 leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
     setView(-118.104631, 34.185104, zoom = 12) %>%
@@ -676,7 +673,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 
 
 ## Some Damage
-These properties with at least some residential use would be considered as sustaining some damage. They sustained at least affected damage (1-8%) and at most minor damage (10-25%).
+These properties with at least some residential use would be considered as sustaining some damage. They sustained at least affected damage (1-9%) and at most minor damage (10-25%). We could combine this category with no damage to make a some to no damage category, or make one single damage category (combining with significant damage or destroyed).
 
 ```{r}
 
@@ -684,7 +681,7 @@ These properties with at least some residential use would be considered as susta
 target <- list("No Damage", "Inaccessible", "Affected (1-9%)","Minor (10-25%)")
 
 # filter for parcels that only have these damage levels
-df_some_damage <- df_any_res %>%
+df_some_damage <- df_any_res_all %>%
   mutate(target_check = map_lgl(damage_type_list, ~any(!(. %in% target)))) %>%
   # filter for only parcels where no other damage type turns up
   filter(target_check == FALSE)
@@ -694,7 +691,14 @@ df_map <- damaged_parcels_simple %>%
   filter(apn %in% df_some_damage$apn) %>%
   filter(!apn %in% df_no_damage$apn) 
 
+# unique parcel count
+unique_count <- length(unique(df_map$apn))
 
+```
+
+A total of `r unique_count` unique parcels fall into this category.
+
+```{r}
 leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
     setView(-118.104631, 34.185104, zoom = 12) %>%
@@ -754,7 +758,7 @@ These properties with at least some residential use would be considered as susta
 target <- list("Destroyed (>50%)", "Major (26-50%)")
 
 # filter for parcels that only have these damage levels
-df_destroyed <- df_any_res %>%
+df_destroyed <- df_any_res_all %>%
   mutate(target_check = map_lgl(damage_type_list, ~any((. %in% target)))) %>%
   # filter for only parcels where at least one of these damage levels turns up
   filter(target_check == TRUE)
@@ -763,6 +767,14 @@ df_destroyed <- df_any_res %>%
 df_map <- damaged_parcels_simple %>%
   filter(apn %in% df_destroyed$apn)
 
+# unique parcel count
+unique_count <- length(unique(df_map$apn))
+
+```
+
+A total of `r unique_count` unique parcels fall into this category.
+
+```{r}
 
 leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
