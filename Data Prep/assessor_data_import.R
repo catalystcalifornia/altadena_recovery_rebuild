@@ -1,4 +1,4 @@
-
+# Filter and import assessor data to postgres
 library(dplyr)
 library(data.table)
 library(sf)
@@ -8,21 +8,21 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 source("Data Prep\\assessor_data_functions.R")
 con <- connect_to_db("altadena_recovery_rebuild")
 
+
 ##### Prep to batch process zipped files #####
 # # Zipped assessor data downloaded to D: drive from EMG's OneDrive
-# assessor_data_folder <- "D:/Assessor Data FULL/OneDrive_2025-09-17.zip"
+# assessor_data_folder <- "D:/Assessor Data FULL/OneDrive_2025-09-23.zip"
 # temp_extract_dir <- "D:/temp_extract/"
 # 
 # # Don't need to rerun # Unzipped in a temporary D:/ folder "temp_extract" (fread wasn't working so I used PowerShell/terminal)
-# # unzipped_result <- system(paste0('powershell "Expand-Archive -Path \\"', assessor_data_folder, '\\" -DestinationPath \\"',temp_extract_dir,'\\" -Force"'))
+# unzipped_result <- system(paste0('powershell "Expand-Archive -Path \\"', assessor_data_folder, '\\" -DestinationPath \\"',temp_extract_dir,'\\" -Force"'))
 # 
 # # Confirm files extracted - by listing filenames in the temp folder
 # extracted_files <- list.files(temp_extract_dir, recursive = TRUE, full.names = TRUE)
 # print(extracted_files)
 
 
-
-##### Batch Process #####
+##### Batch Filter CSVs for targeted cities #####
 # # Sept CSVs to batch process
 # sept_csv_1 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 1.csv"
 # sept_csv_2 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 2.csv"
@@ -31,30 +31,33 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # # Preview one of the CSVs to see what we need
 # preview <- fread(sept_csv_1, nrows = 5)
 # print(preview)
-# print(names(preview)) # Need "City State" and "AIN" 
+# print(names(preview)) # Need "City State" and "AIN"
 # print(ncol(preview)) # 132
-
-# running with debug_cities=TRUE to get summaries about 'City State' data in each CSV
-# Can confirm the function is working so we can set debug_cities=FALSE
-
+# 
+# # running with debug_cities=TRUE to get summaries about 'City State' data in each CSV
+# # Can confirm the function is working so we can set debug_cities=FALSE
+# 
 # # Sept Part 1
 # sept_1_results <- batch_process_assessor_data(
-#   csv_file=sept_csv_1, 
+#   csv_file=sept_csv_1,
 #   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
 # # Sept Part 2
 # sept_2_results <- batch_process_assessor_data(
-#   csv_file=sept_csv_2, 
+#   csv_file=sept_csv_2,
 #   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
 # # Sept Part 3
 # sept_3_results <- batch_process_assessor_data(
-#   csv_file=sept_csv_3, 
+#   csv_file=sept_csv_3,
 #   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
@@ -78,40 +81,112 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # length(unique(all_results$ain)) # 66116
 # 
 # # frequency table of situs 'city_state' field
-# city_results <- as.data.frame(table(all_results$city_state, useNA = "ifany"))
+# sept_city_results <- as.data.frame(table(all_results$city_state, useNA = "ifany"))
 # 
 # # export results to csv (keeping all columns for QA)
-# write.csv(all_results, 
+# write.csv(all_results,
 #           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_sept_2025.csv",
 #           row.names=FALSE,
 #           fileEncoding = "UTF-8")
 
 
-# Jan CSVs to batch process
-jan_csv_1 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 1.csv"
-jan_csv_2 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 2.csv"
-jan_csv_3 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 3.csv"
+# # Sept CUSTOM CSVs to batch process
+# sept_custom_csv_1 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 1.csv"
+# sept_custom_csv_2 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 2.csv"
+# sept_custom_csv_3 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 3.csv"
+# 
+# # Preview one of the CSVs to see what we need
+# preview <- fread(sept_custom_csv_1, nrows = 5)
+# print(preview)
+# print(names(preview)) # Need "City State" and "AIN"
+# print(ncol(preview)) # 132
+# 
+# # running with debug_cities=TRUE to get summaries about 'City State' data in each CSV
+# # Can confirm the function is working so we can set debug_cities=FALSE
+# 
+# # Sept CUSTOM Part 1
+# sept_custom_1_results <- batch_process_assessor_data(
+#   csv_file=sept_custom_csv_1,
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="SitusCity",
+#   chunk_size = 10000,
+#   debug_cities=TRUE)
+# 
+# # Sept CUSTOM Part 2
+# sept_custom_2_results <- batch_process_assessor_data(
+#   csv_file=sept_custom_csv_2,
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="SitusCity",
+#   chunk_size = 10000,
+#   debug_cities=TRUE)
+# 
+# # Sept CUSTOM Part 3
+# sept_custom_3_results <- batch_process_assessor_data(
+#   csv_file=sept_custom_csv_3,
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="SitusCity",
+#   chunk_size = 10000,
+#   debug_cities=TRUE)
+# 
+# # Combine results (only Part 2 of Sept CSVs has results, CSVs are possibly organized by region)
+# all_custom_results <- rbind(sept_custom_1_results, sept_custom_2_results, sept_custom_3_results)
+# 
+# # remove results tables to save space
+# rm(sept_custom_1_results)
+# rm(sept_custom_2_results)
+# rm(sept_custom_3_results)
+# gc()
+# 
+# ##### Do an initial review of results (e.g., ensure unique IDs, note data quality issues, etc.)
+# # first column name has weird symbols ("ï»¿AIN"), bad practice of spaces in column names throughout
+# colnames(all_custom_results)
+# colnames(all_custom_results)[1] <- "AIN"
+# colnames(all_custom_results) <- gsub(" ", "_", tolower(colnames(all_custom_results)))
+# colnames(all_custom_results)
+# 
+# # unique AIN for each row
+# length(unique(all_custom_results$ain)) # 66090
+# 
+# # frequency table of situs 'city_state' field
+# sept_custom_city_results <- as.data.frame(table(all_custom_results$situscity, useNA = "ifany"))
+# 
+# # export results to csv (keeping all columns for QA)
+# write.csv(all_custom_results,
+#           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_sept_custom_2025.csv",
+#           row.names=FALSE,
+#           fileEncoding = "UTF-8")
 
+custom_sept_ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_sept_custom_2025.csv") 
+
+
+# # Jan CSVs to batch process
+# jan_csv_1 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 1.csv"
+# jan_csv_2 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 2.csv"
+# jan_csv_3 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 3.csv"
+# 
 # jan_1_results <- batch_process_assessor_data(
 #   csv_file=jan_csv_1,
 #   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
 # jan_2_results <- batch_process_assessor_data(
 #   csv_file=jan_csv_2,
 #   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
 # jan_3_results <- batch_process_assessor_data(
 #   csv_file=jan_csv_3,
 #   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
-# # Combine results 
-# all_results <- rbind(jan_1_results, jan_2_results, jan_3_results)
+# # Combine results
+# all_jan_results <- rbind(jan_1_results, jan_2_results, jan_3_results)
 # 
 # # remove results tables to save space
 # rm(jan_1_results)
@@ -121,26 +196,27 @@ jan_csv_3 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 3.csv"
 # 
 # ##### Do an initial review of results (e.g., ensure unique IDs, note data quality issues, etc.)
 # # first column name has weird symbols ("ï»¿AIN"), bad practice of spaces in column names throughout
-# colnames(all_results)
-# colnames(all_results)[1] <- "AIN"
-# colnames(all_results) <- gsub(" ", "_", tolower(colnames(all_results)))
-# colnames(all_results)
+# colnames(all_jan_results)
+# colnames(all_jan_results)[1] <- "AIN"
+# colnames(all_jan_results) <- gsub(" ", "_", tolower(colnames(all_jan_results)))
+# colnames(all_jan_results)
 # 
 # # unique AIN for each row
-# length(unique(all_results$ain)) # 66096
+# length(unique(all_jan_results$ain)) # 66096
 # 
 # # frequency table of situs 'city_state' field
-# jan_city_results <- as.data.frame(table(all_results$city_state, useNA = "ifany"))
+# jan_city_results <- as.data.frame(table(all_jan_results$city_state, useNA = "ifany"))
 # 
 # # export results to csv (keeping all columns for QA)
-# write.csv(all_results,
+# write.csv(all_jan_results,
 #           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_jan_2025.csv",
 #           row.names=FALSE,
 #           fileEncoding = "UTF-8")
 
+
 ##### Filter parcel shp files #####
 # read in Sept results and keep only AIN
-ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_sept_2025.csv")
+sept_ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_sept_2025.csv")
 
 # Explore Sept parcel shpfile
 shp_path <- "D:/temp_extract/Assessor Data/Assr Data 20250902/parcels.shp"
@@ -163,7 +239,7 @@ names(parcel_sample) # uses AIN
 # [29] "_ogr_geometry_"
 
 # Convert your AINs to a vector for filtering
-target_ains_vector <- ains$ain
+target_ains_vector <- sept_ains$ain
 
 # # Filter assessor parcels that match Altadena/Pasadena/Sierra Madre AINs
 # filtered_parcels <- batch_filter_shapefile(
@@ -180,26 +256,39 @@ filtered_parcels <- filtered_parcels %>%
 
 colnames(filtered_parcels) <- tolower(colnames(filtered_parcels))
 
-# ##### Export Sept 2025 data #####
-# # shp file
+# ##### Export data #####
+source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
+qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_import_assessor_data.docx"
+schema <- "data"
+
+# # Sept shp file
 # export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_sept2025", srid = "", geometry_type = "", geometry_column = "geometry")
-# # csv
+# indicator <- "Parcels with site addresses in Altadena, Pasadena, and Sierra Madre as of September 2025."
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.assessor_parcels_sept2025 IS '", indicator, " 
+#             Data imported on 9-23-25. ",
+#             "QA DOC: ", qa_filepath,
+#             " Source: ", source, "'"))
+
+# # Sept csv
 # table_name <- "assessor_data_sept2025"
-# schema <- "data"
-# indicator <- "to add"
-# source <- "Los Angeles County Assessor"
-# qa_filepath <- "to add"
-# table_comment <- paste0(indicator, source)
+# indicator <- "Assessor data from September 2025 for parcels in Altadena, Pasadena, and Sierra Madre."
 # dbWriteTable(con, Id(schema, table_name), ains,
 #              overwrite = FALSE, row.names = FALSE)
-# 
-# # Comment on table and columns
-# column_names <- colnames(jan_ains) 
-# column_comments <- c(
-#   "to add",
-# )
-# 
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
+#             Data imported on 9-23-25. ",
+#                         "QA DOC: ", qa_filepath,
+#                         " Source: ", source, "'"))
+
+# # Sept custom csv
+# table_name <- "assessor_custom_data_sept2025"
+# indicator <- "Custom assessor data from September 2025 for parcels in Altadena, Pasadena, and Sierra Madre."
+# dbWriteTable(con, Id(schema, table_name), custom_sept_ains,
+#              overwrite = FALSE, row.names = FALSE)
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
+#             Data imported on 9-23-25. ",
+#                         "QA DOC: ", qa_filepath,
+#                         " Source: ", source, "'"))
+
 
 # read in Jan results and keep only AIN
 jan_ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_jan_2025.csv") 
@@ -228,24 +317,23 @@ colnames(filtered_parcels) <- tolower(colnames(filtered_parcels))
 ##### Export Jan 2025 data #####
 # # Filtered shp file
 # export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_jan2025", srid = "", geometry_type = "", geometry_column = "geometry")
-# 
+# indicator <- "Parcels with site addresses in Altadena, Pasadena, and Sierra Madre as of January 2025."
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.assessor_parcels_jan2025 IS '", indicator, "
+#             Data imported on 9-23-25. ",
+#             "QA DOC: ", qa_filepath,
+#             " Source: ", source, "'"))
+
+
 # # Filtered csv file
 # table_name <- "assessor_data_jan2025"
-# schema <- "data"
-# indicator <- "to add"
-# source <- "Los Angeles County Assessor"
-# qa_filepath <- "to add"
-# table_comment <- paste0(indicator, source)
+# indicator <- "Custom assessor data from January 2025 for parcels in Altadena, Pasadena, and Sierra Madre."
 # dbWriteTable(con, Id(schema, table_name), jan_ains,
 #              overwrite = FALSE, row.names = FALSE)
-# 
-# # Comment on table and columns
-# column_names <- colnames(jan_ains) 
-# column_comments <- c(
-#   "to add",
-# )
-# 
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
+#             Data imported on 9-23-25. ",
+#                         "QA DOC: ", qa_filepath,
+#                         " Source: ", source, "'"))
+
 
 ##### Compare Sept to Jan AINS and parcels #####
 # AINs
