@@ -5,7 +5,11 @@ library(dplyr)
 library(data.table)
 library(sf)
 
-batch_process_assessor_data <- function(csv_file, target_cities, chunk_size = 10000, debug_cities = TRUE) {
+batch_process_assessor_data <- function(csv_file, 
+                                        target_cities, 
+                                        filter_column="",
+                                        chunk_size = 10000, 
+                                        debug_cities = TRUE) {
   # Note the function matches the provided target cities to anywhere in the 'City State' col
   # (e.g., Pasadena and South Pasadena will be matched)
   cat("Starting batch processing of:", csv_file, "\n")
@@ -29,10 +33,10 @@ batch_process_assessor_data <- function(csv_file, target_cities, chunk_size = 10
   cat("Column names found:", length(col_names), "columns\n")
   
   # Verify required columns
-  if (!"City State" %in% col_names) {
-    cat("ERROR: 'City State' column not found!\n")
+  if (!filter_column %in% col_names) {
+    cat(paste("ERROR:", filter_column, "column not found!\n"))
     cat("Available columns:", paste(col_names[1:min(10, length(col_names))], collapse = ", "), "...\n")
-    stop("Required column 'City State' not found")
+    stop(paste("Required column", filter_column, "not found"))
   }
   
   cat("✓ 'City State' column found successfully\n")
@@ -61,7 +65,7 @@ batch_process_assessor_data <- function(csv_file, target_cities, chunk_size = 10
     
     # CITY DISCOVERY: Show unique cities in first few chunks
     if (debug_cities && chunk_num <= 5) {
-      unique_cities <- unique(chunk[["City State"]])
+      unique_cities <- unique(chunk[[filter_column]])
       all_cities_found <- unique(c(all_cities_found, unique_cities))
       cat("\n  Unique cities in chunk", chunk_num, ":\n")
       print(unique_cities[1:min(10, length(unique_cities))])
@@ -70,7 +74,7 @@ batch_process_assessor_data <- function(csv_file, target_cities, chunk_size = 10
     # Filter for target cities
     city_pattern <- paste(target_cities, collapse = "|")
     filtered <- chunk[grepl(city_pattern, 
-                            toupper(trimws(chunk[["City State"]])), 
+                            toupper(trimws(chunk[[filter_column]])), 
                             ignore.case = TRUE)]
     
     # Clean up original chunk
@@ -84,7 +88,7 @@ batch_process_assessor_data <- function(csv_file, target_cities, chunk_size = 10
       total_filtered_rows <- total_filtered_rows + nrow(filtered)
       
       # Show sample cities found
-      sample_cities <- unique(filtered[["City State"]])[1:min(3, length(unique(filtered[["City State"]])))]
+      sample_cities <- unique(filtered[[filter_column]])[1:min(3, length(unique(filtered[[filter_column]])))]
       cat("  ✓ Target cities found:", paste(sample_cities, collapse = ", "), "\n")
     } else {
       cat(" No matching rows found\n")
