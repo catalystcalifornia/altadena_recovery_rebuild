@@ -831,10 +831,16 @@ This map displays residential or mixed use properties that sustained at least an
 
 Kinneloa Mesa did not sustain any damage so it would largely not be included in the analysis. Notably, some properties marked as destroyed fall just slightly outside of the burn area. CalFire's notes in their documentation that they assessor parcels within 100 feet of the fire perimeter. We would include any parcel evaluated by CalFire in the analysis even those that are outside of the official burn area. We could also draw boundaries that encompass more of Altadena to evaluate the housing stock before and after, e.g., for all of the Altadena community--what was the housing makeup before even outside of the fire perimeter vs. what were the properties impacted?
 
-```{r altadena-map}
+```{r altadena-map, include=FALSE}
 
 # map damaged parcels and check boundaries we want to use against tracts and places
+west <- st_read("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Shapefiles\\WEST_fire_perimeter_v2.shp")
+east <- st_read("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Shapefiles\\EAST_fire_perimeter_v2.shp")
+west<-st_transform(west,4326)
+east<-st_transform(east,4326)
+```
 
+```{r}
 # for purpose of boundary mapping, let's just map properties that were damaged, regardless if they are duplicates and let's focus on residential properties
 only_damaged_parcels <- damaged_parcels_simple %>%
   filter(!damage %in% c("No Damage", "Inaccessible")) %>%
@@ -864,6 +870,22 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               opacity=1,
               popup=~"Eaton Fire Burn Area",
               group="Eaton Fire Perimeter") %>%
+    addPolygons(data=west,
+              fillColor="white",
+              fillOpacity=0,
+              color="green",
+              weight=2.5,
+              opacity=1,
+              popup=~"West Altadena",
+              group="West Altadena") %>%
+      addPolygons(data=east,
+              fillColor="white",
+              fillOpacity=0,
+              color="red",
+              weight=2.5,
+              opacity=1,
+              popup=~"East Altadena",
+              group="East Altadena") %>%
     addPolygons(data=altadena_tracts,
               fillColor="white",
               fillOpacity=0,
@@ -894,7 +916,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
         popup = ~paste0(damage,"</br>",
                         "Parcel #: ", apn, "</br>",
                         "Structure Category: ", structurec, "</br>",
-                        "Address: ", full_address, "</br>",
+                        "Address: ", site_address_parcel, "</br>",
                         "City: ", city),
                         # Optional: Add a popup
         group="Damaged Properties"
@@ -906,7 +928,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
         title = "Damage level"
       ) %>%
   addLayersControl(
-          overlayGroups = c("Eaton Fire Perimeter", "Census Tracts","Damaged Properties","Cities"),
+          overlayGroups = c("Eaton Fire Perimeter", "West Altadena", "East Altadena","Census Tracts","Damaged Properties","Cities"),
         options = layersControlOptions(collapsed = FALSE)
   )
       
