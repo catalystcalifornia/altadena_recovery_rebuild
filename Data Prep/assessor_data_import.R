@@ -23,24 +23,24 @@ con <- connect_to_db("altadena_recovery_rebuild")
 
 
 ##### Batch Filter CSVs for targeted cities #####
-# # Sept CSVs to batch process
-# sept_csv_1 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 1.csv"
-# sept_csv_2 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 2.csv"
-# sept_csv_3 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 3.csv"
-# 
-# # Preview one of the CSVs to see what we need
-# preview <- fread(sept_csv_1, nrows = 5)
-# print(preview)
-# print(names(preview)) # Need "City State" and "AIN"
-# print(ncol(preview)) # 132
-# 
-# # running with debug_cities=TRUE to get summaries about 'City State' data in each CSV
-# # Can confirm the function is working so we can set debug_cities=FALSE
-# 
+# Sept CSVs to batch process
+sept_csv_1 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 1.csv"
+sept_csv_2 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 2.csv"
+sept_csv_3 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 3.csv"
+
+# Preview one of the CSVs to see what we need
+preview <- fread(sept_csv_1, nrows = 5)
+print(preview)
+print(names(preview)) # Need "City State" and "AIN"
+print(ncol(preview)) # 132
+
+# running with debug_cities=TRUE to get summaries about 'City State' data in each CSV
+# Can confirm the function is working so we can set debug_cities=FALSE
+
 # # Sept Part 1
 # sept_1_results <- batch_process_assessor_data(
 #   csv_file=sept_csv_1,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
@@ -48,7 +48,7 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # # Sept Part 2
 # sept_2_results <- batch_process_assessor_data(
 #   csv_file=sept_csv_2,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
@@ -56,7 +56,7 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # # Sept Part 3
 # sept_3_results <- batch_process_assessor_data(
 #   csv_file=sept_csv_3,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
@@ -89,25 +89,27 @@ con <- connect_to_db("altadena_recovery_rebuild")
 #           row.names=FALSE,
 #           fileEncoding = "UTF-8")
 
+sept_ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/filtered_ain_sept_2025.csv")
 
-# # Sept CUSTOM CSVs to batch process
-# sept_custom_csv_1 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 1.csv"
-# sept_custom_csv_2 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 2.csv"
-# sept_custom_csv_3 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 3.csv"
-# 
-# # Preview one of the CSVs to see what we need
-# preview <- fread(sept_custom_csv_1, nrows = 5)
-# print(preview)
-# print(names(preview)) # Need "City State" and "AIN"
-# print(ncol(preview)) # 132
-# 
-# # running with debug_cities=TRUE to get summaries about 'City State' data in each CSV
-# # Can confirm the function is working so we can set debug_cities=FALSE
-# 
+
+# Sept CUSTOM CSVs to batch process
+sept_custom_csv_1 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 1.csv"
+sept_custom_csv_2 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 2.csv"
+sept_custom_csv_3 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 3.csv"
+
+# Preview one of the CSVs to see what we need
+preview <- fread(sept_custom_csv_1, nrows = 5)
+print(preview)
+print(names(preview)) # Need "City State" and "AIN"
+print(ncol(preview)) # 132
+
+# running with debug_cities=TRUE to get summaries about 'City State' data in each CSV
+# Can confirm the function is working so we can set debug_cities=FALSE
+
 # # Sept CUSTOM Part 1
 # sept_custom_1_results <- batch_process_assessor_data(
 #   csv_file=sept_custom_csv_1,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="SitusCity",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
@@ -115,7 +117,7 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # # Sept CUSTOM Part 2
 # sept_custom_2_results <- batch_process_assessor_data(
 #   csv_file=sept_custom_csv_2,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="SitusCity",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
@@ -123,7 +125,7 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # # Sept CUSTOM Part 3
 # sept_custom_3_results <- batch_process_assessor_data(
 #   csv_file=sept_custom_csv_3,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="SitusCity",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
@@ -166,25 +168,29 @@ custom_sept_ains <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/
 # 
 # jan_1_results <- batch_process_assessor_data(
 #   csv_file=jan_csv_1,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
 # jan_2_results <- batch_process_assessor_data(
 #   csv_file=jan_csv_2,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
 # jan_3_results <- batch_process_assessor_data(
 #   csv_file=jan_csv_3,
-#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE"),
+#   target_cities = c("ALTADENA", "PASADENA", "SIERRA MADRE", "ARCADIA"),
 #   filter_column="City State",
 #   chunk_size = 10000,
 #   debug_cities=TRUE)
 # 
+# # note: suddenly jan 3 results has 133 columns (don't think it did before) - 
+# # dropping for now (all NA) so it can be joined with other Jan results
+# jan_3_results <- jan_3_results %>%
+#   select(-`CR LF`)
 # # Combine results
 # all_jan_results <- rbind(jan_1_results, jan_2_results, jan_3_results)
 # 
@@ -242,11 +248,11 @@ names(parcel_sample) # uses AIN
 target_ains_vector <- sept_ains$ain
 
 # # Filter assessor parcels that match Altadena/Pasadena/Sierra Madre AINs
-# filtered_parcels <- batch_filter_shapefile(
-#   shp_path=shp_path,
-#   target_ains=target_ains_vector,
-#   chunk_size = 5000,
-#   ain_column = "AIN")
+filtered_parcels <- batch_filter_shapefile(
+  shp_path=shp_path,
+  target_ains=target_ains_vector,
+  chunk_size = 5000,
+  ain_column = "AIN")
 
 quick_check <- head(filtered_parcels, 10)
 
@@ -263,16 +269,16 @@ schema <- "data"
 
 # # Sept shp file
 # export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_sept2025", srid = "", geometry_type = "", geometry_column = "geometry")
-# indicator <- "Parcels with site addresses in Altadena, Pasadena, and Sierra Madre as of September 2025."
-# dbSendQuery(con, paste0("COMMENT ON TABLE data.assessor_parcels_sept2025 IS '", indicator, " 
+# indicator <- "Parcels with site addresses in Altadena, Arcadia, Pasadena, and Sierra Madre as of September 2025."
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.assessor_parcels_sept2025 IS '", indicator, "
 #             Data imported on 9-23-25. ",
 #             "QA DOC: ", qa_filepath,
 #             " Source: ", source, "'"))
 
 # # Sept csv
 # table_name <- "assessor_data_sept2025"
-# indicator <- "Assessor data from September 2025 for parcels in Altadena, Pasadena, and Sierra Madre."
-# dbWriteTable(con, Id(schema, table_name), ains,
+# indicator <- "Assessor data from September 2025 for parcels in Altadena, Arcadia, Pasadena, and Sierra Madre."
+# dbWriteTable(con, Id(schema, table_name), sept_ains,
 #              overwrite = FALSE, row.names = FALSE)
 # dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
 #             Data imported on 9-23-25. ",
@@ -281,7 +287,7 @@ schema <- "data"
 
 # # Sept custom csv
 # table_name <- "assessor_custom_data_sept2025"
-# indicator <- "Custom assessor data from September 2025 for parcels in Altadena, Pasadena, and Sierra Madre."
+# indicator <- "Custom assessor data from September 2025 for parcels in Altadena, Arcadia, Pasadena, and Sierra Madre."
 # dbWriteTable(con, Id(schema, table_name), custom_sept_ains,
 #              overwrite = FALSE, row.names = FALSE)
 # dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
@@ -317,7 +323,7 @@ colnames(filtered_parcels) <- tolower(colnames(filtered_parcels))
 ##### Export Jan 2025 data #####
 # # Filtered shp file
 # export_shpfile(con=con, df=filtered_parcels, schema="data", table_name="assessor_parcels_jan2025", srid = "", geometry_type = "", geometry_column = "geometry")
-# indicator <- "Parcels with site addresses in Altadena, Pasadena, and Sierra Madre as of January 2025."
+# indicator <- "Parcels with site addresses in Altadena, Arcadia, Pasadena, and Sierra Madre  as of January 2025."
 # dbSendQuery(con, paste0("COMMENT ON TABLE data.assessor_parcels_jan2025 IS '", indicator, "
 #             Data imported on 9-23-25. ",
 #             "QA DOC: ", qa_filepath,
@@ -326,7 +332,7 @@ colnames(filtered_parcels) <- tolower(colnames(filtered_parcels))
 
 # # Filtered csv file
 # table_name <- "assessor_data_jan2025"
-# indicator <- "Custom assessor data from January 2025 for parcels in Altadena, Pasadena, and Sierra Madre."
+# indicator <- "Custom assessor data from January 2025 for parcels in Altadena, Arcadia, Pasadena, and Sierra Madre."
 # dbWriteTable(con, Id(schema, table_name), jan_ains,
 #              overwrite = FALSE, row.names = FALSE)
 # dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
@@ -337,13 +343,13 @@ colnames(filtered_parcels) <- tolower(colnames(filtered_parcels))
 
 ##### Compare Sept to Jan AINS and parcels #####
 # AINs
-sept_only_ains <- anti_join(ains, jan_ains, by="ain") %>%
+sept_only_ains <- anti_join(sept_ains, jan_ains, by="ain") %>%
   select(ain) 
 
-jan_only_ains <- anti_join(jan_ains, ains, by="ain") %>%
+jan_only_ains <- anti_join(jan_ains, sept_ains, by="ain") %>%
   select(ain) 
 
-all_ains <- rbind(ains, jan_ains) %>%
+all_ains <- rbind(sept_ains, jan_ains) %>%
   select(ain) %>%
   distinct() %>%
   mutate(source_data = 
