@@ -1,4 +1,9 @@
 # Filter and import assessor data to postgres
+# In three parts: 
+## (1) Get list of AINs by filtering CSVs on site city based on list of targeted city names
+## (2) Get list of AINs from spatial join of CalFire damage points to parcels
+## (3) Get list of AINs from spatial join of targeted city perimeters to parcels
+
 library(dplyr)
 library(data.table)
 library(sf)
