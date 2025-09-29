@@ -490,3 +490,36 @@ batch_filter_shapefile_intersect <- function(shp_path, target_points, chunk_size
     return(NULL)
   }
 }
+
+# For each unmatched point, find nearest parcel
+find_nearest_postgis <- function(con, unmatched_points, max_distance = 100) {
+  
+  # Convert points to WKT for the query
+  point_wkt <- st_as_text(st_geometry(unmatched_points))
+  
+  results <- list()
+  
+  for (i in 1:nrow(unmatched_points)) {
+    query <- paste0("
+      SELECT 
+        ain,
+        ST_Distance(geom, ST_GeomFromText('", point_wkt[i], "', ", st_crs(unmatched_points)$epsg, ")) as distance
+      FROM parcel_jan2025 
+      WHERE ST_DWithin(geom, ST_GeomFromText('", point_wkt[i], "', ", st_crs(unmatched_points)$epsg, "), ", max_distance, ")
+      ORDER BY geom <-> ST_GeomFromText('", point_wkt[i], "', ", st_crs(unmatched_points)$epsg, ")
+      LIMIT 1;
+    ")
+    
+    result <- dbGetQuery(con, query)
+    if (nrow(result) > 0) {
+      results[[i]] <- data.frame(
+        point_index = i,
+        nearest_ain = result$ain,
+        distance = result$distance
+      )
+    }
+  }
+  
+  do.call(rbind, results)
+}
+
