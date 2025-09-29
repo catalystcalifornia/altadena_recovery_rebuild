@@ -9,6 +9,7 @@ library(purrr)
 library(stringr)
 library(sf)
 library(RPostgres)
+library(readr)
 
 #Add database connection and source script with functions for pushing to postgres
 source("W:\\RDA Team\\R\\credentials_source.R")
@@ -48,16 +49,16 @@ View(step3_col_names)
 
 #4th, rename columns as needed
 cols_rename <- c(
-    "street_type_e_g_road_drive_lane_etc" = "street_type",
-    "street_suffix_e_g_apt_23_blding_c" = "street_suffix",
-    "incident_number_e_g_caaeu_123456" = "incident_number",
-    "if_affected_1_9_where_did_fire_start" = "affected_start",
-    "if_affected_1_9_what_started_fire" = "affected_cause",
-    "of_damaged_outbuildings_120_sqft" = "n_damaged_outbuildings_120_sqft",
-    "of_non_damaged_outbuildings_120_sqft" = "n_non_damaged_outbuildings_120_sqft",
-    "distance_residence_to_utility_misc_structure_gt_120_sqft" = "distance_residence_to_utility_misc_structure",
-    "globalid" = "global_id"
-  )
+  "street_type_e_g_road_drive_lane_etc" = "street_type",
+  "street_suffix_e_g_apt_23_blding_c" = "street_suffix",
+  "incident_number_e_g_caaeu_123456" = "incident_number",
+  "if_affected_1_9_where_did_fire_start" = "affected_start",
+  "if_affected_1_9_what_started_fire" = "affected_cause",
+  "of_damaged_outbuildings_120_sqft" = "n_damaged_outbuildings_120_sqft",
+  "of_non_damaged_outbuildings_120_sqft" = "n_non_damaged_outbuildings_120_sqft",
+  "distance_residence_to_utility_misc_structure_gt_120_sqft" = "distance_residence_to_utility_misc_structure",
+  "globalid" = "global_id"
+)
 
 step4_col_names <- step3_col_names %>%
   mutate(
@@ -65,19 +66,22 @@ step4_col_names <- step3_col_names %>%
                      cols_rename[cleaned],
                      cleaned)
   ) %>%
-  filter(!cleaned %in% c("objectid", "x", "y")) %>%
-  add_row(original = "Geometry", cleaned = "geometry")
+  filter(!cleaned %in% c("objectid", "x", "y")) 
 
 #5th, apply to shapefile
-names(fire_shp_3310) <- step4_col_names$cleaned
+names(fire_shp_3310)[1:ncol(fire_shp_3310)-1] <- step4_col_names$cleaned
+
+fire_shp_3310 <- fire_shp_3310 %>%
+  mutate(din_id=row_number()) %>%
+  select(din_id, everything())
 
 #### Step 2: Use export function to push to postgres ####
 
 export_shpfile(con=con, df=fire_shp_3310, schema="data",
-               table_name= "eaton_fire_dmg_insp_3310",
+               table_name= "eaton_fire_dmg_insp_3310_jz",
                geometry_column = "geometry")
 
-dbSendQuery(con, "COMMENT ON TABLE data.eaton_fire_dmg_insp_3310 IS
+dbSendQuery(con, "COMMENT ON TABLE data.eaton_fire_dmg_insp_3310_jz IS
             'Damage Inspection data for the Eaton Fire from CAL FIRE eGIS, June 2, 2025 in SRID 3310
             Data imported on 9-4-25
             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_import_dmg_insp.docx
@@ -88,7 +92,7 @@ for(i in seq_len(nrow(step4_col_names))) {
   comment_text <- step4_col_names$original[i]
   
   sql <- sprintf(
-    "COMMENT ON COLUMN data.eaton_fire_dmg_insp_3310.%s IS '%s';",
+    "COMMENT ON COLUMN data.eaton_fire_dmg_insp_3310_jz.%s IS '%s';",
     DBI::dbQuoteIdentifier(con, col),
     comment_text
   )
