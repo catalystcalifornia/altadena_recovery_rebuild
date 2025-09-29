@@ -1,4 +1,4 @@
-options(scipen = 999) # turn off scientific notation for batch queries
+# join all structures from CalFire Eaton fire damage assessment to an assessor parcel
 
 library(dplyr)
 library(data.table)
@@ -10,16 +10,16 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 source("Data Prep\\assessor_data_functions.R")
 con <- connect_to_db("altadena_recovery_rebuild")
 
-##### SHP FILES #####
+##### Define/load data #####
 jan_shp_path <- "D:/temp_extract/Assessor Data/Assr Data 20250106/parcel.shp"
-
-##### get calfire damage points #####
 
 calfire <- st_read(con, quer="SELECT global_id, apn_parcel, geom as geometry FROM data.eaton_fire_dmg_insp_3310")
 st_crs(calfire)
 
-jan_parcel_matches <- batch_filter_shapefile_intersect(shp_path=jan_shp_path, target_points=calfire, chunk_size = 10000)
-st_crs(jan_parcel_matches)
+##### Run intersection ######
+# jan_parcel_matches <- batch_filter_shapefile_intersect(shp_path=jan_shp_path, target_points=calfire, chunk_size = 10000)
+st_crs(jan_parcel_matches) # 2229
+
 # mapview(jan_parcel_matches) 
 
 jan_parcel_matches_3310 <- st_transform(jan_parcel_matches, 3310)
@@ -39,16 +39,18 @@ check_point_dupes <- jan_intersects_results %>%
 
 length(unique(check_point_dupes$global_id)) #92
 
+# these seem to be condos but there is a record where apn=ain for each
+# will keep those records and discard the rest
 ain_apn_matches <- check_point_dupes %>%
   filter(apn_parcel==AIN) %>%
   select(global_id, apn_parcel, AIN)
 
 length(unique(ain_apn_matches$global_id)) #81
 
-# these are the ones from missing_parcels.R that are condos that should 
-# have their own AIN/APN. Don't understand the duplicates and that there
-# are unique global_id values within but to reconcile will pull in the 
-# these from pg using apn_parcel and then filter for matching apn and global_id
+# the remaining 11 are the ones from missing_parcels.R that are condos that  
+# have their own AIN/APN but for some reason are all recorded with the same apn
+# in CalFire. To reconcile will manually define the correct AIN
+# then filter for matching apn and global_id
 
 # correct ain:
 # "5833019043", # 155 E Palm Street Altadena CA 91001
@@ -78,44 +80,125 @@ street_nums <- dbGetQuery(con, "SELECT global_id, apn_parcel, street_number FROM
     street_number==197 ~ "5833019053",
   ))
 
-no_matches <- setdiff(check_point_dupes$global_id, ain_apn_matches$global_id) %>%
+# the remaining 11 structures
+ain_apn_no_match <- setdiff(check_point_dupes$global_id, ain_apn_matches$global_id) %>%
   data.frame(global_id=.) %>%
   left_join(jan_intersects_results, by="global_id") %>%
   left_join(street_nums) %>%
   filter(new_apn==AIN) %>%
   select(global_id, apn_parcel, AIN)
-  
-fixed_dupes <- rbind(no_matches, ain_apn_matches) %>%
+
+# combine corrected records
+deduped <- rbind(ain_apn_no_match, ain_apn_matches) %>%
   left_join(jan_intersects_results) %>%
   select(-geometry)
 
+# get freq count again
 check_point_dupes <- check_point_dupes %>%
   select(global_id, apn_parcel, AIN, freq)
 
+# join freq col drop records that have duplicates
 remove_dupes <- jan_intersects_results %>%
   left_join(check_point_dupes) %>% 
   filter(is.na(freq)) %>%
   select(-freq) %>%
   st_drop_geometry()
 
-final <- rbind(remove_dupes, fixed_dupes)
+# combine for final de-duped df
+final <- rbind(remove_dupes, deduped)
+
+##### Check for NAs #####
+na_ains <- final %>% filter(is.na(AIN))
+
+calfire <- st_read(con, query="SELECT * FROM data.eaton_fire_dmg_insp_3310")
+calfire_na <- na_ains %>%
+  left_join(calfire, by="global_id") %>%
+  st_as_sf(sf_column_name="geom", crs=st_crs(calfire)) 
+
+mapview(calfire_na)
+# all the mount wilson addresses should be apn/ain: 5862017310 - the parcel shapes in the assessor portal are not clipped properly https://portal.assessor.lacounty.gov/parceldetail/5862017310
+# 3308 bellaire rd has an AIN: 5833010028; looks like coordinate is slightly off
+
+# 5829002013 - apn looks correct and matches ain based on address here: https://portal.assessor.lacounty.gov/parceldetail/5829002013
+# same for others: 5832009005, 5853007006, 5862017310
+# search csv and shapefile for this AIN
+check <- calfire_na %>% st_drop_geometry() %>% select(apn_parcel.x) %>% pull()
+
+# based on apns expect they'll be in csv 2 and/or 3
+jan_2_results <- batch_process_assessor_data(
+  csv_file=jan_csv_2,
+  target_list = check,
+  filter_column="ï»¿AIN",
+  chunk_size = 10000,
+  debug_filter=TRUE)
+
+jan_shp_results <- batch_filter_shapefile(
+  shp_path=jan_shp_path,
+  target_ains=check,
+  chunk_size = 5000,
+  ain_column = "AIN")
+
+check_csv_results <- jan_2_results %>%
+  left_join(jan_shp_results, by=c("ï»¿AIN"="AIN")) %>%
+  st_as_sf(sf_column_name="_ogr_geometry_", crs=st_crs(jan_shp_results))
+
+st_crs(calfire_na)
+
+# can see coordinates for these four structures are just outside of their parcels
+mapview(calfire_na) + mapview(check_csv_results)
+
+##### run nearest feature to see if we can grab the correct parcel for structures with NA AIN #####
+# Note - best to import parcel shp to pg (done for Jan 2025) for this to run quickly
+# check within 100 meters
+calfire_na_2229 <-st_transform(calfire_na, 2229)
+nearest_parcels <- find_nearest_postgis(con, unmatched_points=calfire_na_2229, max_distance = 100) 
+calfire_na_parcel <- calfire_na %>%
+  mutate(row_id=row_number()) %>%
+  left_join(nearest_parcels, by=c("row_id"="point_index")) %>% 
+  select(global_id, apn_parcel.x, nearest_ain, distance, starts_with("street"), city, state, zip_code, everything()) %>%
+  rename(apn_parcel=apn_parcel.x)
+
+# based on above - results match what we wanted
+# replace the NA AINs in final with these results
+nearest_ain <- calfire_na_parcel %>%
+  st_drop_geometry() %>%
+  select(global_id, apn_parcel, nearest_ain)
+
+# get shp data for these ains
+nearest_ain_results <- batch_filter_shapefile(
+  shp_path=jan_shp_path,
+  target_ains=nearest_ain$nearest_ain,
+  chunk_size = 5000,
+  ain_column = "AIN")
+
+replace_ain <- nearest_ain_results %>%
+  select(GlobalID, AIN) %>%
+  st_drop_geometry() %>%
+  left_join(nearest_ain, by=c("AIN"="nearest_ain")) 
+
+#drop previous NA AINs
+final_dropna <- final %>% #18422
+  filter(!is.na(AIN)) %>%
+  select(global_id, apn_parcel, AIN, GlobalID) 
 
 
-length(unique(final$global_id))
-length(unique(final$apn_parcel))
-length(unique(final$GlobalID))
-length(unique(final$AIN))
-
-final <- final %>% 
-  select(global_id, apn_parcel, AIN, GlobalID, match_date) %>%
+final2 <- rbind(final_dropna, replace_ain) %>%
   rename(calfire_apn=apn_parcel,
          assessor_ain=AIN,
          calfire_global_id = global_id,
          assessor_global_id = GlobalID)
 
+
+#### Final review and export #####
+length(unique(final2$calfire_global_id))  #18422
+length(unique(final2$calfire_apn)) #11068
+length(unique(final2$assessor_global_id)) # 11086
+length(unique(final2$assessor_ain))  # 11086
+
+
 ##### Export to postgres #####
-charvect = rep('varchar', ncol(final)) 
-names(charvect) <- colnames(final)  
+charvect = rep('varchar', ncol(final2)) 
+names(charvect) <- colnames(final2)  
 
 table_name <- 'calfire_assessor_xwalk_jan2025'
 schema<- 'data'
@@ -127,11 +210,11 @@ table_comment <- paste0(indicator, source)
 
 dbWriteTable(con,
              Id(schema = schema, table = table_name),
-             final, overwrite = FALSE, row.names = FALSE,  field.types = charvect)
+             final2, overwrite = FALSE, row.names = FALSE,  field.types = charvect)
 
 
 #Add comment on table and columns
-column_names <- colnames(final) 
+column_names <- colnames(final2) 
 column_comments <- c(
   "CalFire-assigned ID - should be unique alone or in conjunction with calfire_apn",
   "CalFire-assigned Assessor''s Parcel Number (APN); can differ from assessor_ain",
@@ -142,11 +225,3 @@ column_comments <- c(
 
 add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
-# # look into one example - old
-# calfire %>% filter(global_id=="061a5a1e-bcb2-4726-87cd-324a84044932")
-# multiple_parcels <- jan_intersects_results %>% filter(global_id=="061a5a1e-bcb2-4726-87cd-324a84044932") %>% select(GlobalID) %>%
-#   st_drop_geometry() %>% pull()
-# 
-# multiple_parcels_shp <- batch_filter_shapefile(shp_path=jan_shp_path, target_ains=multiple_parcels, chunk_size = 10000, ain_column = "GlobalID") 
-# 
-# mapview(multiple_parcels_shp)
