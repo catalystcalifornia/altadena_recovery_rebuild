@@ -78,21 +78,22 @@ fire_shp_3310 <- fire_shp_3310 %>%
 #### Step 2: Use export function to push to postgres ####
 
 export_shpfile(con=con, df=fire_shp_3310, schema="data",
-               table_name= "eaton_fire_dmg_insp_3310_jz",
+               table_name= "eaton_fire_dmg_insp_3310",
                geometry_column = "geometry")
 
-dbSendQuery(con, "COMMENT ON TABLE data.eaton_fire_dmg_insp_3310_jz IS
+dbSendQuery(con, "COMMENT ON TABLE data.eaton_fire_dmg_insp_3310 IS
             'Damage Inspection data for the Eaton Fire from CAL FIRE eGIS, June 2, 2025 in SRID 3310
             Data imported on 9-4-25
             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_import_dmg_insp.docx
-            Source: https://gis.data.ca.gov/datasets/CALFIRE-Forestry::california-fire-perimeters-all/explore'")
+            Source: https://gis.data.ca.gov/datasets/CALFIRE-Forestry::california-fire-perimeters-all/explore
+            Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\CAL FIRE Damage Inspection (DINS) Data\\DINSDatabaseDictionary.pdf'")
 
 for(i in seq_len(nrow(step4_col_names))) {
   col <- step4_col_names$cleaned[i]
   comment_text <- step4_col_names$original[i]
   
   sql <- sprintf(
-    "COMMENT ON COLUMN data.eaton_fire_dmg_insp_3310_jz.%s IS '%s';",
+    "COMMENT ON COLUMN data.eaton_fire_dmg_insp_3310.%s IS '%s';",
     DBI::dbQuoteIdentifier(con, col),
     comment_text
   )
