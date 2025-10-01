@@ -32,13 +32,11 @@ con_fires <- connect_to_db("la_fires")
 eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom")
 
 # get damage inspection database
-eaton_damage <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_dmg_insp_3310", geom="geom")
+dins_damage <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_dmg_insp_3310", geom="geom")
 
-# add a unique identifier
-eaton_damage$din_id <- 1:nrow(eaton_damage)
 
 # reduce columns for joins
-eaton_damage_reduced <- eaton_damage %>% select(din_id,1:8,
+dins_reduced <- dins_damage %>% select(1:9,
                                                 community,
                                                 structure_type,structure_category,
                                                 units_in_structure_if_multi_unit,
@@ -47,12 +45,12 @@ eaton_damage_reduced <- eaton_damage %>% select(din_id,1:8,
 
   
 # get city boundaries from tigris for mapping
-lac_places <- places(state="CA", year=2023) %>% filter(NAME %in% c("Altadena","Pasadena","Sierra Madre","Arcadia"))
+lac_places <- st_read(con_alt, query="Select * from data.tl_2023_places", geom="geom") %>%
+  filter(NAME %in% c("Altadena","Pasadena"))
 st_crs(lac_places)
-lac_places <- st_transform(lac_places,3310)
 
 # get assessor parcels
-assessor_parcels <- st_read(con_alt, query="Select * from data.assessor_parcels_jan2025", geom="geom")
+assessor_parcels <- st_read(con_alt, query="Select * from data.assessor_parcels_universe_jan2025", geom="geom")
 
 # get assessor data
 assessor_data <- st_read(con_alt, query="Select * from data.assessor_data_jan2025")
@@ -78,7 +76,7 @@ table(assessor_data_missing_parcels$use_code)
 assessor_data <- assessor_data %>%
   mutate(zipcode=gsub("0000", "", zip)) %>%
   mutate(city=gsub(" CA ", ", CA", city_state)) %>%
-  mutate(site_address=paste0(situs_house_no, direction, street_name, ", ", city, zipcode)) %>%
+  mutate(site_address=paste0(situs_house_no, " ", direction, " ", street_name, ", ", city, zipcode)) %>%
   mutate(site_address=gsub("\\s+", " ", site_address)) %>%
   mutate(site_address=gsub(" , ", ", ", site_address))
 
@@ -87,7 +85,44 @@ assessor_data %>%
   View()
 
 ##############################################################################
-# STEP 1: Joining Calfire DIN data to parcel shapes POINTS to polygon join ----
+# STEP 1: Focus on structures in Altadena/Pasadena ----
+## set projections
+st_crs(dins_reduced) # good
+st_crs(lac_places) #good
+
+# select all structures either in the pasadena or altadena boundary
+dins_reduced <- st_join(dins_reduced, lac_places%>%select(NAME), join=st_within, left=FALSE)
+
+dins_reduced <- dins_reduced %>% rename(tl_place_name=NAME)
+
+# check
+mapview(dins_reduced) +
+  mapview(lac_places)
+# looks good
+
+##############################################################################
+# STEP 2: Split assessor data by condos vs. not condos ----
+# create a separate sf object and df for condos as these will require special treatment
+# get a df of condos separately
+assessor_data_condos <- assessor_data %>%
+  filter(str_detect(use_code, "C$")) 
+
+# check
+table(assessor_data_condos$use_code)
+# excludes residential, commercial, and industrial condos, I think that's okay
+
+# make the assessor data df everything but condos
+assessor_data <- assessor_data %>% filter(!ain %in% assessor_data_condos$ain)
+
+# make a condo assessor parcel df object
+assessor_parcels_condos <- assessor_parcels %>% filter(AIN %in% assessor_data_condos$ain)
+
+# make the assessor parcel df object everything but condos
+assessor_parcels <- assessor_parcels %>% filter(!AIN %in% assessor_data_condos$ain)
+
+
+##############################################################################
+# STEP 3: Joining Calfire DIN data to parcel shapes POINTS to polygon join ----
 ## set projections
 st_crs(assessor_parcels) # set to 3310
 st_crs(eaton_damage) # good
