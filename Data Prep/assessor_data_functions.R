@@ -55,7 +55,7 @@ read_single_chunk_csv <- function(csv_file,
 }
 
 
-batch_process_assessor_data <- function(csv_file, 
+batch_filter_csv_data <- function(csv_file, 
                                         target_list, 
                                         filter_column="",
                                         chunk_size = 10000, 
@@ -117,18 +117,18 @@ batch_process_assessor_data <- function(csv_file,
     chunk[[filter_column]] <- as.character(chunk[[filter_column]])
     
     # FILTER DISCOVERY: Show unique values of filter_column in first few chunks
-    if (debug_filter & chunk_num <11) {
+    if (debug_filter & chunk_num %% 5 == 0) {
       unique_values <- unique(chunk[[filter_column]])
       all_values_found <- unique(c(all_values_found, unique_values))
       cat("\n  Unique values in chunk", chunk_num, ":\n")
       print(unique_values[1:min(10, length(unique_values))])
     }
     
-    # Filter for target value
-    filter_pattern <- paste(target_list, collapse = "|")
-    filtered <- chunk[grepl(filter_pattern, 
-                            toupper(trimws(chunk[[filter_column]])), 
-                            ignore.case = TRUE)]
+    # Filter for target value using direct matching
+    chunk[[filter_column]] <- toupper(trimws(chunk[[filter_column]]))
+    target_list_upper <- toupper(as.character(target_list))
+    filtered <- chunk[chunk[[filter_column]] %in% target_list_upper]
+    
     
     # Clean up original chunk
     rm(chunk)
@@ -160,8 +160,10 @@ batch_process_assessor_data <- function(csv_file,
       if (debug_filter) {
         cat("All unique values discovered so far (", length(all_values_found), "total):\n")
         # Show rows that might contain our targets
-        potential_matches <- all_values_found[grepl(paste(target_list, collapse = "|"), 
-                                                    toupper(all_values_found), ignore.case = TRUE)]
+        # Check for potential matches
+        target_list_upper <- toupper(as.character(target_list))
+        potential_matches <- all_values_found[toupper(all_values_found) %in% target_list_upper]
+        
         if (length(potential_matches) > 0) {
           cat("  ✓ Potential target matches:", paste(potential_matches, collapse = ", "), "\n")
         } else {
@@ -183,8 +185,9 @@ batch_process_assessor_data <- function(csv_file,
     cat("Total unique values found:", length(all_values_found), "\n")
     
     # Check for potential matches
-    potential_matches <- all_values_found[grepl(paste(target_list, collapse = "|"), 
-                                                toupper(all_values_found), ignore.case = TRUE)]
+    target_list_upper <- toupper(as.character(target_list))
+    potential_matches <- all_values_found[toupper(all_values_found) %in% target_list_upper]
+    
     if (length(potential_matches) > 0) {
       cat("Values containing target names:\n")
       print(potential_matches)
@@ -342,20 +345,37 @@ batch_filter_shapefile <- function(shp_path, target_ains, chunk_size = 10000, ai
 }
 
 
-batch_filter_shapefile_intersect <- function(shp_path, target_points, chunk_size = 10000) {
+
+batch_intersect_shapefile <- function(shp_path, target_geo, chunk_size = 10000, retain_cols = NULL) {
   cat("=== STARTING SPATIAL CONTAINMENT BATCH PROCESSING ===\n")
   cat("Shapefile path:", shp_path, "\n")
-  cat("Target points count:", nrow(target_points), "\n")
-  cat("Chunk size:", chunk_size, "\n\n")
+  cat("Target points count:", nrow(target_geo), "\n")
+  cat("Chunk size:", chunk_size, "\n")
+  if (!is.null(retain_cols)) {
+    cat("Retaining columns from target_geo:", paste(retain_cols, collapse = ", "), "\n")
+  }
+  cat("\n")
   
-  # Ensure target_points is an sf object
-  if (!inherits(target_points, "sf")) {
-    stop("target_points must be an sf object with point geometries")
+  # Ensure target_geo is an sf object
+  if (!inherits(target_geo, "sf")) {
+    stop("target_geo must be an sf object")
   }
   
-  # Check if points have geometry
-  if (!"geometry" %in% names(target_points)) {
-    stop("target_points must have a geometry column")
+  # Check if geometry exists
+  if (!"geometry" %in% names(target_geo)) {
+    stop("target_geo must have a geometry column")
+  }
+  
+  # Detect geometry type
+  target_geom_type <- unique(as.character(st_geometry_type(target_geo)))
+  cat("Target geometry type(s):", paste(target_geom_type, collapse = ", "), "\n")
+  
+  # Validate retain_cols
+  if (!is.null(retain_cols)) {
+    missing_cols <- setdiff(retain_cols, names(target_geo))
+    if (length(missing_cols) > 0) {
+      stop("Columns not found in target_geo: ", paste(missing_cols, collapse = ", "))
+    }
   }
   
   file_name <- gsub(".shp", "", basename(shp_path))
@@ -370,12 +390,12 @@ batch_filter_shapefile_intersect <- function(shp_path, target_points, chunk_size
   
   # Get CRS info from shapefile for consistency
   sample_geom <- st_read(shp_path, query = paste0("SELECT * FROM ", file_name, " LIMIT 1"), quiet = TRUE)
-  shp_crs <- st_crs(sample_geom)
+  shp_crs <- st_crs(sample_geom)$epsg
   
   # Transform points to match shapefile CRS if needed
-  if (st_crs(target_points) != shp_crs) {
+  if (st_crs(target_geo)$epsg != shp_crs) {
     cat("Transforming points CRS to match shapefile...\n")
-    target_points <- st_transform(target_points, shp_crs)
+    target_geo <- st_transform(target_geo, shp_crs)
   }
   
   # Initialize for incremental combination
@@ -403,12 +423,88 @@ batch_filter_shapefile_intersect <- function(shp_path, target_points, chunk_size
       }
       
       # Spatial filtering: check if any target points intersect with chunk polygons
-      # Using st_intersects for containment check
-      intersections <- st_intersects(chunk_data, target_points)
+      intersections <- st_intersects(chunk_data, target_geo)
       
       # Find which polygons contain at least one point
       contains_points <- lengths(intersections) > 0
       filtered_chunk <- chunk_data[contains_points, ]
+      
+      # ENHANCED: Add target_geo information if requested
+      if (nrow(filtered_chunk) > 0 && !is.null(retain_cols)) {
+        # Get intersection details for filtered polygons
+        filtered_intersections <- intersections[contains_points]
+        
+        # For each feature in filtered chunk, get info about intersecting target_geo features
+        matched_info <- lapply(seq_len(nrow(filtered_chunk)), function(i) {
+          target_indices <- filtered_intersections[[i]]
+          
+          if (length(target_indices) == 0) {
+            return(NULL)
+          }
+          
+          # Get the matching target features (points or polygons)
+          matched_targets <- target_geo[target_indices, ]
+          
+          # Calculate intersection areas/metrics
+          # This works for both point-in-polygon and polygon-polygon intersections
+          intersect_metrics <- tryCatch({
+            # Perform actual intersection to get geometry
+            intersection_geom <- st_intersection(
+              st_geometry(filtered_chunk[i, ]), 
+              st_geometry(matched_targets)
+            )
+            
+            if (length(intersection_geom) > 0) {
+              # Try to calculate area (for polygon intersections)
+              area_val <- tryCatch({
+                as.numeric(sum(st_area(intersection_geom)))
+              }, error = function(e) NA)
+              
+              # Calculate percentage of chunk feature that intersects
+              chunk_area <- tryCatch({
+                as.numeric(st_area(filtered_chunk[i, ]))
+              }, error = function(e) NA)
+              
+              pct_intersect <- if (!is.na(area_val) && !is.na(chunk_area) && chunk_area > 0) {
+                (area_val / chunk_area) * 100
+              } else {
+                NA
+              }
+              
+              list(area = area_val, pct = pct_intersect)
+            } else {
+              list(area = NA, pct = NA)
+            }
+          }, error = function(e) {
+            list(area = NA, pct = NA)
+          })
+          
+          # Create summary data frame
+          result_df <- data.frame(
+            n_intersecting_features = length(target_indices),
+            intersect_area = intersect_metrics$area,
+            intersect_pct = intersect_metrics$pct
+          )
+          
+          # Add retained columns (collapse multiple matches into lists or take first)
+          for (col in retain_cols) {
+            col_values <- st_drop_geometry(matched_targets)[[col]]
+            # If multiple matches, create a concatenated string
+            if (length(col_values) > 1) {
+              result_df[[paste0("matched_", col)]] <- paste(col_values, collapse = "; ")
+            } else {
+              result_df[[paste0("matched_", col)]] <- col_values
+            }
+          }
+          
+          return(result_df)
+        })
+        
+        # Combine matched info with filtered chunk
+        matched_df <- do.call(rbind, matched_info)
+        filtered_chunk <- cbind(st_drop_geometry(filtered_chunk), matched_df)
+        filtered_chunk <- st_sf(filtered_chunk, geometry = st_geometry(chunk_data[contains_points, ]))
+      }
       
       # INCREMENTAL COMBINATION - avoid memory buildup
       if (nrow(filtered_chunk) > 0) {
@@ -444,6 +540,7 @@ batch_filter_shapefile_intersect <- function(shp_path, target_points, chunk_size
       # Memory cleanup
       rm(chunk_data, intersections, contains_points)
       if (exists("filtered_chunk")) rm(filtered_chunk)
+      if (exists("matched_info")) rm(matched_info)
       gc(verbose = FALSE)
       
     }, error = function(e) {
@@ -484,6 +581,10 @@ batch_filter_shapefile_intersect <- function(shp_path, target_points, chunk_size
   
   if (!is.null(final_data) && nrow(final_data) > 0) {
     cat("✓ Final dataset:", nrow(final_data), "features,", ncol(final_data), "columns\n")
+    if (!is.null(retain_cols)) {
+      cat("✓ Added columns: n_intersecting_features, intersect_area, intersect_pct,", 
+          paste0("matched_", retain_cols, collapse = ", "), "\n")
+    }
     return(final_data)
   } else {
     cat("No matches found\n")
@@ -522,4 +623,156 @@ find_nearest_postgis <- function(con, unmatched_points, max_distance = 100) {
   
   do.call(rbind, results)
 }
+
+
+
+### DELETE
+# batch_filter_shapefile_intersect_old <- function(shp_path, target_geo, chunk_size = 10000) {
+#   cat("=== STARTING SPATIAL CONTAINMENT BATCH PROCESSING ===\n")
+#   cat("Shapefile path:", shp_path, "\n")
+#   cat("Target points count:", nrow(target_geo), "\n")
+#   cat("Chunk size:", chunk_size, "\n\n")
+#   
+#   # Ensure target_geo is an sf object
+#   if (!inherits(target_geo, "sf")) {
+#     stop("target_geo must be an sf object with point geometries")
+#   }
+#   
+#   # Check if points have geometry
+#   if (!"geometry" %in% names(target_geo)) {
+#     stop("target_geo must have a geometry column")
+#   }
+#   
+#   file_name <- gsub(".shp", "", basename(shp_path))
+#   
+#   # Get total feature count
+#   total_count <- st_read(shp_path, query = paste0("SELECT COUNT(*) as count FROM ", file_name))$count[1]
+#   cat("Total features in shapefile:", total_count, "\n")
+#   
+#   # Calculate number of chunks
+#   num_chunks <- ceiling(total_count / chunk_size)
+#   cat("Processing in", num_chunks, "chunks\n\n")
+#   
+#   # Get CRS info from shapefile for consistency
+#   sample_geom <- st_read(shp_path, query = paste0("SELECT * FROM ", file_name, " LIMIT 1"), quiet = TRUE)
+#   shp_crs <- st_crs(sample_geom)
+#   
+#   # Transform points to match shapefile CRS if needed
+#   if (st_crs(target_geo) != shp_crs) {
+#     cat("Transforming points CRS to match shapefile...\n")
+#     target_geo <- st_transform(target_geo, shp_crs)
+#   }
+#   
+#   # Initialize for incremental combination
+#   final_data <- NULL
+#   temp_results <- list()
+#   temp_counter <- 0
+#   total_matches <- 0
+#   offset <- 0
+#   chunk_num <- 1
+#   
+#   while (offset < total_count) {
+#     cat("Processing chunk", chunk_num, "of", num_chunks, 
+#         "(offset", offset, ")...")
+#     
+#     tryCatch({
+#       # SQL query with LIMIT and OFFSET
+#       sql_query <- paste0("SELECT * FROM ", file_name, " LIMIT ", chunk_size, " OFFSET ", offset)
+#       
+#       # Read chunk using LIMIT/OFFSET
+#       chunk_data <- st_read(shp_path, query = sql_query, quiet = TRUE)
+#       
+#       if (nrow(chunk_data) == 0) {
+#         cat(" No more data\n")
+#         break  # No more data
+#       }
+#       
+#       # Spatial filtering: check if any target points intersect with chunk polygons
+#       # Using st_intersects for containment check
+#       intersections <- st_intersects(chunk_data, target_geo)
+#       
+#       # Find which polygons contain at least one point
+#       contains_points <- lengths(intersections) > 0
+#       filtered_chunk <- chunk_data[contains_points, ]
+#       
+#       # INCREMENTAL COMBINATION - avoid memory buildup
+#       if (nrow(filtered_chunk) > 0) {
+#         temp_counter <- temp_counter + 1
+#         temp_results[[temp_counter]] <- filtered_chunk
+#         total_matches <- total_matches + nrow(filtered_chunk)
+#         
+#         cat(" Found", nrow(filtered_chunk), "matches (total:", total_matches, ")")
+#         
+#         # Combine every 10 chunks to manage memory
+#         if (temp_counter >= 10) {
+#           cat(" [Combining temp results...]")
+#           temp_combined <- do.call(rbind, temp_results)
+#           
+#           if (is.null(final_data)) {
+#             final_data <- temp_combined
+#           } else {
+#             final_data <- rbind(final_data, temp_combined)
+#           }
+#           
+#           # Reset temp storage
+#           temp_results <- list()
+#           temp_counter <- 0
+#           rm(temp_combined)
+#           gc(verbose = FALSE)
+#         }
+#       } else {
+#         cat(" No matches")
+#       }
+#       
+#       cat("\n")
+#       
+#       # Memory cleanup
+#       rm(chunk_data, intersections, contains_points)
+#       if (exists("filtered_chunk")) rm(filtered_chunk)
+#       gc(verbose = FALSE)
+#       
+#     }, error = function(e) {
+#       cat(" ERROR:", e$message, "\n")
+#       cat("  Problematic offset:", offset, "\n")
+#     })
+#     
+#     offset <- offset + chunk_size
+#     chunk_num <- chunk_num + 1
+#     
+#     # Progress summary every 25 chunks
+#     if (chunk_num %% 25 == 0) {
+#       cat("\n--- Progress Summary ---\n")
+#       cat("Processed", chunk_num - 1, "chunks of", num_chunks, "\n")
+#       cat("Total matches found so far:", total_matches, "\n")
+#       invisible(gc())
+#       cat("Memory cleaned. Continuing...\n\n")
+#     }
+#   }
+#   
+#   # Handle any remaining temp results
+#   if (length(temp_results) > 0) {
+#     cat("Combining final temp results...\n")
+#     temp_combined <- do.call(rbind, temp_results)
+#     if (is.null(final_data)) {
+#       final_data <- temp_combined
+#     } else {
+#       final_data <- rbind(final_data, temp_combined)
+#     }
+#     rm(temp_combined, temp_results)
+#     gc()
+#   }
+#   
+#   # Final summary
+#   cat("\n=== PROCESSING COMPLETE ===\n")
+#   cat("Total chunks processed:", chunk_num - 1, "\n")
+#   cat("Total matches found:", total_matches, "\n")
+#   
+#   if (!is.null(final_data) && nrow(final_data) > 0) {
+#     cat("✓ Final dataset:", nrow(final_data), "features,", ncol(final_data), "columns\n")
+#     return(final_data)
+#   } else {
+#     cat("No matches found\n")
+#     return(NULL)
+#   }
+# }
 
