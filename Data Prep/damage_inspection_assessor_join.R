@@ -41,7 +41,7 @@ dins_reduced <- dins_damage %>% select(1:9,
                                                 structure_type,structure_category,
                                                 units_in_structure_if_multi_unit,
                                                 apn_parcel, year_built_parcel,site_address_parcel,assessed_improved_value_parcel) %>%
-  mutate(street_address=paste0(street_number, " ", street_name, " ", street_type))
+  mutate(street_address=toupper(paste0(street_number, " ", street_name, " ", street_type, ", ", city, ", ", state, " ", zip_code)))
 
   
 # get city boundaries from tigris for mapping
@@ -85,7 +85,7 @@ assessor_data %>%
   View()
 
 ##############################################################################
-# STEP 1: Focus on structures in Altadena/Pasadena ----
+# Step 1: Focus on structures in Altadena/Pasadena ----
 ## set projections
 st_crs(dins_reduced) # good
 st_crs(lac_places) #good
@@ -123,12 +123,12 @@ assessor_parcels <- assessor_parcels %>% filter(!ain %in% assessor_data_condos$a
 # running the joins separately for condos vs. not condos
 
 ##############################################################################
-# STEP 3: Non-condo data ----
+# Part 1: Non-condo data ----
 ##############################################################################
 # we are going to do a point to polygon, then an ain/apn number join, and then a site address join for everything but condos
 
 ##############################################################################
-## STEP 4: Joining Calfire DIN data to parcel shapes POINTS to polygon join ----
+## STEP 3: Joining Calfire DIN data to parcel shapes POINTS to polygon join ----
 ## set projections
 st_crs(assessor_parcels) # good
 st_crs(dins_reduced) # good
@@ -158,7 +158,7 @@ nrow(joined_points)
 
 ## Check the ones that didn't join ----
 na_assessor_points <- joined_points %>% filter(is.na(ain))
-nrow(na_assessor_points) #408 didn't join
+nrow(na_assessor_points) #96 didn't join
 
 # prep 4326 layers to explore ones missing data
 lac_places_4326 <- st_transform(lac_places, 4326)
@@ -207,23 +207,23 @@ leaflet () %>%
 
 # explore the data
 table(na_assessor_points$structure_category,useNA='always')
-# >300 are single residence could be condos
+# most are single residence could be condos
 
 table(na_assessor_points$structure_type,useNA='always')
 # most are single family residence multi story
 
 table(na_assessor_points$city,useNA='always')
-# most are in altadena count 336
+# most are in altadena count 68
 
 # check those that are residential more
 na_assessor_points %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% count(city)
 # most residential are in Altadena
 
-length(unique(na_assessor_points$apn_parcel)) #329 unique parcel numbers
+length(unique(na_assessor_points$apn_parcel)) #18 unique parcel numbers
 sum(is.na(na_assessor_points$apn_parcel)) # no blank parcel numbers, we can try joining by parcel number
 
 ##############################################################################
-# STEP 2: Joining Calfire DIN data to parcel shapes NAME apn to ain join ----
+## STEP 4: Joining Calfire DIN data to parcel shapes NAME apn to ain join ----
 # join by apn and ain
 joined_name <- na_assessor_points %>% select(1:19) %>% left_join(assessor_parcels%>%st_drop_geometry(), keep=TRUE, by=c("apn_parcel"="ain"))
 sum(is.na(joined_name$ain)) # only a handful missing still 78
@@ -297,7 +297,7 @@ length(unique(na_assessor_name$apn_parcel)) #10 unique parcel numbers
 sum(is.na(na_assessor_name$site_address_parcel)) # no blank addresses
 
 ##############################################################################
-# STEP 3: Joining Calfire DIN data to parcel shapes SITE ADDRESS site address join ----
+## STEP 5: Joining Calfire DIN data to parcel shapes SITE ADDRESS site address join ----
 # try a full address join
 joined_site_address <- na_assessor_name %>%
   select(1:19) %>%
@@ -317,16 +317,16 @@ nrow(na_assessor_address) #78 still not joining, could be condos
 
 
 table(na_assessor_address$structure_category,useNA='always')
-# same counts as last attempt
+# similar counts as last attempt
 
 table(na_assessor_address$structure_type,useNA='always')
-# same counts as last attempt
+# similar counts as last attempt
 
 table(na_assessor_address$city.x,useNA='always')
-# same counts as last attempt
+# similar counts as last attempt
 
 na_assessor_address %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% count(city.x)
-# same counts as last attempt
+# similar counts as last attempt
 
 # focus on residential for mapping
 na_assessor_address_residential <- na_assessor_address %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% st_transform(4326)
@@ -370,8 +370,8 @@ leaflet () %>%
     options = layersControlOptions(collapsed = FALSE)
   )
 
-
-# Pull together and clean up joins -----
+##############################################################################
+## STEP 6: Pull together and clean up joins -----
 joined_structures_noncondos <- rbind(joined_points %>% 
                              filter(!is.na(ain)) %>%
                                       select(1:19, ain),
@@ -386,6 +386,129 @@ joined_structures_noncondos <- rbind(joined_points %>%
 nrow(dins_reduced)-nrow(joined_structures_noncondos) # just 78 missing--see if they are condos
 length(unique(joined_structures_noncondos$din_id)) # 16975
 nrow(joined_structures_noncondos) #same count
+
+##############################################################################
+# Part 2: Condo data ----
+##############################################################################
+# we are going to a street address to site address join
+
+##############################################################################
+## STEP 7: Joining UnJoined Calfire DIN data to assessor data by street address ----
+## create a full address field
+dins_reduced_condos <- dins_reduced %>% filter(!dins_reduced$din_id %in% joined_structures_noncondos$din_id)
+
+## Perform the address join ----
+# try a full address join
+joined_site_addres_condos <- dins_reduced_condos %>%
+  left_join(assessor_data_condos, keep=TRUE, by=c("street_address"="site_address"))
+
+nrow(dins_reduced_condos)
+nrow(joined_site_addres_condos)
+
+## Check the ones that didn't join ----
+na_assessor_condo_address <- joined_site_addres_condos %>% filter(is.na(ain))
+nrow(na_assessor_condo_address) #78 didn't join
+
+unique(na_assessor_condo_address$apn)
+# only 10 unique APNs
+
+unique(na_assessor_condo_address$site_address_parcel)
+
+# E Sacramento Street should just be Sacramento st
+# E Palm Street should be E Palm St
+dins_reduced_condos <- dins_reduced_condos %>%
+  mutate(street_address=gsub("E SACRAMENTO STREET", "SACRAMENTO ST", street_address)) %>%
+  mutate(street_address=gsub("E PALM STREET", "E PALM ST", street_address))
+
+joined_site_addres_condos <- dins_reduced_condos %>%
+  left_join(assessor_data_condos, keep=TRUE, by=c("street_address"="site_address"))
+
+nrow(dins_reduced_condos)
+nrow(joined_site_addres_condos)
+
+
+# joined_dup_rows <- joined_site_addres_condos[joined_site_addres_condos$din_id %in% joined_site_addres_condos$din_id[duplicated(joined_site_addres_condos$din_id)], ]
+
+## Check the ones that didn't join ----
+na_assessor_condo_address <- joined_site_addres_condos %>% filter(is.na(ain))
+nrow(na_assessor_condo_address) #62 didn't join
+
+unique(na_assessor_condo_address$apn)
+# only 9 unique APNs
+
+unique(na_assessor_condo_address$site_address_parcel)
+ # Export these and clean later
+
+na_assessor_universe <- na_assessor_condo_address %>% select(1:19)
+write_xlsx(na_assessor_universe, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_100125.xlsx")
+
+
+##########################################################################################
+# Export crosswalk of dins to ain numbers --------
+final_df <- joined_structures_noncondos
+
+# prep 4326 layers to explore ones missing data
+lac_places_4326 <- st_transform(lac_places, 4326)
+na_assessor_4326 <- st_transform(na_assessor_points, 4326)
+assessor_parcels_4326 <- st_transform(assessor_parcels, 4326)
+
+# map the data
+leaflet () %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  setView(-118.104631, 34.185104, zoom = 12) %>%
+  addPolygons(data=assessor_parcels_4326,
+              fillColor="white",
+              fillOpacity=0,
+              color="purple",
+              weight=1,
+              opacity=1,
+              popup=~ain,
+              group="Parcels") %>%
+  addPolygons(data=lac_places_4326,
+              fillColor="white",
+              fillOpacity=0,
+              color="green",
+              weight=1.5,
+              opacity=1,
+              popup=~NAME,
+              group="Cities") %>%
+  addCircleMarkers(data=na_assessor_4326,
+                   radius = 2,
+                   stroke=TRUE,
+                   # fill=TRUE,
+                   fillOpacity = 1,
+                   color="black",
+                   weight=.5,
+                   opacity=.5,
+                   popup = ~paste0(damage,"</br>",
+                                   "Parcel #: ", apn_parcel, "</br>",
+                                   "Structure Category: ", structure_category, "</br>",
+                                   "Address: ", site_address_parcel, "</br>",
+                                   "City: ", city),
+                   group="Structures Missing Assessor Data - Point Join"
+  ) %>%
+  addLayersControl(
+    overlayGroups = c("Parcels", "Cities","Structures Missing Assessor Data - Point Join"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+# explore the data
+table(na_assessor_points$structure_category,useNA='always')
+# >300 are single residence could be condos
+
+table(na_assessor_points$structure_type,useNA='always')
+# most are single family residence multi story
+
+table(na_assessor_points$city,useNA='always')
+# most are in altadena count 336
+
+# check those that are residential more
+na_assessor_points %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% count(city)
+# most residential are in Altadena
+
+length(unique(na_assessor_points$apn_parcel)) #329 unique parcel numbers
+sum(is.na(na_assessor_points$apn_parcel)) # no blank parcel numbers, we can try joining by parcel number
+
 
 # Map data together for QA -----
 joined_structures_residential <- joined_structures %>%
@@ -466,11 +589,6 @@ full_map <- leaflet () %>%
 
 saveWidget(full_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\full_map.html", selfcontained = TRUE)
 
-
-# Export for Hillary to check for more matches in original assessor data
-na_assessor_final <- na_assessor_address %>% select(1:17)
-# write_xlsx(na_assessor_final, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_parcels_excel.csv") # this one exported on 9-25-25
-# write_xlsx(na_assessor_final, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_092625.xlsx") 
 
 
 
