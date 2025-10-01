@@ -26,7 +26,7 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # extracted_files <- list.files(temp_extract_dir, recursive = TRUE, full.names = TRUE)
 # print(extracted_files)
 
-##### Step 1 #####
+##### Step 1: Intersect Jan Shps #####
 # Spatial Intersect of Jan and Sept parcel shp files to 
 # Altadena/Pasadena city boundaries
 
@@ -48,25 +48,242 @@ st_crs(city_perimeters)$epsg # 2229
 #   target_geo=city_perimeters, 
 #   chunk_size = 10000,
 #   retain_cols = c("name")) # 54874
-# 
+
+# length(unique(jan_intersect$AIN)) # 54874
+# table(jan_intersect$matched_name, useNA = "ifany")
+# # Altadena           Pasadena        Pasadena; Altadena 
+# # 13951              40342           581 
+
+# # clean up before export #
+# colnames(jan_intersect) <- tolower(colnames(jan_intersect))
+# jan_intersect_3310 <- st_transform(jan_intersect, 3310)
+
 # # # export results
 # source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
 # qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_import_assessor_data.docx"
 # schema <- "data"
 # indicator <- "Jan 2025 Parcels that intersect Altadena and Pasadena 2023 place tiger lines."
 # 
-# export_shpfile(con=con, df=jan_intersect, schema="data", table_name="assessor_parcels_universe_jan2025", srid = "", geometry_type = "", geometry_column = "geometry")
+# export_shpfile(con=con, 
+#                df=jan_intersect_3310, 
+#                schema="data", 
+#                table_name="assessor_parcels_universe_jan2025", 
+#                srid = "", geometry_type = "", 
+#                geometry_column = "geometry")
+# 
+# 
 # dbSendQuery(con, paste0("COMMENT ON TABLE data.assessor_parcels_universe_jan2025 IS '", indicator, "
-#             Data imported on 9-30-25. ",
+#             Data imported on 10-01-25. ",
 #             "QA DOC: ", qa_filepath,
 #             " Source: ", source, "'"))
 
 jan_intersect <- st_read(con, query="SELECT * FROM data.assessor_parcels_universe_jan2025;")
+st_crs(jan_intersect)$epsg # 3310
 
-# length(unique(jan_intersect$AIN)) # 54874
-# table(jan_intersect$matched_name, useNA = "ifany")
-# # Altadena           Pasadena        Pasadena; Altadena 
-# # 13951              40342           581 
+
+##### Step 2: Filter Jan CSVs #####
+# Filter Jan csv data for AINs found in Step 1 #
+jan_ain_universe <- jan_intersect %>% st_drop_geometry() %>% select(ain) %>% pull()
+
+# CSV Files
+jan_csv_1 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 1.csv"
+jan_csv_2 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 2.csv"
+jan_csv_3 <- "D:/temp_extract/Assessor Data/Jan 2025 DS04 Part 3.csv"
+
+# # January
+# jan_1_ain_filter <- batch_filter_csv_data(
+#   csv_file=jan_csv_1,
+#   target_list = jan_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# jan_2_ain_filter <- batch_filter_csv_data(
+#   csv_file=jan_csv_2,
+#   target_list = jan_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# jan_3_ain_filter <- batch_filter_csv_data(
+#   csv_file=jan_csv_3,
+#   target_list = jan_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# # Combine results
+# jan_csv_ains <- rbind(jan_1_ain_filter, 
+#                           jan_2_ain_filter, 
+#                           jan_3_ain_filter) # 54826
+# 
+# colnames(jan_csv_ains) <- tolower(gsub(" ", "_", colnames(jan_csv_ains)))
+# 
+# jan_csv_ains <- jan_csv_ains %>%
+#   rename(ain = `ï»¿ain`) %>%
+#   mutate(ain=as.character(ain)) 
+# 
+# length(unique(jan_csv_ains$ain)) # 54826
+
+# ### Export to postgres
+# table_name <- "assessor_data_universe_jan2025"
+# indicator <- "Assessor data from January 2025 that matches Altadena and Pasadena parcels in assessor_parcels_universe_jan2025 table."
+# dbWriteTable(con, Id(schema, table_name), jan_csv_ains,
+#              overwrite = FALSE, row.names = FALSE)
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
+#             Data imported on 10-01-25. ",
+#                         "QA DOC: ", qa_filepath,
+#                         " Source: ", source, "'"))
+
+
+##### Repeat Step 1: Filter Sept Shps #####
+# # sept intersection
+# sept_intersect <- batch_intersect_shapefile(
+#   shp_path=sept_shp_path, 
+#   target_geo=city_perimeters, 
+#   chunk_size = 10000,
+#   retain_cols = c("name")) # 54874
+
+# length(unique(sept_intersect$AIN)) # 54874
+# table(sept_intersect$matched_name, useNA = "ifany") 
+# # joint parcel count is the same as jan, individual are slightly different
+# # Altadena           Pasadena           Pasadena; Altadena 
+# # 13947              40346              581 
+
+# # clean up before export #
+# colnames(sept_intersect) <- tolower(colnames(sept_intersect))
+# sept_intersect_3310 <- st_transform(sept_intersect, 3310)
+# 
+# # export results
+# source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
+# qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_import_assessor_data.docx"
+# schema <- "data"
+# indicator <- "Sept 2025 Parcels that intersect Altadena and Pasadena 2023 place tiger lines."
+# 
+# export_shpfile(con=con, df=sept_intersect_3310, schema="data", table_name="assessor_parcels_universe_sept2025", srid = "", geometry_type = "", geometry_column = "geometry")
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.assessor_parcels_universe_sept2025 IS '", indicator, "
+#             Data imported on 10-01-25. ",
+#             "QA DOC: ", qa_filepath,
+#             " Source: ", source, "'"))
+
+sept_intersect <- st_read(con, query="SELECT * FROM data.assessor_parcels_universe_sept2025;")
+st_crs(sept_intersect)$epsg # 3310
+
+
+##### Repeat Step 2: Filter Sept CSVs (standard AND custom) #####
+# Filter Jan csv data for AINs found in Step 1 #
+sept_ain_universe <- sept_intersect %>% st_drop_geometry() %>% select(ain) %>% pull()
+
+# Standard CSVs
+sept_csv_1 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 1.csv"
+sept_csv_2 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 2.csv"
+sept_csv_3 <- "D:/temp_extract/Assessor Data/September 2025 DS04 Part 3.csv"
+
+# Custom CSVs
+sept_custom_csv_1 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 1.csv"
+sept_custom_csv_2 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 2.csv"
+sept_custom_csv_3 <- "D:/temp_extract/Assessor Data/September 2025 Custom DS04 Part 3.csv"
+
+# # Sept Standard
+# sept_1_ain_filter <- batch_filter_csv_data(
+#   csv_file=sept_csv_1,
+#   target_list = sept_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# sept_2_ain_filter <- batch_filter_csv_data(
+#   csv_file=sept_csv_2,
+#   target_list = sept_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# sept_3_ain_filter <- batch_filter_csv_data(
+#   csv_file=sept_csv_3,
+#   target_list = sept_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# # Combine results
+# sept_csv_ains <- rbind(sept_1_ain_filter,
+#                           sept_2_ain_filter,
+#                           sept_3_ain_filter) # 54826
+# 
+# colnames(sept_csv_ains) <- tolower(gsub(" ", "_", colnames(sept_csv_ains)))
+# 
+# sept_csv_ains <- sept_csv_ains %>%
+#   rename(ain = `ï»¿ain`) %>%
+#   mutate(ain=as.character(ain))
+# 
+# length(unique(sept_csv_ains$ain)) # 54797
+
+# ### Export to postgres
+# table_name <- "assessor_data_universe_sept2025"
+# indicator <- "Assessor data from September 2025 that matches Altadena and Pasadena parcels in assessor_parcels_universe_sept2025 table."
+# dbWriteTable(con, Id(schema, table_name), sept_csv_ains,
+#              overwrite = FALSE, row.names = FALSE)
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
+#             Data imported on 10-01-25. ",
+#                         "QA DOC: ", qa_filepath,
+#                         " Source: ", source, "'"))
+
+
+# # Sept CUSTOM
+# sept_custom_1_ain_filter <- batch_filter_csv_data(
+#   csv_file=sept_custom_csv_1,
+#   target_list = sept_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# sept_custom_2_ain_filter <- batch_filter_csv_data(
+#   csv_file=sept_custom_csv_2,
+#   target_list = sept_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# sept_custom_3_ain_filter <- batch_filter_csv_data(
+#   csv_file=sept_custom_csv_3,
+#   target_list = sept_ain_universe,
+#   filter_column="ï»¿AIN",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# # Combine results
+# sept_custom_csv_ains <- rbind(sept_custom_1_ain_filter,
+#                        sept_custom_2_ain_filter,
+#                        sept_custom_3_ain_filter) # 54826
+# 
+# colnames(sept_custom_csv_ains) <- tolower(gsub(" ", "_", colnames(sept_custom_csv_ains)))
+# 
+# sept_custom_csv_ains <- sept_custom_csv_ains %>%
+#   rename(ain = `ï»¿ain`) %>%
+#   mutate(ain=as.character(ain))
+# 
+# length(unique(sept_custom_csv_ains$ain)) # 54797
+
+# ### Export to postgres
+# table_name <- "assessor_customdata_universe_sept2025"
+# indicator <- "Custom Assessor data from September 2025 that matches Altadena and Pasadena parcels in assessor_parcels_universe_sept2025 table."
+# dbWriteTable(con, Id(schema, table_name), sept_custom_csv_ains,
+#              overwrite = FALSE, row.names = FALSE)
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.",table_name, " IS '", indicator, "
+#             Data imported on 10-01-25. ",
+#                         "QA DOC: ", qa_filepath,
+#                         " Source: ", source, "'"))
+
+
+
+
+
+
+
+
+
+
 # 
 # altadena_jan <- jan_intersect %>% filter(matched_name=="Altadena")
 # pasadena_jan <- jan_intersect %>% filter(matched_name=="Pasadena")
@@ -79,33 +296,12 @@ jan_intersect <- st_read(con, query="SELECT * FROM data.assessor_parcels_univers
 #   mapview(pasadena_jan, col.regions="royalblue") +
 #   mapview(combo_jan, col.regions="chartreuse4")
 
-# sept intersection
-sept_intersect <- batch_intersect_shapefile(
-  shp_path=sept_shp_path, 
-  target_geo=city_perimeters, 
-  chunk_size = 10000,
-  retain_cols = c("name")) # 54874
 
-# # export results
-# source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
-# qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_import_assessor_data.docx"
-# schema <- "data"
-# indicator <- "Sept 2025 Parcels that intersect Altadena and Pasadena 2023 place tiger lines."
-# 
-# export_shpfile(con=con, df=sept_intersect, schema="data", table_name="assessor_parcels_universe_sept2025", srid = "", geometry_type = "", geometry_column = "geometry")
-# dbSendQuery(con, paste0("COMMENT ON TABLE data.assessor_parcels_universe_sept2025 IS '", indicator, "
-#             Data imported on 9-30-25. ",
-#             "QA DOC: ", qa_filepath,
-#             " Source: ", source, "'"))
 
-sept_intersect <- st_read(con, query="SELECT * FROM data.assessor_parcels_universe_sept2025;")
 
-# length(unique(sept_intersect$AIN)) # 54874
-# table(sept_intersect$matched_name, useNA = "ifany") 
-# # joint parcel count is the same as jan, individual are slightly different
-# # Altadena           Pasadena           Pasadena; Altadena 
-# # 13947              40346              581 
-# 
+
+
+
 # altadena_sept <- sept_intersect %>% filter(matched_name=="Altadena")
 # pasadena_sept <- sept_intersect %>% filter(matched_name=="Pasadena")
 # combo_sept <- sept_intersect %>% filter(matched_name=="Pasadena; Altadena")
