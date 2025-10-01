@@ -53,13 +53,13 @@ st_crs(lac_places)
 assessor_parcels <- st_read(con_alt, query="Select * from data.assessor_parcels_universe_jan2025", geom="geom")
 
 # get assessor data
-assessor_data <- st_read(con_alt, query="Select * from data.assessor_data_jan2025")
+assessor_data <- st_read(con_alt, query="Select * from data.assessor_data_universe_jan2025")
 
 # Explore the assessor data ----
-nrow(assessor_parcels) #85430
-length(unique(assessor_parcels$ain)) #85430
-nrow(assessor_data) #85465 - slightly more records here
-length(unique(assessor_data$ain)) #85465
+nrow(assessor_parcels) #43851
+length(unique(assessor_parcels$ain)) #43851
+nrow(assessor_data) #54865 - slightly more records here
+length(unique(assessor_data$ain)) #54865 
 
 assessor_data_missing_parcels <- assessor_data %>%
   filter(!ain %in% assessor_parcels$ain)
@@ -105,7 +105,7 @@ mapview(dins_reduced) +
 # create a separate sf object and df for condos as these will require special treatment
 # get a df of condos separately
 assessor_data_condos <- assessor_data %>%
-  filter(str_detect(use_code, "C$")) 
+  filter(str_detect(use_code, "C$") | str_detect(use_code, "E$") ) 
 
 # check
 table(assessor_data_condos$use_code)
@@ -115,66 +115,50 @@ table(assessor_data_condos$use_code)
 assessor_data <- assessor_data %>% filter(!ain %in% assessor_data_condos$ain)
 
 # make a condo assessor parcel df object
-assessor_parcels_condos <- assessor_parcels %>% filter(AIN %in% assessor_data_condos$ain)
+assessor_parcels_condos <- assessor_parcels %>% filter(ain %in% assessor_data_condos$ain)
 
 # make the assessor parcel df object everything but condos
-assessor_parcels <- assessor_parcels %>% filter(!AIN %in% assessor_data_condos$ain)
+assessor_parcels <- assessor_parcels %>% filter(!ain %in% assessor_data_condos$ain)
 
+# running the joins separately for condos vs. not condos
 
 ##############################################################################
-# STEP 3: Joining Calfire DIN data to parcel shapes POINTS to polygon join ----
-## set projections
-st_crs(assessor_parcels) # set to 3310
-st_crs(eaton_damage) # good
+# STEP 3: Non-condo data ----
+##############################################################################
+# we are going to do a point to polygon, then an ain/apn number join, and then a site address join for everything but condos
 
-assessor_parcels <- st_transform(assessor_parcels, 3310)
+##############################################################################
+## STEP 4: Joining Calfire DIN data to parcel shapes POINTS to polygon join ----
+## set projections
+st_crs(assessor_parcels) # good
+st_crs(dins_reduced) # good
 
 ## Perform the spatial join ----
-joined_points <- st_join(eaton_damage_reduced, assessor_parcels, join=st_within, left=TRUE)
+joined_points <- st_join(dins_reduced, assessor_parcels, join=st_within, left=TRUE)
 
 # includes duplicate records, explore those
 joined_points_dup_rows <- joined_points[joined_points$din_id %in% joined_points$din_id[duplicated(joined_points$din_id)], ]
-length(unique(joined_points_dup_rows$ain)) #218 ains
-length(unique(joined_points_dup_rows$din_id)) #86 unique structures
-
+length(unique(joined_points_dup_rows$ain)) #10 ains
+length(unique(joined_points_dup_rows$din_id)) #14 unique structures
+# null these out and carry through to address join instead
 
 mapview(joined_points_dup_rows)
-# essentially condos can have overlapping parcel shapes so some condo joined to multiple shapes -- keep records where the ain equals the apn
+# condos and commercial
 
-joined_points_dedup_rows <- joined_points_dup_rows %>%
-  group_by(din_id) %>%
-  filter(apn_parcel==ain) %>%
-  ungroup()
-
-length(unique(joined_points_dedup_rows$din_id)) #75 that end up joining well so keep these
-
-joined_points_fail <- joined_points_dup_rows %>%
-  filter(!din_id %in% joined_points_dedup_rows$din_id)
-length(unique(joined_points_fail$din_id)) #11 - 11+75=86 so back to the original unique structures 
-
-# null out ones that did not join well so they get carried into next step
+# null out ones that are duplicates so we try them in next step
 joined_points <- joined_points %>%
-  mutate(across(all_of(19:46), ~ if_else(din_id %in% joined_points_fail$din_id, NA, .)))
-
-# null out the duplicates that we need to bind to the dataframe
-joined_points <- joined_points %>%
-  mutate(across(all_of(19:46), ~ if_else(din_id %in% joined_points_dedup_rows$din_id, NA, .)))
+  mutate(across(all_of(20:51), ~ if_else(din_id %in% joined_points_dup_rows$din_id, NA, .)))
 
 # dedup
 joined_points  <- joined_points [!duplicated(joined_points ), ]
 
-# now add in the dups that we cleaned up
-joined_points <- rbind(joined_points %>%
-  filter(!din_id %in% joined_points_dedup_rows$din_id),
-  joined_points_dedup_rows)
-
-nrow(eaton_damage_reduced)
+nrow(dins_reduced)
 nrow(joined_points)
 # back to original
 
 ## Check the ones that didn't join ----
 na_assessor_points <- joined_points %>% filter(is.na(ain))
-nrow(na_assessor_points) #298 didn't join
+nrow(na_assessor_points) #408 didn't join
 
 # prep 4326 layers to explore ones missing data
 lac_places_4326 <- st_transform(lac_places, 4326)
@@ -223,26 +207,26 @@ leaflet () %>%
 
 # explore the data
 table(na_assessor_points$structure_category,useNA='always')
-# most are nonresidential commercial, >50 are single residence
+# >300 are single residence could be condos
 
 table(na_assessor_points$structure_type,useNA='always')
-# most are schools, >30 are single family residence single story
+# most are single family residence multi story
 
 table(na_assessor_points$city,useNA='always')
-# most are in altadena count 186
+# most are in altadena count 336
 
 # check those that are residential more
 na_assessor_points %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% count(city)
 # most residential are in Altadena
 
-length(unique(na_assessor_points$apn_parcel)) #121 unique parcel numbers
+length(unique(na_assessor_points$apn_parcel)) #329 unique parcel numbers
 sum(is.na(na_assessor_points$apn_parcel)) # no blank parcel numbers, we can try joining by parcel number
 
 ##############################################################################
 # STEP 2: Joining Calfire DIN data to parcel shapes NAME apn to ain join ----
 # join by apn and ain
-joined_name <- na_assessor_points %>% select(1:18) %>% left_join(assessor_parcels%>%st_drop_geometry(), keep=TRUE, by=c("apn_parcel"="ain"))
-sum(is.na(joined_name$ain)) # only a handful joined still 291 missing
+joined_name <- na_assessor_points %>% select(1:19) %>% left_join(assessor_parcels%>%st_drop_geometry(), keep=TRUE, by=c("apn_parcel"="ain"))
+sum(is.na(joined_name$ain)) # only a handful missing still 78
 nrow(joined_name)
 nrow(na_assessor_points)
 # count the same
@@ -297,70 +281,52 @@ leaflet () %>%
 
 # explore the data
 table(na_assessor_name$structure_category,useNA='always')
-# most are nonresidential commercial, >50 are single residence
+# most are residential >50 multiple residence
 
 table(na_assessor_name$structure_type,useNA='always')
-# most are schools, >30 are single family residence single story
+# most are multi family residence multi story
 
 table(na_assessor_name$city,useNA='always')
-# most are in altadena count 180
+# most are in altadena count 51
 
 # check those that are residential more
 na_assessor_name %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% count(city)
 # most residential are in Altadena
 
-length(unique(na_assessor_name$apn_parcel)) #114 unique parcel numbers
+length(unique(na_assessor_name$apn_parcel)) #10 unique parcel numbers
 sum(is.na(na_assessor_name$site_address_parcel)) # no blank addresses
 
 ##############################################################################
 # STEP 3: Joining Calfire DIN data to parcel shapes SITE ADDRESS site address join ----
 # try a full address join
 joined_site_address <- na_assessor_name %>%
-  select(1:18) %>%
+  select(1:19) %>%
   left_join(assessor_data, keep=TRUE, by=c("site_address_parcel"="site_address"))
 
-# check the ones that had many to many join
-joined_site_dup_rows <- joined_site_address[joined_site_address$din_id %in% joined_site_address$din_id[duplicated(joined_site_address$din_id)], ]
-View(joined_site_dup_rows)
+nrow(na_assessor_name)
+nrow(joined_site_address)
+# same number
+length(unique(na_assessor_name$din_id))
+length(unique(joined_site_address$din_id))
+# same number
 
-unique(joined_site_dup_rows$ain) #two ains joined
-unique(joined_site_dup_rows$site_address_parcel) # one site
-
-assessor_data_dup_search <- assessor_data %>%
-  filter(str_detect(site_address, "CANYON CREST RD"))
-
-# examine these AINs
-# 5830009022 5830009026 online
-
-mapview(joined_site_dup_rows)
-
-unique(joined_site_dup_rows$apn)
-
-# https://portal.assessor.lacounty.gov/parceldetail/5830009023
-# these aren't joining to the right parcels -- they are joining to parcels with the same address but that are different in location and characteristics
-# zero out these as not joining since they are joining to the wrong parcels
-joined_site_address <- joined_site_address %>%
-  mutate(across(all_of(19:154), ~ if_else(din_id %in% joined_site_dup_rows$din_id, NA, .)))
-
-# dedup
-joined_site_address <- joined_site_address[!duplicated(joined_site_address), ]
 
 ## Check the ones that didn't join ------
 na_assessor_address <- joined_site_address  %>% filter(is.na(ain))
-nrow(na_assessor_address) #280 still not joining
+nrow(na_assessor_address) #78 still not joining, could be condos
 
 
 table(na_assessor_address$structure_category,useNA='always')
-# most are infrastructure, >50 single family residence
+# same counts as last attempt
 
 table(na_assessor_address$structure_type,useNA='always')
-# most are school, >30 still single family residence
+# same counts as last attempt
 
 table(na_assessor_address$city.x,useNA='always')
-# Most are in altadena 171
+# same counts as last attempt
 
 na_assessor_address %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% count(city.x)
-# most residential are in Altadena
+# same counts as last attempt
 
 # focus on residential for mapping
 na_assessor_address_residential <- na_assessor_address %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% st_transform(4326)
@@ -404,28 +370,22 @@ leaflet () %>%
     options = layersControlOptions(collapsed = FALSE)
   )
 
-# most seem like holes in the parcel data - vacant land or other
-
-# Export for Hillary to check for more matches in original assessor data
-na_assessor_final <- na_assessor_address %>% select(1:17)
-# write_xlsx(na_assessor_final, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_parcels_excel.csv") # this one exported on 9-25-25
-# write_xlsx(na_assessor_final, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_092625.xlsx") 
-
 
 # Pull together and clean up joins -----
-joined_structures <- rbind(joined_points %>% 
+joined_structures_noncondos <- rbind(joined_points %>% 
                              filter(!is.na(ain)) %>%
-                                      select(1:18, ain),
+                                      select(1:19, ain),
                            joined_name %>% 
                              filter(!is.na(ain)) %>%
-                                      select(1:18,ain ),
+                                      select(1:19,ain ),
                     joined_site_address %>%
                              filter(!is.na(ain)) %>% 
                             rename_with(~ gsub("\\.x", "", .x)) %>%   # Remove .x from column names
-                      select(1:18,ain)) 
+                      select(1:19,ain)) 
 
-nrow(eaton_damage_reduced)-nrow(joined_structures) # difference is 280, the number in the exported missing data
-
+nrow(dins_reduced)-nrow(joined_structures_noncondos) # just 78 missing--see if they are condos
+length(unique(joined_structures_noncondos$din_id)) # 16975
+nrow(joined_structures_noncondos) #same count
 
 # Map data together for QA -----
 joined_structures_residential <- joined_structures %>%
@@ -505,6 +465,15 @@ full_map <- leaflet () %>%
   )
 
 saveWidget(full_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\full_map.html", selfcontained = TRUE)
+
+
+# Export for Hillary to check for more matches in original assessor data
+na_assessor_final <- na_assessor_address %>% select(1:17)
+# write_xlsx(na_assessor_final, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_parcels_excel.csv") # this one exported on 9-25-25
+# write_xlsx(na_assessor_final, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_092625.xlsx") 
+
+
+
 
 ## Sample sets of structures for QA ------
 # randomly sample and then map a set of 20 properties 4 times
@@ -764,3 +733,28 @@ sample_emg_map <- leaflet () %>%
 saveWidget(sample_emg_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\emg_map.html", selfcontained = FALSE)
 write_xlsx(sample_emg, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\emg_sample.xlsx") 
 
+# check the ones that had many to many join
+joined_site_dup_rows <- joined_site_address[joined_site_address$din_id %in% joined_site_address$din_id[duplicated(joined_site_address$din_id)], ]
+View(joined_site_dup_rows)
+
+unique(joined_site_dup_rows$ain) #two ains joined
+unique(joined_site_dup_rows$site_address_parcel) # one site
+
+assessor_data_dup_search <- assessor_data %>%
+  filter(str_detect(site_address, "CANYON CREST RD"))
+
+# examine these AINs
+# 5830009022 5830009026 online
+
+mapview(joined_site_dup_rows)
+
+unique(joined_site_dup_rows$apn)
+
+# https://portal.assessor.lacounty.gov/parceldetail/5830009023
+# these aren't joining to the right parcels -- they are joining to parcels with the same address but that are different in location and characteristics
+# zero out these as not joining since they are joining to the wrong parcels
+joined_site_address <- joined_site_address %>%
+  mutate(across(all_of(19:154), ~ if_else(din_id %in% joined_site_dup_rows$din_id, NA, .)))
+
+# dedup
+joined_site_address <- joined_site_address[!duplicated(joined_site_address), ]
