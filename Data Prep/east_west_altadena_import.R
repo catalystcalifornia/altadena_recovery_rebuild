@@ -33,11 +33,24 @@ colnames(east_shp) <- tolower(colnames(east_shp))
 colnames(west_shp) <- tolower(colnames(west_shp))
 
 #transform to 3310/ California Albers preferred for CA statistics/analysis
-east_shp <- st_transform(east_shp, 3310) 
-west_shp <- st_transform(west_shp, 3310) 
+east_shp <- st_transform(east_shp, 3310) %>% 
+  select(geometry) %>%
+  mutate(id = "1",
+         name = "East",
+         label = "East Altadena") %>%
+  relocate(geometry, .after = last_col())
+
+west_shp <- st_transform(west_shp, 3310) %>%
+select(geometry) %>%
+  mutate(id = "1",
+         name = "West",
+         label = "West Altadena") %>%
+  relocate(geometry, .after = last_col())
+
+
 
 #### Step 2: Use export function to push to postgres ####
-
+# 
 # export_shpfile(con=con, df=east_shp, schema="data",
 #                table_name= "east_altadena_3310",
 #                geometry_column = "geometry")
