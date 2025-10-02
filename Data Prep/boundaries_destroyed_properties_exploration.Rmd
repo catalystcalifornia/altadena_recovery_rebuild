@@ -25,7 +25,7 @@ library(dplyr)
 library(rmapshaper)
 library(leaflet)
 library(htmlwidgets)
-library(tigris)
+# library(tigris)
 # library(tidycensus)
 library(stringr)
 library(showtext)
@@ -85,13 +85,15 @@ tracts <- st_read(con_fires, query="SELECT * FROM data.tract_firezone_xwalk wher
 
 
 # get detailed tract boundaries from tigris to match provided maps -
-lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
+# lac_tracts <- tracts("CA",county="Los Angeles",year=2023) 
+lac_tracts <- st_read(con_rda, query="SELECT * FROM geographies_ca.cb_2023_06_tract_500k",geom="geom_4326")
 
 ## join to lafire xwalk to get prc intersect and detailed tract shapes in one dataframe for altadena
-altadena_tracts <- lac_tracts %>% filter(GEOID %in% tracts$tract_geoid) %>% select(GEOID,NAME) %>%
-  left_join(tracts %>% select(tract_geoid, prc_tract_area, prc_fire_area), by=c("GEOID"="tract_geoid")) %>%
+altadena_tracts <- lac_tracts %>% filter(ct_geoid %in% tracts$tract_geoid) %>% select(ct_geoid,name) %>%
+  left_join(tracts %>% select(tract_geoid, prc_tract_area, prc_fire_area), by=c("ct_geoid"="tract_geoid")) %>%
   # limit to tracts over 5% in burn radius
-  filter(prc_tract_area>=.05)
+  filter(prc_tract_area>=.05)%>%
+  rename(geoid=ct_geoid)
 
 # add an indicator for west/east of lake avenue  and clean up table
 names(altadena_tracts ) <- tolower(names(altadena_tracts ))
@@ -105,7 +107,9 @@ altadena_tracts <- altadena_tracts %>%
 
 
 # get city boundaries from tigris for mapping -
-lac_places <- places(state="CA", year=2023)
+# lac_places <- places(state="CA", year=2023)
+lac_places <- st_read(con_alt, query="SELECT * FROM data.tl_2023_places", geom="geom")
+
 
 ## reduce to places around altadena which requires a spatial join with census tracts
 ## check geometries
@@ -826,16 +830,16 @@ addProviderTiles(providers$CartoDB.Positron) %>%
 
 ```
 
-# Eaton Fire Boundary Compared to Damaged Properties, Cities, and Tract Boundaries
-This map displays residential or mixed use properties that sustained at least an affected (1-9%) damage level. The purpose of this map is to confirm boundaries for analysis, e.g., West Altadena to include the burn area West of Lake Avenue and East Altadena/Pasadena to include the burn area East of Lake Avenue and West of Michillinda.
+# Altadena Boundaries Compared to Damaged Properties, Cities, and Tracts
+This map displays residential or mixed use properties that sustained at least an affected (1-9%) damage level. The purpose of this map is to confirm boundaries for analysis, e.g., West Altadena to include the burn area West of Lake Avenue and East Altadena to include the burn area East of Lake Avenue--each within the perimeter of Altadena proper. West and East Altadena boundaries indicate how we will compare the housing stock before and after the fire--examining changes within the broader Altadena community vs. focusing on the fire burn area exclusively. We will explore expanding boundaries to include parts of Pasadena after the initial analysis.
 
-Kinneloa Mesa did not sustain any damage so it would largely not be included in the analysis. Notably, some properties marked as destroyed fall just slightly outside of the burn area. CalFire's notes in their documentation that they assessor parcels within 100 feet of the fire perimeter. We would include any parcel evaluated by CalFire in the analysis even those that are outside of the official burn area. We could also draw boundaries that encompass more of Altadena to evaluate the housing stock before and after, e.g., for all of the Altadena community--what was the housing makeup before even outside of the fire perimeter vs. what were the properties impacted?
+Notably, some properties marked as destroyed fall just slightly outside of the burn area. CalFire's notes in their documentation that they assessor parcels within 100 feet of the fire perimeter.
 
 ```{r altadena-map, include=FALSE}
 
 # map damaged parcels and check boundaries we want to use against tracts and places
-west <- st_read("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Shapefiles\\WEST_fire_perimeter_v2.shp")
-east <- st_read("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Shapefiles\\EAST_fire_perimeter_v2.shp")
+west <- st_read(con_alt, query="SELECT * FROM data.west_altadena_3310", geom="geom")
+east <- st_read(con_alt, query="SELECT * FROM data.east_altadena_3310", geom="geom")
 west<-st_transform(west,4326)
 east<-st_transform(east,4326)
 ```
@@ -930,7 +934,8 @@ addProviderTiles(providers$CartoDB.Positron) %>%
   addLayersControl(
           overlayGroups = c("Eaton Fire Perimeter", "West Altadena", "East Altadena","Census Tracts","Damaged Properties","Cities"),
         options = layersControlOptions(collapsed = FALSE)
-  )
+  ) %>%
+  hideGroup(c("Cities","Census Tracts"))
       
 
 
