@@ -443,9 +443,35 @@ na_assessor_universe <- na_assessor_condo_address %>% select(1:19)
 write_xlsx(na_assessor_universe, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_100125.xlsx")
 
 
+##############################################################################
+## STEP 8: Pull together and clean up join -----
+joined_structures_condos <- rbind(joined_site_addres_condos %>% 
+                                       filter(!is.na(ain)) %>% 
+                                       rename_with(~ gsub("\\.x", "", .x)) %>%   # Remove .x from column names
+                                       select(1:19,ain)) 
+
+
 ##########################################################################################
 # Export crosswalk of dins to ain numbers --------
-final_df <- joined_structures_noncondos
+final_df <- rbind(joined_structures_noncondos, joined_structures_condos)
+nrow(dins_reduced)-nrow(final_df) # just 62 missing--see if they are condos
+length(unique(final_df$din_id)) # 16991
+nrow(final_df) #same count
+
+table_name <- "crosswalk_dins_assessor_ain"
+schema <- "data"
+indicator <- "Crosswalk of damage inspection database to assessor ain numbers. Each row is a structure in the damage inspection database."
+source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/damage_inspection_assessor_join.R "
+qa_filepath<-"  QA_sheet_relational_tables.docx "
+dbWriteTable(con_alt, Id(schema, table_name), final_df,
+             overwrite = FALSE, row.names = FALSE)
+
+# # Add metadata 
+# column_names <- colnames(final_df) # Get column names
+# column_comments <- c('')
+# 
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
 
 # prep 4326 layers to explore ones missing data
 lac_places_4326 <- st_transform(lac_places, 4326)
