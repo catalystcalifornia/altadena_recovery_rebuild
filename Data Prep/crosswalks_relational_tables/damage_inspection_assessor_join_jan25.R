@@ -1,8 +1,5 @@
 # Join the assessor data to the damage inspection data
-# create relational tables to identify residential properties
-# a relational table with apn/ain crosswalks
-# relational tables of addresses
-# relational table of damage
+# create a crosswalk of the damage inspection data to the january assessor data
 
 
 # Library and environment set up ----
