@@ -458,7 +458,7 @@ nrow(dins_reduced)-nrow(final_df) # just 62 missing--see if they are condos
 length(unique(final_df$din_id)) # 16991
 nrow(final_df) #same count
 
-table_name <- "crosswalk_dins_assessor_ain"
+table_name <- "crosswalk_dins_assessor_jan2025"
 schema <- "data"
 indicator <- "Crosswalk of damage inspection database to assessor ain numbers. Each row is a structure in the damage inspection database."
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/damage_inspection_assessor_join.R "
