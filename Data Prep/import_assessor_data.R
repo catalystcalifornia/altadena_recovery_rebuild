@@ -573,9 +573,13 @@ table(sept_mismatch_2$use_code, useNA = "ifany")
 # Note some of these look to overlap with some addresses came up when dealing with mismatch_1
 
 all_mismatch_2 <- full_join(jan_mismatch_2, sept_mismatch_2, by="ain") %>%
-  select(ain, jan, sept, everything()) # 30
+  select(ain, jan, sept, use_code.x, use_code.y, everything()) # 30, 27 if we exclude vacant lots
 
-
+# # export results to csv (keeping all columns for QA)
+# write.csv(all_mismatch_2,
+#           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/all_mismatch_2.csv",
+#           row.names=FALSE,
+#           fileEncoding = "UTF-8")
 
 
 
