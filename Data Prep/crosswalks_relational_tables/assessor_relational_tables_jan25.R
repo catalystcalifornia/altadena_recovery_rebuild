@@ -54,23 +54,75 @@ st_crs(east)
 st_crs(west)
 
 # parcels in east altadena
-parcels_east <- st_join(assessor_parcels, east %>% select(name), join=st_within, left=FALSE)
-parcels_east_test <- st_join(assessor_parcels, east %>% select(name), join=st_intersects, left=FALSE)
+# parcels_east <- st_join(assessor_parcels, east %>% select(name), join=st_within, left=FALSE)
+parcels_east <- st_join(assessor_parcels, east %>% select(name), join=st_intersects, left=FALSE)
 
 # check
-mapview(parcels_east_test) +
+mapview(parcels_east) +
   mapview(east) 
 # looks good
 
-parcels_west <- st_join(assessor_parcels, west %>% select(name), join=st_within, left=FALSE)
+parcels_west <- st_join(assessor_parcels, west %>% select(name), join=st_intersects, left=FALSE)
 
 # check
 mapview(parcels_west) +
   mapview(west)
 # looks good
 
+# 2 assessor parcels overlapping, keep in east not west
+# 5862005304 and 5843005901
+parcels_west <- parcels_west %>%
+  filter(!ain %in% c("5862005304","5843005901"))
+
 # join together
 parcels_altadena <- rbind(parcels_west,parcels_east)
 
+# check for duplicates
+nrow(parcels_altadena)
+length(unique(parcels_altadena$ain))
+# looks good 14525
+# this is our universe moving forward
+
+# filter assessor data for same ains
+data_altadena <- assessor_data %>%
+  filter(ain %in% parcels_altadena$ain)
+
+nrow(data_altadena)
+length(unique(data_altadena$ain))
+# 14519, difference of 6, that's fine for now
+
+# Add total units and total square feet for us to see throughout
+data_altadena <- data_altadena %>%
+  mutate(total_units = rowSums(across(ends_with("_units"))),
+       total_sq_ft = rowSums(across(ends_with("_square_feet")))) %>%
+         mutate(total_units=total_units-landlord_units) ## fix later
+
+data_altadena %>%
+  select(ends_with("_units")) %>%
+  View()
+
 # TABLE 1: RESIDENTIAL PROPERTIES INFO ------
 # We need to analyze all residential properties in Altadena and know what is single family, multi-family, condos, number of units, square footage, owner/renter
+# this is our basis for all other tables
+# Use codes: Ws01data\Project\RDA Team\Altadena Recovery and Rebuild\Data\Assessor Data Extract\Use Code 2023.pdf
+## Residential properties ----
+data_altadena_res <- data_altadena %>%
+  filter(str_detect(use_code, "^0")) 
+
+table(data_altadena_res$use_code)
+
+# pull out x and v suffixes which are vacant or vacant parcel with improvements that are non-structural
+
+data_altadena_res_vacant <- data_altadena_res %>%
+  filter(str_detect(use_code, "V$") | str_detect(use_code, "X$") ) 
+
+data_altadena_res_vacant %>%
+  select(total_units, total_sq_ft, use_code, everything()) %>%
+  View()
+
+# one has incorrect units 5841019007
+
+assessor_data_condos <- assessor_data %>%
+  filter(str_detect(use_code, "C$") | str_detect(use_code, "E$") ) 
+
+
