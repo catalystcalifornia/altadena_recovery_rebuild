@@ -470,432 +470,432 @@ dbWriteTable(con_alt, Id(schema, table_name), final_df,
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
-# prep 4326 layers to explore ones missing data
-lac_places_4326 <- st_transform(lac_places, 4326)
-na_assessor_4326 <- st_transform(na_assessor_points, 4326)
-assessor_parcels_4326 <- st_transform(assessor_parcels, 4326)
-
-# map the data
-leaflet () %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
-  setView(-118.104631, 34.185104, zoom = 12) %>%
-  addPolygons(data=assessor_parcels_4326,
-              fillColor="white",
-              fillOpacity=0,
-              color="purple",
-              weight=1,
-              opacity=1,
-              popup=~ain,
-              group="Parcels") %>%
-  addPolygons(data=lac_places_4326,
-              fillColor="white",
-              fillOpacity=0,
-              color="green",
-              weight=1.5,
-              opacity=1,
-              popup=~NAME,
-              group="Cities") %>%
-  addCircleMarkers(data=na_assessor_4326,
-                   radius = 2,
-                   stroke=TRUE,
-                   # fill=TRUE,
-                   fillOpacity = 1,
-                   color="black",
-                   weight=.5,
-                   opacity=.5,
-                   popup = ~paste0(damage,"</br>",
-                                   "Parcel #: ", apn_parcel, "</br>",
-                                   "Structure Category: ", structure_category, "</br>",
-                                   "Address: ", site_address_parcel, "</br>",
-                                   "City: ", city),
-                   group="Structures Missing Assessor Data - Point Join"
-  ) %>%
-  addLayersControl(
-    overlayGroups = c("Parcels", "Cities","Structures Missing Assessor Data - Point Join"),
-    options = layersControlOptions(collapsed = FALSE)
-  )
-
-# explore the data
-table(na_assessor_points$structure_category,useNA='always')
-# >300 are single residence could be condos
-
-table(na_assessor_points$structure_type,useNA='always')
-# most are single family residence multi story
-
-table(na_assessor_points$city,useNA='always')
-# most are in altadena count 336
-
-# check those that are residential more
-na_assessor_points %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% count(city)
-# most residential are in Altadena
-
-length(unique(na_assessor_points$apn_parcel)) #329 unique parcel numbers
-sum(is.na(na_assessor_points$apn_parcel)) # no blank parcel numbers, we can try joining by parcel number
-
-
-# Map data together for QA -----
-joined_structures_residential <- joined_structures %>%
-  left_join(assessor_data %>% 
-              mutate(ain=as.character(ain)) %>%
-              select(ain, use_code, site_address, ends_with("_units"), ends_with("_square_feet")), recording_date,
-            by="ain") %>%
-  select(-landlord_units) %>%
-  mutate(total_units = rowSums(across(ends_with("_units"))),
-         total_sq_ft = rowSums(across(ends_with("_square_feet")))) %>%
-           filter(str_detect(use_code, "^0")) %>%                       
-         filter(grepl("ALTADENA",site_address))
-
-assessor_parcels_map<- assessor_parcels_4326 %>%
-left_join(assessor_data %>% 
-            mutate(ain=as.character(ain)) %>%
-            select(ain, use_code, site_address, ends_with("_units"), ends_with("_square_feet")), recording_date,
-          by="ain")%>%
-  select(-landlord_units) %>%
-  mutate(total_units = rowSums(across(ends_with("_units"))),
-         total_sq_ft = rowSums(across(ends_with("_square_feet"))))
-
-df_map <- joined_structures_residential %>% st_transform(4326)
-
-assessor_parcels_map <-assessor_parcels_map %>%
-  filter(grepl("ALTADENA",site_address))
-  
-pal <- colorFactor(palette = "Dark2", domain = df_map$structure_category)
-
-full_map <- leaflet () %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
-  setView(-118.1539581, 34.1924798, zoom = 14) %>%
-  addPolygons(data=assessor_parcels_map,
-              fillColor="white",
-              fillOpacity=0,
-              color="purple",
-              weight=1,
-              opacity=1,
-              popup=~paste0("Assessor AIN: ", ain, "</br>",
-              "Assessor Use Code: ", use_code, "</br>",
-              "Assessor Address: ", site_address, "</br>",
-              "Assessor Total Parcel Units: ", total_units, "</br>",
-              "Assessor Total Sq Ft: ", total_sq_ft),
-              group="Parcels") %>%
-  addPolygons(data=lac_places_4326,
-              fillColor="white",
-              fillOpacity=0,
-              color="green",
-              weight=1.5,
-              opacity=1,
-              popup=~NAME,
-              group="Cities") %>%
-  addCircleMarkers(data=df_map,
-                   radius = 2,
-                   stroke=TRUE,
-                   fillColor = ~pal(structure_category), # Color based on category
-                   fillOpacity = 1,
-                   color="black",
-                   weight=.5,
-                   opacity=.5,
-                   popup = ~paste0(damage,"</br>",
-                                   "CalFire APN #: ", apn_parcel, "</br>",
-                                   "CalFire Structure Category: ", structure_category, "</br>",
-                                   "CalFire Site Address: ", site_address_parcel, "</br>",
-                                   "CalFire Street Address: ", street_address, "</br>",
-                                   "Assessor AIN: ", ain, "</br>",
-                                   "Assessor Use Code: ", use_code, "</br>",
-                                   "Assessor Address: ", site_address, "</br>",
-                                   "Assessor Total Parcel Units: ", total_units, "</br>",
-                                   "Assessor Total Sq Ft: ", total_sq_ft),
-                   group="Matched CalFire Structures to Assessor Data"
-  ) %>%
-  addLegend(pal = pal, values = df_map$structure_category, title = "Structure Category") %>%
-  addLayersControl(
-    overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
-    options = layersControlOptions(collapsed = FALSE)
-  )
-
-saveWidget(full_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\full_map.html", selfcontained = TRUE)
-
-
-
-
-
-## Sample sets of structures for QA ------
-# randomly sample and then map a set of 20 properties 4 times
-# Get a random sample of unique ains
-sampled_ids <- sample(unique(df_map$ain), 20)
-
-# Filter the data frame to keep rows with the sampled ains
-sample_jz <- df_map[df_map$ain %in% sampled_ids, ]
-
-sample_jz <- sample_jz %>% arrange(ain)
-
-pal <- colorFactor(palette = "Dark2", domain = sample_jz$structure_category)
-
-sample_jz_map <- leaflet () %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
-  setView(-118.1539581, 34.1924798, zoom = 14) %>%
-  addPolygons(data=assessor_parcels_map,
-              fillColor="white",
-              fillOpacity=0,
-              color="purple",
-              weight=1,
-              opacity=1,
-              popup=~paste0("Assessor AIN: ", ain, "</br>",
-                            "Assessor Use Code: ", use_code, "</br>",
-                            "Assessor Address: ", site_address, "</br>",
-                            "Assessor Total Parcel Units: ", total_units, "</br>",
-                            "Assessor Total Sq Ft: ", total_sq_ft),
-              group="Parcels") %>%
-  addPolygons(data=lac_places_4326,
-              fillColor="white",
-              fillOpacity=0,
-              color="green",
-              weight=1.5,
-              opacity=1,
-              popup=~NAME,
-              group="Cities") %>%
-  addCircleMarkers(data=sample_jz,
-                   radius = 4,
-                   stroke=TRUE,
-                   fillColor = ~pal(structure_category), # Color based on category
-                   fillOpacity = 1,
-                   color="black",
-                   weight=.5,
-                   opacity=.5,
-                   popup = ~paste0(damage,"</br>",
-                                   "CalFire APN #: ", apn_parcel, "</br>",
-                                   "CalFire Structure Category: ", structure_category, "</br>",
-                                   "CalFire Address: ", site_address_parcel, "</br>",
-                                   "CalFire Street Address: ", street_address, "</br>",
-                                   "Assessor AIN: ", ain, "</br>",
-                                   "Assessor Use Code: ", use_code, "</br>",
-                                   "Assessor Address: ", site_address, "</br>",
-                                   "Assessor Total Parcel Units: ", total_units, "</br>",
-                                   "Assessor Total Sq Ft: ", total_sq_ft),
-                   group="Matched CalFire Structures to Assessor Data"
-  ) %>%
-  addLegend(pal = pal, values = sample_jz$structure_category, title = "Structure Category") %>%
-  addLayersControl(
-    overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
-    options = layersControlOptions(collapsed = FALSE)
-  )
-
-saveWidget(sample_jz_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\jz_map.html", selfcontained = FALSE)
-write_xlsx(sample_jz, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\jz_sample.xlsx") 
-
-## second sample
-# remove prior sample
-temp_df <- df_map %>% filter(!ain %in% sample_jz$ain)
-
-# Get a random sample of unique ains
-sampled_ids <- sample(unique(temp_df$ain), 20)
-
-# Filter the data frame to keep rows with the sampled ains
-sample_hk <- df_map[df_map$ain %in% sampled_ids, ]
-
-sample_hk <- sample_hk %>% arrange(ain)
-
-pal <- colorFactor(palette = "Dark2", domain = sample_hk$structure_category)
-
-sample_hk_map <- leaflet () %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
-  setView(-118.1539581, 34.1924798, zoom = 14) %>%
-  addPolygons(data=assessor_parcels_map,
-              fillColor="white",
-              fillOpacity=0,
-              color="purple",
-              weight=1,
-              opacity=1,
-              popup=~paste0("Assessor AIN: ", ain, "</br>",
-                            "Assessor Use Code: ", use_code, "</br>",
-                            "Assessor Address: ", site_address, "</br>",
-                            "Assessor Total Parcel Units: ", total_units, "</br>",
-                            "Assessor Total Sq Ft: ", total_sq_ft),
-              group="Parcels") %>%
-  addPolygons(data=lac_places_4326,
-              fillColor="white",
-              fillOpacity=0,
-              color="green",
-              weight=1.5,
-              opacity=1,
-              popup=~NAME,
-              group="Cities") %>%
-  addCircleMarkers(data=sample_hk,
-                   radius = 4,
-                   stroke=TRUE,
-                   fillColor = ~pal(structure_category), # Color based on category
-                   fillOpacity = 1,
-                   color="black",
-                   weight=.5,
-                   opacity=.5,
-                   popup = ~paste0(damage,"</br>",
-                                   "CalFire APN #: ", apn_parcel, "</br>",
-                                   "CalFire Structure Category: ", structure_category, "</br>",
-                                   "CalFire Address: ", site_address_parcel, "</br>",
-                                   "CalFire Street Address: ", street_address, "</br>",
-                                   "Assessor AIN: ", ain, "</br>",
-                                   "Assessor Use Code: ", use_code, "</br>",
-                                   "Assessor Address: ", site_address, "</br>",
-                                   "Assessor Total Parcel Units: ", total_units, "</br>",
-                                   "Assessor Total Sq Ft: ", total_sq_ft),
-                   group="Matched CalFire Structures to Assessor Data"
-  ) %>%
-  addLegend(pal = pal, values = sample_hk$structure_category, title = "Structure Category") %>%
-  addLayersControl(
-    overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
-    options = layersControlOptions(collapsed = FALSE)
-  )
-
-saveWidget(sample_hk_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\hk_map.html", selfcontained = FALSE)
-write_xlsx(sample_hk, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\hk_sample.xlsx") 
-
-
-## third sample - focus on multifamily
-temp_df <- df_map %>%
-  filter(str_detect(use_code, "^02") |str_detect(use_code, "^03") | str_detect(use_code, "^04") | str_detect(use_code, "^05")) 
-
-# Get a random sample of unique ains
-sampled_ids <- sample(unique(temp_df$ain), 20)
-
-# Filter the data frame to keep rows with the sampled ains
-sample_mtk <- df_map[df_map$ain %in% sampled_ids, ]
-
-sample_mtk <- sample_mtk %>% arrange(ain)
-
-pal <- colorFactor(palette = "Dark2", domain = sample_mtk$structure_category)
-
-sample_mtk_map <- leaflet () %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
-  setView(-118.1539581, 34.1924798, zoom = 14) %>%
-  addPolygons(data=assessor_parcels_map,
-              fillColor="white",
-              fillOpacity=0,
-              color="purple",
-              weight=1,
-              opacity=1,
-              popup=~paste0("Assessor AIN: ", ain, "</br>",
-                            "Assessor Use Code: ", use_code, "</br>",
-                            "Assessor Address: ", site_address, "</br>",
-                            "Assessor Total Parcel Units: ", total_units, "</br>",
-                            "Assessor Total Sq Ft: ", total_sq_ft),
-              group="Parcels") %>%
-  addPolygons(data=lac_places_4326,
-              fillColor="white",
-              fillOpacity=0,
-              color="green",
-              weight=1.5,
-              opacity=1,
-              popup=~NAME,
-              group="Cities") %>%
-  addCircleMarkers(data=sample_mtk,
-                   radius = 4,
-                   stroke=TRUE,
-                   fillColor = ~pal(structure_category), # Color based on category
-                   fillOpacity = 1,
-                   color="black",
-                   weight=.5,
-                   opacity=.5,
-                   popup = ~paste0(damage,"</br>",
-                                   "CalFire APN #: ", apn_parcel, "</br>",
-                                   "CalFire Structure Category: ", structure_category, "</br>",
-                                   "CalFire Address: ", site_address_parcel, "</br>",
-                                   "CalFire Street Address: ", street_address, "</br>",
-                                   "Assessor AIN: ", ain, "</br>",
-                                   "Assessor Use Code: ", use_code, "</br>",
-                                   "Assessor Address: ", site_address, "</br>",
-                                   "Assessor Total Parcel Units: ", total_units, "</br>",
-                                   "Assessor Total Sq Ft: ", total_sq_ft),
-                   group="Matched CalFire Structures to Assessor Data"
-  ) %>%
-  addLegend(pal = pal, values = sample_mtk$structure_category, title = "Structure Category") %>%
-  addLayersControl(
-    overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
-    options = layersControlOptions(collapsed = FALSE)
-  )
-
-saveWidget(sample_mtk_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\mtk_map.html", selfcontained = FALSE)
-write_xlsx(sample_mtk, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\mtk_sample.xlsx") 
-
-
-## fourth sample - focus on condos
-temp_df <- df_map %>%
-  filter(str_detect(use_code, "C$")) 
-
-sample_emg <- temp_df %>% arrange(ain)
-
-pal <- colorFactor(palette = "Dark2", domain = sample_emg$structure_category)
-
-sample_emg_map <- leaflet () %>%
-  addProviderTiles(providers$CartoDB.Positron) %>%
-  setView(-118.1539581, 34.1924798, zoom = 14) %>%
-  addPolygons(data=assessor_parcels_map,
-              fillColor="white",
-              fillOpacity=0,
-              color="purple",
-              weight=1,
-              opacity=1,
-              popup=~paste0("Assessor AIN: ", ain, "</br>",
-                            "Assessor Use Code: ", use_code, "</br>",
-                            "Assessor Address: ", site_address, "</br>",
-                            "Assessor Total Parcel Units: ", total_units, "</br>",
-                            "Assessor Total Sq Ft: ", total_sq_ft),
-              group="Parcels") %>%
-  addPolygons(data=lac_places_4326,
-              fillColor="white",
-              fillOpacity=0,
-              color="green",
-              weight=1.5,
-              opacity=1,
-              popup=~NAME,
-              group="Cities") %>%
-  addCircleMarkers(data=sample_emg,
-                   radius = 4,
-                   stroke=TRUE,
-                   fillColor = ~pal(structure_category), # Color based on category
-                   fillOpacity = 1,
-                   color="black",
-                   weight=.5,
-                   opacity=.5,
-                   popup = ~paste0(damage,"</br>",
-                                   "CalFire APN #: ", apn_parcel, "</br>",
-                                   "CalFire Structure Category: ", structure_category, "</br>",
-                                   "CalFire Address: ", site_address_parcel, "</br>",
-                                   "CalFire Street Address: ", street_address, "</br>",
-                                   "Assessor AIN: ", ain, "</br>",
-                                   "Assessor Use Code: ", use_code, "</br>",
-                                   "Assessor Address: ", site_address, "</br>",
-                                   "Assessor Total Parcel Units: ", total_units, "</br>",
-                                   "Assessor Total Sq Ft: ", total_sq_ft),
-                   group="Matched CalFire Structures to Assessor Data"
-  ) %>%
-  addLegend(pal = pal, values = sample_emg$structure_category, title = "Structure Category") %>%
-  addLayersControl(
-    overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
-    options = layersControlOptions(collapsed = FALSE)
-  )
-
-saveWidget(sample_emg_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\emg_map.html", selfcontained = FALSE)
-write_xlsx(sample_emg, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\emg_sample.xlsx") 
-
-# check the ones that had many to many join
-joined_site_dup_rows <- joined_site_address[joined_site_address$din_id %in% joined_site_address$din_id[duplicated(joined_site_address$din_id)], ]
-View(joined_site_dup_rows)
-
-unique(joined_site_dup_rows$ain) #two ains joined
-unique(joined_site_dup_rows$site_address_parcel) # one site
-
-assessor_data_dup_search <- assessor_data %>%
-  filter(str_detect(site_address, "CANYON CREST RD"))
-
-# examine these AINs
-# 5830009022 5830009026 online
-
-mapview(joined_site_dup_rows)
-
-unique(joined_site_dup_rows$apn)
-
-# https://portal.assessor.lacounty.gov/parceldetail/5830009023
-# these aren't joining to the right parcels -- they are joining to parcels with the same address but that are different in location and characteristics
-# zero out these as not joining since they are joining to the wrong parcels
-joined_site_address <- joined_site_address %>%
-  mutate(across(all_of(19:154), ~ if_else(din_id %in% joined_site_dup_rows$din_id, NA, .)))
-
-# dedup
-joined_site_address <- joined_site_address[!duplicated(joined_site_address), ]
+# # prep 4326 layers to explore ones missing data
+# lac_places_4326 <- st_transform(lac_places, 4326)
+# na_assessor_4326 <- st_transform(na_assessor_points, 4326)
+# assessor_parcels_4326 <- st_transform(assessor_parcels, 4326)
+# 
+# # map the data
+# leaflet () %>%
+#   addProviderTiles(providers$CartoDB.Positron) %>%
+#   setView(-118.104631, 34.185104, zoom = 12) %>%
+#   addPolygons(data=assessor_parcels_4326,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="purple",
+#               weight=1,
+#               opacity=1,
+#               popup=~ain,
+#               group="Parcels") %>%
+#   addPolygons(data=lac_places_4326,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="green",
+#               weight=1.5,
+#               opacity=1,
+#               popup=~NAME,
+#               group="Cities") %>%
+#   addCircleMarkers(data=na_assessor_4326,
+#                    radius = 2,
+#                    stroke=TRUE,
+#                    # fill=TRUE,
+#                    fillOpacity = 1,
+#                    color="black",
+#                    weight=.5,
+#                    opacity=.5,
+#                    popup = ~paste0(damage,"</br>",
+#                                    "Parcel #: ", apn_parcel, "</br>",
+#                                    "Structure Category: ", structure_category, "</br>",
+#                                    "Address: ", site_address_parcel, "</br>",
+#                                    "City: ", city),
+#                    group="Structures Missing Assessor Data - Point Join"
+#   ) %>%
+#   addLayersControl(
+#     overlayGroups = c("Parcels", "Cities","Structures Missing Assessor Data - Point Join"),
+#     options = layersControlOptions(collapsed = FALSE)
+#   )
+# 
+# # explore the data
+# table(na_assessor_points$structure_category,useNA='always')
+# # >300 are single residence could be condos
+# 
+# table(na_assessor_points$structure_type,useNA='always')
+# # most are single family residence multi story
+# 
+# table(na_assessor_points$city,useNA='always')
+# # most are in altadena count 336
+# 
+# # check those that are residential more
+# na_assessor_points %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% count(city)
+# # most residential are in Altadena
+# 
+# length(unique(na_assessor_points$apn_parcel)) #329 unique parcel numbers
+# sum(is.na(na_assessor_points$apn_parcel)) # no blank parcel numbers, we can try joining by parcel number
+# 
+# 
+# # Map data together for QA -----
+# joined_structures_residential <- joined_structures %>%
+#   left_join(assessor_data %>% 
+#               mutate(ain=as.character(ain)) %>%
+#               select(ain, use_code, site_address, ends_with("_units"), ends_with("_square_feet")), recording_date,
+#             by="ain") %>%
+#   select(-landlord_units) %>%
+#   mutate(total_units = rowSums(across(ends_with("_units"))),
+#          total_sq_ft = rowSums(across(ends_with("_square_feet")))) %>%
+#            filter(str_detect(use_code, "^0")) %>%                       
+#          filter(grepl("ALTADENA",site_address))
+# 
+# assessor_parcels_map<- assessor_parcels_4326 %>%
+# left_join(assessor_data %>% 
+#             mutate(ain=as.character(ain)) %>%
+#             select(ain, use_code, site_address, ends_with("_units"), ends_with("_square_feet")), recording_date,
+#           by="ain")%>%
+#   select(-landlord_units) %>%
+#   mutate(total_units = rowSums(across(ends_with("_units"))),
+#          total_sq_ft = rowSums(across(ends_with("_square_feet"))))
+# 
+# df_map <- joined_structures_residential %>% st_transform(4326)
+# 
+# assessor_parcels_map <-assessor_parcels_map %>%
+#   filter(grepl("ALTADENA",site_address))
+#   
+# pal <- colorFactor(palette = "Dark2", domain = df_map$structure_category)
+# 
+# full_map <- leaflet () %>%
+#   addProviderTiles(providers$CartoDB.Positron) %>%
+#   setView(-118.1539581, 34.1924798, zoom = 14) %>%
+#   addPolygons(data=assessor_parcels_map,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="purple",
+#               weight=1,
+#               opacity=1,
+#               popup=~paste0("Assessor AIN: ", ain, "</br>",
+#               "Assessor Use Code: ", use_code, "</br>",
+#               "Assessor Address: ", site_address, "</br>",
+#               "Assessor Total Parcel Units: ", total_units, "</br>",
+#               "Assessor Total Sq Ft: ", total_sq_ft),
+#               group="Parcels") %>%
+#   addPolygons(data=lac_places_4326,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="green",
+#               weight=1.5,
+#               opacity=1,
+#               popup=~NAME,
+#               group="Cities") %>%
+#   addCircleMarkers(data=df_map,
+#                    radius = 2,
+#                    stroke=TRUE,
+#                    fillColor = ~pal(structure_category), # Color based on category
+#                    fillOpacity = 1,
+#                    color="black",
+#                    weight=.5,
+#                    opacity=.5,
+#                    popup = ~paste0(damage,"</br>",
+#                                    "CalFire APN #: ", apn_parcel, "</br>",
+#                                    "CalFire Structure Category: ", structure_category, "</br>",
+#                                    "CalFire Site Address: ", site_address_parcel, "</br>",
+#                                    "CalFire Street Address: ", street_address, "</br>",
+#                                    "Assessor AIN: ", ain, "</br>",
+#                                    "Assessor Use Code: ", use_code, "</br>",
+#                                    "Assessor Address: ", site_address, "</br>",
+#                                    "Assessor Total Parcel Units: ", total_units, "</br>",
+#                                    "Assessor Total Sq Ft: ", total_sq_ft),
+#                    group="Matched CalFire Structures to Assessor Data"
+#   ) %>%
+#   addLegend(pal = pal, values = df_map$structure_category, title = "Structure Category") %>%
+#   addLayersControl(
+#     overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
+#     options = layersControlOptions(collapsed = FALSE)
+#   )
+# 
+# saveWidget(full_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\full_map.html", selfcontained = TRUE)
+# 
+# 
+# 
+# 
+# 
+# ## Sample sets of structures for QA ------
+# # randomly sample and then map a set of 20 properties 4 times
+# # Get a random sample of unique ains
+# sampled_ids <- sample(unique(df_map$ain), 20)
+# 
+# # Filter the data frame to keep rows with the sampled ains
+# sample_jz <- df_map[df_map$ain %in% sampled_ids, ]
+# 
+# sample_jz <- sample_jz %>% arrange(ain)
+# 
+# pal <- colorFactor(palette = "Dark2", domain = sample_jz$structure_category)
+# 
+# sample_jz_map <- leaflet () %>%
+#   addProviderTiles(providers$CartoDB.Positron) %>%
+#   setView(-118.1539581, 34.1924798, zoom = 14) %>%
+#   addPolygons(data=assessor_parcels_map,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="purple",
+#               weight=1,
+#               opacity=1,
+#               popup=~paste0("Assessor AIN: ", ain, "</br>",
+#                             "Assessor Use Code: ", use_code, "</br>",
+#                             "Assessor Address: ", site_address, "</br>",
+#                             "Assessor Total Parcel Units: ", total_units, "</br>",
+#                             "Assessor Total Sq Ft: ", total_sq_ft),
+#               group="Parcels") %>%
+#   addPolygons(data=lac_places_4326,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="green",
+#               weight=1.5,
+#               opacity=1,
+#               popup=~NAME,
+#               group="Cities") %>%
+#   addCircleMarkers(data=sample_jz,
+#                    radius = 4,
+#                    stroke=TRUE,
+#                    fillColor = ~pal(structure_category), # Color based on category
+#                    fillOpacity = 1,
+#                    color="black",
+#                    weight=.5,
+#                    opacity=.5,
+#                    popup = ~paste0(damage,"</br>",
+#                                    "CalFire APN #: ", apn_parcel, "</br>",
+#                                    "CalFire Structure Category: ", structure_category, "</br>",
+#                                    "CalFire Address: ", site_address_parcel, "</br>",
+#                                    "CalFire Street Address: ", street_address, "</br>",
+#                                    "Assessor AIN: ", ain, "</br>",
+#                                    "Assessor Use Code: ", use_code, "</br>",
+#                                    "Assessor Address: ", site_address, "</br>",
+#                                    "Assessor Total Parcel Units: ", total_units, "</br>",
+#                                    "Assessor Total Sq Ft: ", total_sq_ft),
+#                    group="Matched CalFire Structures to Assessor Data"
+#   ) %>%
+#   addLegend(pal = pal, values = sample_jz$structure_category, title = "Structure Category") %>%
+#   addLayersControl(
+#     overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
+#     options = layersControlOptions(collapsed = FALSE)
+#   )
+# 
+# saveWidget(sample_jz_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\jz_map.html", selfcontained = FALSE)
+# write_xlsx(sample_jz, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\jz_sample.xlsx") 
+# 
+# ## second sample
+# # remove prior sample
+# temp_df <- df_map %>% filter(!ain %in% sample_jz$ain)
+# 
+# # Get a random sample of unique ains
+# sampled_ids <- sample(unique(temp_df$ain), 20)
+# 
+# # Filter the data frame to keep rows with the sampled ains
+# sample_hk <- df_map[df_map$ain %in% sampled_ids, ]
+# 
+# sample_hk <- sample_hk %>% arrange(ain)
+# 
+# pal <- colorFactor(palette = "Dark2", domain = sample_hk$structure_category)
+# 
+# sample_hk_map <- leaflet () %>%
+#   addProviderTiles(providers$CartoDB.Positron) %>%
+#   setView(-118.1539581, 34.1924798, zoom = 14) %>%
+#   addPolygons(data=assessor_parcels_map,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="purple",
+#               weight=1,
+#               opacity=1,
+#               popup=~paste0("Assessor AIN: ", ain, "</br>",
+#                             "Assessor Use Code: ", use_code, "</br>",
+#                             "Assessor Address: ", site_address, "</br>",
+#                             "Assessor Total Parcel Units: ", total_units, "</br>",
+#                             "Assessor Total Sq Ft: ", total_sq_ft),
+#               group="Parcels") %>%
+#   addPolygons(data=lac_places_4326,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="green",
+#               weight=1.5,
+#               opacity=1,
+#               popup=~NAME,
+#               group="Cities") %>%
+#   addCircleMarkers(data=sample_hk,
+#                    radius = 4,
+#                    stroke=TRUE,
+#                    fillColor = ~pal(structure_category), # Color based on category
+#                    fillOpacity = 1,
+#                    color="black",
+#                    weight=.5,
+#                    opacity=.5,
+#                    popup = ~paste0(damage,"</br>",
+#                                    "CalFire APN #: ", apn_parcel, "</br>",
+#                                    "CalFire Structure Category: ", structure_category, "</br>",
+#                                    "CalFire Address: ", site_address_parcel, "</br>",
+#                                    "CalFire Street Address: ", street_address, "</br>",
+#                                    "Assessor AIN: ", ain, "</br>",
+#                                    "Assessor Use Code: ", use_code, "</br>",
+#                                    "Assessor Address: ", site_address, "</br>",
+#                                    "Assessor Total Parcel Units: ", total_units, "</br>",
+#                                    "Assessor Total Sq Ft: ", total_sq_ft),
+#                    group="Matched CalFire Structures to Assessor Data"
+#   ) %>%
+#   addLegend(pal = pal, values = sample_hk$structure_category, title = "Structure Category") %>%
+#   addLayersControl(
+#     overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
+#     options = layersControlOptions(collapsed = FALSE)
+#   )
+# 
+# saveWidget(sample_hk_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\hk_map.html", selfcontained = FALSE)
+# write_xlsx(sample_hk, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\hk_sample.xlsx") 
+# 
+# 
+# ## third sample - focus on multifamily
+# temp_df <- df_map %>%
+#   filter(str_detect(use_code, "^02") |str_detect(use_code, "^03") | str_detect(use_code, "^04") | str_detect(use_code, "^05")) 
+# 
+# # Get a random sample of unique ains
+# sampled_ids <- sample(unique(temp_df$ain), 20)
+# 
+# # Filter the data frame to keep rows with the sampled ains
+# sample_mtk <- df_map[df_map$ain %in% sampled_ids, ]
+# 
+# sample_mtk <- sample_mtk %>% arrange(ain)
+# 
+# pal <- colorFactor(palette = "Dark2", domain = sample_mtk$structure_category)
+# 
+# sample_mtk_map <- leaflet () %>%
+#   addProviderTiles(providers$CartoDB.Positron) %>%
+#   setView(-118.1539581, 34.1924798, zoom = 14) %>%
+#   addPolygons(data=assessor_parcels_map,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="purple",
+#               weight=1,
+#               opacity=1,
+#               popup=~paste0("Assessor AIN: ", ain, "</br>",
+#                             "Assessor Use Code: ", use_code, "</br>",
+#                             "Assessor Address: ", site_address, "</br>",
+#                             "Assessor Total Parcel Units: ", total_units, "</br>",
+#                             "Assessor Total Sq Ft: ", total_sq_ft),
+#               group="Parcels") %>%
+#   addPolygons(data=lac_places_4326,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="green",
+#               weight=1.5,
+#               opacity=1,
+#               popup=~NAME,
+#               group="Cities") %>%
+#   addCircleMarkers(data=sample_mtk,
+#                    radius = 4,
+#                    stroke=TRUE,
+#                    fillColor = ~pal(structure_category), # Color based on category
+#                    fillOpacity = 1,
+#                    color="black",
+#                    weight=.5,
+#                    opacity=.5,
+#                    popup = ~paste0(damage,"</br>",
+#                                    "CalFire APN #: ", apn_parcel, "</br>",
+#                                    "CalFire Structure Category: ", structure_category, "</br>",
+#                                    "CalFire Address: ", site_address_parcel, "</br>",
+#                                    "CalFire Street Address: ", street_address, "</br>",
+#                                    "Assessor AIN: ", ain, "</br>",
+#                                    "Assessor Use Code: ", use_code, "</br>",
+#                                    "Assessor Address: ", site_address, "</br>",
+#                                    "Assessor Total Parcel Units: ", total_units, "</br>",
+#                                    "Assessor Total Sq Ft: ", total_sq_ft),
+#                    group="Matched CalFire Structures to Assessor Data"
+#   ) %>%
+#   addLegend(pal = pal, values = sample_mtk$structure_category, title = "Structure Category") %>%
+#   addLayersControl(
+#     overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
+#     options = layersControlOptions(collapsed = FALSE)
+#   )
+# 
+# saveWidget(sample_mtk_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\mtk_map.html", selfcontained = FALSE)
+# write_xlsx(sample_mtk, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\mtk_sample.xlsx") 
+# 
+# 
+# ## fourth sample - focus on condos
+# temp_df <- df_map %>%
+#   filter(str_detect(use_code, "C$")) 
+# 
+# sample_emg <- temp_df %>% arrange(ain)
+# 
+# pal <- colorFactor(palette = "Dark2", domain = sample_emg$structure_category)
+# 
+# sample_emg_map <- leaflet () %>%
+#   addProviderTiles(providers$CartoDB.Positron) %>%
+#   setView(-118.1539581, 34.1924798, zoom = 14) %>%
+#   addPolygons(data=assessor_parcels_map,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="purple",
+#               weight=1,
+#               opacity=1,
+#               popup=~paste0("Assessor AIN: ", ain, "</br>",
+#                             "Assessor Use Code: ", use_code, "</br>",
+#                             "Assessor Address: ", site_address, "</br>",
+#                             "Assessor Total Parcel Units: ", total_units, "</br>",
+#                             "Assessor Total Sq Ft: ", total_sq_ft),
+#               group="Parcels") %>%
+#   addPolygons(data=lac_places_4326,
+#               fillColor="white",
+#               fillOpacity=0,
+#               color="green",
+#               weight=1.5,
+#               opacity=1,
+#               popup=~NAME,
+#               group="Cities") %>%
+#   addCircleMarkers(data=sample_emg,
+#                    radius = 4,
+#                    stroke=TRUE,
+#                    fillColor = ~pal(structure_category), # Color based on category
+#                    fillOpacity = 1,
+#                    color="black",
+#                    weight=.5,
+#                    opacity=.5,
+#                    popup = ~paste0(damage,"</br>",
+#                                    "CalFire APN #: ", apn_parcel, "</br>",
+#                                    "CalFire Structure Category: ", structure_category, "</br>",
+#                                    "CalFire Address: ", site_address_parcel, "</br>",
+#                                    "CalFire Street Address: ", street_address, "</br>",
+#                                    "Assessor AIN: ", ain, "</br>",
+#                                    "Assessor Use Code: ", use_code, "</br>",
+#                                    "Assessor Address: ", site_address, "</br>",
+#                                    "Assessor Total Parcel Units: ", total_units, "</br>",
+#                                    "Assessor Total Sq Ft: ", total_sq_ft),
+#                    group="Matched CalFire Structures to Assessor Data"
+#   ) %>%
+#   addLegend(pal = pal, values = sample_emg$structure_category, title = "Structure Category") %>%
+#   addLayersControl(
+#     overlayGroups = c("Parcels", "Cities","Matched CalFire Structures to Assessor Data"),
+#     options = layersControlOptions(collapsed = FALSE)
+#   )
+# 
+# saveWidget(sample_emg_map, file = "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\emg_map.html", selfcontained = FALSE)
+# write_xlsx(sample_emg, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Maps\\emg_sample.xlsx") 
+# 
+# # check the ones that had many to many join
+# joined_site_dup_rows <- joined_site_address[joined_site_address$din_id %in% joined_site_address$din_id[duplicated(joined_site_address$din_id)], ]
+# View(joined_site_dup_rows)
+# 
+# unique(joined_site_dup_rows$ain) #two ains joined
+# unique(joined_site_dup_rows$site_address_parcel) # one site
+# 
+# assessor_data_dup_search <- assessor_data %>%
+#   filter(str_detect(site_address, "CANYON CREST RD"))
+# 
+# # examine these AINs
+# # 5830009022 5830009026 online
+# 
+# mapview(joined_site_dup_rows)
+# 
+# unique(joined_site_dup_rows$apn)
+# 
+# # https://portal.assessor.lacounty.gov/parceldetail/5830009023
+# # these aren't joining to the right parcels -- they are joining to parcels with the same address but that are different in location and characteristics
+# # zero out these as not joining since they are joining to the wrong parcels
+# joined_site_address <- joined_site_address %>%
+#   mutate(across(all_of(19:154), ~ if_else(din_id %in% joined_site_dup_rows$din_id, NA, .)))
+# 
+# # dedup
+# joined_site_address <- joined_site_address[!duplicated(joined_site_address), ]
