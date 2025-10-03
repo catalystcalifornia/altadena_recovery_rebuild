@@ -350,6 +350,10 @@ dins_xwalk_res <- dins_xwalk %>%
 length(unique(dins_xwalk_res$ain))
 length(unique(residential_ains$ain))
 # some parcels aren't assessed if they aren't in the fire perimeter
+mapview(dins_xwalk_res) +
+  mapview(eaton_fire,col.regions="red") +
+  mapview(parcels_altadena)
+# looks pretty good, some holes are from commercial, parks, schools, etc.
 
 ## Create binary columns for each damage level -----
 table(dins_xwalk_res$damage)
@@ -453,8 +457,8 @@ indicator <- "Relational table that contains summarised damage levels for assess
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
 qa_filepath<-"  QA_sheet_relational_tables.docx "
 
-dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final,
-             overwrite = FALSE, row.names = FALSE)
+# dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final,
+#              overwrite = FALSE, row.names = FALSE)
 
 
 # Add metadata

@@ -135,8 +135,8 @@ joined_points <- st_join(dins_reduced, assessor_parcels, join=st_within, left=TR
 
 # includes duplicate records, explore those
 joined_points_dup_rows <- joined_points[joined_points$din_id %in% joined_points$din_id[duplicated(joined_points$din_id)], ]
-length(unique(joined_points_dup_rows$ain)) #10 ains
-length(unique(joined_points_dup_rows$din_id)) #14 unique structures
+length(unique(joined_points_dup_rows$ain)) #27 ains
+length(unique(joined_points_dup_rows$din_id)) #22 unique structures
 # null these out and carry through to address join instead
 
 mapview(joined_points_dup_rows)
@@ -371,14 +371,17 @@ leaflet () %>%
 ## STEP 6: Pull together and clean up joins -----
 joined_structures_noncondos <- rbind(joined_points %>% 
                              filter(!is.na(ain)) %>%
-                                      select(1:19, ain),
+                                      select(1:19, ain) %>%
+                               mutate(join_type="point"),
                            joined_name %>% 
                              filter(!is.na(ain)) %>%
-                                      select(1:19,ain ),
+                                      select(1:19,ain ) %>%
+                             mutate(join_type="apn"),
                     joined_site_address %>%
                              filter(!is.na(ain)) %>% 
                             rename_with(~ gsub("\\.x", "", .x)) %>%   # Remove .x from column names
-                      select(1:19,ain)) 
+                      select(1:19,ain) %>%
+                      mutate(join_type="address")) 
 
 nrow(dins_reduced)-nrow(joined_structures_noncondos) # just 78 missing--see if they are condos
 length(unique(joined_structures_noncondos$din_id)) # 16975
@@ -390,8 +393,7 @@ nrow(joined_structures_noncondos) #same count
 # we are going to a street address to site address join
 
 ##############################################################################
-## STEP 7: Joining UnJoined Calfire DIN data to assessor data by street address ----
-## create a full address field
+## STEP 7: Joining Condos by street address ----
 dins_reduced_condos <- dins_reduced %>% filter(!dins_reduced$din_id %in% joined_structures_noncondos$din_id)
 
 ## Perform the address join ----
@@ -404,7 +406,7 @@ nrow(joined_site_addres_condos)
 
 ## Check the ones that didn't join ----
 na_assessor_condo_address <- joined_site_addres_condos %>% filter(is.na(ain))
-nrow(na_assessor_condo_address) #78 didn't join
+nrow(na_assessor_condo_address) #78 didn't join 
 
 unique(na_assessor_condo_address$apn)
 # only 10 unique APNs
@@ -437,37 +439,101 @@ unique(na_assessor_condo_address$site_address_parcel)
  # Export these and clean later
 
 na_assessor_universe <- na_assessor_condo_address %>% select(1:19)
-write_xlsx(na_assessor_universe, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_100125.xlsx")
+# export for manual matching
+# write_xlsx(na_assessor_universe, "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_100125.xlsx")
 
+# bring in manual condo matches
+condos_manual_match <- read_excel("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_100125_MTK.xlsx")
+
+# Step 1: I need a row for every assessor ID that matched to a din id. Basically assessor data gives each condo it's own ain, but for CalFire, 
+# if a condo building had 2 or more units in it, the building only has one record. So I have on record in calfire that needs to match to several in the assessor data
+# the manual match into multiple rows
+condos_expanded <- condos_manual_match %>%
+  separate_rows(ain_list, sep = ", ")
+# there are NAs for E Mendocino street because there are 10 unique ain numbers associated and we assigned those units to buildings A, B, & NA. 
+# There was no record of damage on any buildings on E Mendocino so as long as all 10 unique AINs are accounted for that's what we need
+# also for some complexes, we excluded the utility structures that looked like covered parking
+
+# make sure no duplicates ains here
+condos_expanded %>% filter(!is.na(ain_list)) %>% nrow()
+# 167 not including NA
+
+length(unique(condos_expanded$ain_list))
+# 168 (1 NA unique AIN included) so good
+
+# Step 2: We need to match these AINs to the din_ids now for the 62 records that were missing ain, there will be multiple rows per DIN-ID but we'll have the unique condo match. We'll create another DIN-id field to account for this
+condos_na_manual_join <- na_assessor_universe %>%
+  left_join(condos_expanded %>% select(ain_list,din_id)) %>%
+  mutate(din_id_condo=paste0(din_id,"_",ain_list)) %>%
+  rename(ain=ain_list)
+
+nrow(condos_na_manual_join)
+nrow(condos_expanded)
+# same count
+length(unique(condos_na_manual_join$din_id_condo))
+# 177
 
 ##############################################################################
-## STEP 8: Pull together and clean up join -----
+## STEP 8: Pull together and clean up join for condos -----
 joined_structures_condos <- rbind(joined_site_addres_condos %>% 
                                        filter(!is.na(ain)) %>% 
                                        rename_with(~ gsub("\\.x", "", .x)) %>%   # Remove .x from column names
-                                       select(1:19,ain)) 
+                                       select(1:19,ain) %>%
+                                    mutate(join_type="condo address",
+                                           din_id_condo=NA),
+                                  condos_na_manual_join %>% 
+                                    filter(!is.na(ain)) %>% 
+                                    rename_with(~ gsub("\\.x", "", .x)) %>%   # Remove .x from column names
+                                    mutate(join_type="condo manual") %>%
+                                    select(1:19,ain,join_type,din_id_condo))
 
 
 ##########################################################################################
-# Export crosswalk of dins to ain numbers --------
-final_df <- rbind(joined_structures_noncondos, joined_structures_condos)
-nrow(dins_reduced)-nrow(final_df) # just 62 missing--see if they are condos
-length(unique(final_df$din_id)) # 16991
-nrow(final_df) #same count
+# Combine and export crosswalk of dins to ain numbers --------
+final_df <- rbind(joined_structures_noncondos%>%
+                    mutate(din_id_condo=NA), 
+                  joined_structures_condos)
+nrow(dins_reduced)-nrow(final_df) # duplicates because of the condo records where 2 or more condo records match to one building
+length(unique(final_df$din_id)) # 17043
+length(unique(dins_reduced$din_id)) # 17053
+# just 10 missing in final_df, check which ones
+
+dins_reduced_na_final <- dins_reduced %>%
+  filter(!din_id %in% final_df$din_id)
+
+View(dins_reduced_na_final)
+# these are fine, we have all the Mendocino units accounted for and the rest are utility structures
+
+# reduce columns
+final_df <- final_df %>%
+  select(din_id,din_id_condo,damage,apn_parcel,ain,join_type,site_address_parcel,street_address,structure_type,structure_category,tl_place_name)
 
 table_name <- "crosswalk_dins_assessor_jan2025"
 schema <- "data"
-indicator <- "Crosswalk of damage inspection database to assessor ain numbers. Each row is a structure in the damage inspection database."
+indicator <- "Crosswalk of damage inspection database to assessor ain numbers. Each row is a structure in the damage inspection database. The din_id joins to the damage database and the ain joins to the assessor data. This includes all inspected properties, including commercial"
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/damage_inspection_assessor_join.R "
 qa_filepath<-"  QA_sheet_relational_tables.docx "
-dbWriteTable(con_alt, Id(schema, table_name), final_df,
-             overwrite = FALSE, row.names = FALSE)
+# dbWriteTable(con_alt, Id(schema, table_name), final_df,
+#              overwrite = FALSE, row.names = FALSE)
 
-# # Add metadata 
-# column_names <- colnames(final_df) # Get column names
-# column_comments <- c('')
-# 
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# Add metadata
+column_names <- colnames(final_df) # Get column names
+column_names
+column_comments <- c('Unique id from damage inspection database -- use to join to damage inspection database. Some din_ids might be duplicated because of multiple condos in one building, see din_id_condo',
+                     'din_id pasted to the unique ains each building matched to, e.g., a building could have matched to 3 ains if there were 3 condo units in one building -these are all manual matches',
+                     'damage level from damage inspection database',
+                     'parcel number from damage inspection database--not accurate for joining',
+                     'Assessor identification number -- for joining and using with the assessor data',
+                     'How records were joined',
+                     'Site address from damage inspection database - like the parcel address, but not always consitent',
+                     'street address from damage inspection database - like mailing address for the building, but not always accurate',
+                     'structure type from damage inspection database',
+                     'structure category from damage inspection database',
+                     'place matched to Altadena or pasadena or both',
+                     'geometry'
+                     )
+
+# add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
 # # prep 4326 layers to explore ones missing data
