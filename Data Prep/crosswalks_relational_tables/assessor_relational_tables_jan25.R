@@ -321,14 +321,6 @@ export_shpfile(con=con_alt, df=rel_area_geom_df, schema="data",
                geometry_column = "geom")
 
 
-# STEP 5: TABLE 3: Damage categories ------
-# We need to summarise at assessor ID number the damage categories based on our definitions
-# any parcel with at least one building damaged or majorly destroyed >25% is counted as significant damage
-# any parcel with maximum of an affecting or minor <25% damage is counted as some damage
-# no damage or inaccessible is counted as no damage
-
-
-
 # Add metadata
 column_names <- colnames(rel_area_geom_df) # Get column names
 column_names
@@ -336,6 +328,150 @@ column_comments <- c('Assessor ID number - use this to match to other relational
                      'West or East Altadena shortened label',
                      'West or East Altadena long label',
                      'geometry')
+
+add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
+
+
+# STEP 5: TABLE 3: Damage categories ------
+# We need to summarise at assessor ID number the damage categories based on our definitions
+# any parcel with at least one building damaged or majorly destroyed >25% is counted as significant damage
+# any parcel with maximum of an affecting or minor <25% damage is counted as some damage
+# no damage or inaccessible is counted as no damage
+
+# I want the following columns: overall damage category based on groups, binary columns with count of structures in each damage level, list of damage types, count of structures assessed
+
+# keep just AINs in our residential or mixed used base
+residential_ains <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_residential_jan2025")
+
+dins_xwalk_res <- dins_xwalk %>% 
+  filter(ain %in% residential_ains$ain)
+
+length(unique(dins_xwalk_res$ain))
+length(unique(residential_ains$ain))
+# some parcels aren't assessed if they aren't in the fire perimeter
+
+## Create binary columns for each damage level -----
+table(dins_xwalk_res$damage)
+
+dins_xwalk_res <- dins_xwalk_res %>%
+  mutate(destroyed_damage=ifelse(damage=="Destroyed (>50%)", 1,0),
+         major_damage=ifelse(damage=="Major (26-50%)", 1,0),
+         minor_damage=ifelse(damage=="Minor (10-25%)",1,0),
+         affected_damage=ifelse(damage=="Affected (1-9%)",1,0),
+         no_damage=ifelse(damage=="No Damage",1,0),
+         inaccessible_damage=ifelse(damage=="Inaccessible",1,0))
+
+# check
+dins_xwalk_res %>%
+  select(damage,ends_with("_damage")) %>%
+  View()
+# looks good
+
+rel_assessor_dins <- dins_xwalk_res %>%
+  st_drop_geometry() %>%
+  group_by(ain) %>%
+  summarise(
+    structure_count=n(),
+    destroyed_damage_count=sum(destroyed_damage),
+    major_damage_count=sum(major_damage),
+    minor_damage_count=sum(minor_damage),
+    affected_damage_count=sum(affected_damage),
+    no_damage_count=sum(no_damage),
+    inaccessible_damage_count=sum(inaccessible_damage),
+    damage_type_list=list(unique(damage))
+  )
+
+# check counts
+nrow(dins_xwalk_res)
+sum(rel_assessor_dins$structure_count)
+# checks out
+
+sum(rel_assessor_dins$destroyed_damage_count)
+# checks out
+
+## Create a single damage category based on highest damage level -----
+rel_assessor_dins <- rel_assessor_dins %>%
+  ungroup() %>%
+  mutate(damage_category = case_when(
+    destroyed_damage_count>=1 ~ "Significant Damage", # top code so destroyed goes first
+    major_damage_count>=1 ~ "Significant Damage", # same coding for highest damage of major
+    minor_damage_count>=1 ~ "Some Damage", # next category
+    affected_damage_count>=1 ~ "Some Damage",
+    no_damage_count>=1 ~ "No Damage",
+    inaccessible_damage_count>=1 ~ "No Damage",
+    TRUE ~ NA))
+    
+# check
+rel_assessor_dins %>%
+  select(damage_category,everything()) %>%
+  View()
+# looks good
+
+check <- rel_assessor_dins %>%
+  group_by(damage_category,damage_type_list) %>%
+  count()
+# looks good
+
+# sort list of damage for easier viewing
+rel_assessor_dins$damage_type_list <- lapply(rel_assessor_dins$damage_type_list,sort)
+
+check <- rel_assessor_dins %>%
+  group_by(damage_category,damage_type_list) %>%
+  count()
+
+View(check)
+# looks good
+
+# add a column with the count of unique damage types
+rel_assessor_dins<- rel_assessor_dins %>%
+  group_by(ain) %>%
+  mutate(damage_type_count=length(unique(damage_type_list[[1]]))) %>%
+  ungroup() %>%
+  mutate(mixed_damage=ifelse(damage_type_count<2, "One Damage Type",
+                             "Two or More"))
+
+rel_assessor_dins %>%
+  select(damage_type_count,damage_type_list,mixed_damage) %>%
+  View()
+# looks good
+
+## Clean up and push to postgres----
+rel_assessor_dins_final <- rel_assessor_dins %>%
+  rowwise() %>%
+  mutate(damage_type_list=paste(damage_type_list,collapse=', ')) %>% # make list column easier to read
+  select(ain, damage_category,structure_count,mixed_damage,everything()) 
+
+View(rel_assessor_dins_final)
+nrow(rel_assessor_dins_final)
+length(unique(rel_assessor_dins_final$ain))
+# final check of unique AINs, looks good
+
+table_name <- "rel_assessor_damage_level"
+schema <- "data"
+indicator <- "Relational table that contains summarised damage levels for assessor IDS assessed by CalFire post the Eaton Fire, Unlike the damage inspection database, this table is at the unique parcel level rather than building level"
+source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
+qa_filepath<-"  QA_sheet_relational_tables.docx "
+
+dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final,
+             overwrite = FALSE, row.names = FALSE)
+
+
+# Add metadata
+column_names <- colnames(rel_assessor_dins_final) # Get column names
+column_names
+column_comments <- c('Assessor ID number - use this to match to other relational tables',
+                     'Overall damage category level -- top coded so highest damage level of a building on the property takes precedent',
+                     'Number of structures assessed by CalFire associated with AIN',
+                     'Indicator for whether there was a one type of damage or two or more',
+                     'total count for destroyed structures on property',
+                     'total count for major damage structures on property',
+                     'total count for minor damage structures on property',
+                     'total count for affected damage structures on property',
+                     'total count for no damage structures on property',
+                     'total count for inaccessible structures on property',
+                     'list of unique damage types assigned to property by CalFire',
+                     'Total unique types of damage')
 
 add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
