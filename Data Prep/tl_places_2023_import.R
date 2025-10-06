@@ -22,6 +22,9 @@ ca_places <- places(state="CA",
 st_crs(ca_places) #4269
 ca_places_3310 <- st_transform(ca_places, 3310)
 
+#lower column names
+colnames(ca_places_3310) <- tolower(colnames(ca_places_3310))
+
 # ## Export to rda_shared
 # export_shpfile(con=con_rda,
 #                df=ca_places_3310,
@@ -33,11 +36,11 @@ ca_places_3310 <- st_transform(ca_places, 3310)
 #             '2023 CA Places Tiger Lines in SRID 3310
 #             Imported on 9-27-25
 #             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_import_tl_places_2023.docx'")
-
+# 
 
 
 target_places <- st_read(con_rda, query="SELECT * FROM geographies_ca.tl_2023_06_places") %>% 
-  filter(NAME %in% target_cities)
+  filter(name %in% target_cities)
 
 # Confirm SRID is 3310
 st_crs(target_places) #3310
