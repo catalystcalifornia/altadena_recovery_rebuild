@@ -43,7 +43,7 @@ dins_reduced <- dins_damage %>% select(1:9,
   
 # get city boundaries from tigris for mapping
 lac_places <- st_read(con_alt, query="Select * from data.tl_2023_places", geom="geom") %>%
-  filter(NAME %in% c("Altadena","Pasadena"))
+  filter(name %in% c("Altadena","Pasadena"))
 st_crs(lac_places)
 
 # get assessor parcels
