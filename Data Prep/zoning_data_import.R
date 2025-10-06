@@ -33,10 +33,48 @@ st_crs(lac_shp) #2229
 
 #transform to 3310/ California Albers preferred for CA statistics/analysis
 pas_shp_3310 <- st_transform(pas_shp, 3310) 
-colnames(pas_shp_3310) <- tolower(colnames(pas_shp_3310))
 
 lac_shp_3310 <- st_transform(lac_shp, 3310) 
 colnames(lac_shp_3310) <- tolower(colnames(lac_shp_3310))
+
+#### Step 1A: Cleaning up column names for Pasadena ####
+#rename columns
+#1st, pull the column names from csv and view
+step1_col_names <- names(pas_shp)
+View(tibble::tibble(original = step1_col_names))
+
+#2nd, clean column names and view
+step2_col_names <- step1_col_names %>%
+  # make lowercase
+  str_to_lower() %>%
+  # delete spaces and punctuation, add underscores but delete trailing underscores 
+  str_replace_all("[^a-z0-9]+", "_") %>%
+  str_replace_all("^_+|_+$", "")
+
+#3rd, create df to see if cleaning is good and what needs to be renamed
+step3_col_names <- as.data.frame(tibble(original = step1_col_names, cleaned = step2_col_names))
+View(step3_col_names)
+
+#4th, rename columns as needed
+cols_rename <- c(
+  "gen_code" = "general_code",
+  "overlay_co" = "overlay_code",
+  "overlay_de" = "overlay_label",
+  "overlay_1" = "overlay_code2",
+  "gen_plan" = "general_plan",
+  "gen_plan_d" = "general_plan_label"
+)
+
+step4_col_names <- step3_col_names %>%
+  mutate(
+    cleaned = ifelse(cleaned %in% names(cols_rename),
+                     cols_rename[cleaned],
+                     cleaned)
+  ) %>%
+  filter(!cleaned %in% c("objectid", "x", "y")) 
+
+#5th, apply to shapefile
+names(pas_shp_3310)[1:ncol(pas_shp_3310)-1] <- step4_col_names$cleaned
 
 #### Step 2: Use export function to push to postgres ####
 
