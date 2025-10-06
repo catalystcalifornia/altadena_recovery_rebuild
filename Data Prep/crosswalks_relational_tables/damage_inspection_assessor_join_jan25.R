@@ -88,9 +88,13 @@ st_crs(dins_reduced) # good
 st_crs(lac_places) #good
 
 # select all structures either in the pasadena or altadena boundary
-dins_reduced <- st_join(dins_reduced, lac_places%>%select(NAME), join=st_within, left=FALSE)
+dins_reduced <- st_join(dins_reduced, lac_places%>%select(name), join=st_within, left=FALSE)
 
-dins_reduced <- dins_reduced %>% rename(tl_place_name=NAME)
+# QA: view the result of the st_within join
+library(mapview)
+# mapview(dins_reduced)+mapview(lac_places) # this looks good
+
+dins_reduced <- dins_reduced %>%  rename(tl_place_name=name)
 
 # check
 mapview(dins_reduced) +
@@ -110,6 +114,9 @@ table(assessor_data_condos$use_code)
 
 # make the assessor data df everything but condos
 assessor_data <- assessor_data %>% filter(!ain %in% assessor_data_condos$ain)
+
+# QA check
+table(assessor_data$use_code)
 
 # make a condo assessor parcel df object
 assessor_parcels_condos <- assessor_parcels %>% filter(ain %in% assessor_data_condos$ain)
@@ -133,8 +140,20 @@ st_crs(dins_reduced) # good
 ## Perform the spatial join ----
 joined_points <- st_join(dins_reduced, assessor_parcels, join=st_within, left=TRUE)
 
+# QA view result
+# mapview(joined_points)+mapview(assessor_parcels) # this looks good
+
 # includes duplicate records, explore those
 joined_points_dup_rows <- joined_points[joined_points$din_id %in% joined_points$din_id[duplicated(joined_points$din_id)], ]
+
+# QA try different method of extracting duplicates and see if its the same result: checks out
+
+# joined_points_dup_qa <- joined_points %>%
+#   filter(duplicated(din_id) | duplicated(din_id, fromLast = TRUE))
+# 
+# sum(as.numeric(joined_points_dup_rows$din_id))
+# sum(as.numeric(joined_points_dup_qa$din_id))
+
 length(unique(joined_points_dup_rows$ain)) #27 ains
 length(unique(joined_points_dup_rows$din_id)) #22 unique structures
 # null these out and carry through to address join instead
@@ -148,6 +167,10 @@ joined_points <- joined_points %>%
 
 # dedup
 joined_points  <- joined_points [!duplicated(joined_points ), ]
+
+# QA extra check it worked -- 0 obs so no duplicates left
+dup_2 <- joined_points[joined_points$din_id %in% joined_points$din_id[duplicated(joined_points$din_id)], ]
+rm(dup_2)
 
 nrow(dins_reduced)
 nrow(joined_points)
@@ -180,7 +203,7 @@ leaflet () %>%
               color="green",
               weight=1.5,
               opacity=1,
-              popup=~NAME,
+              popup=~name,
               group="Cities") %>%
   addCircleMarkers(data=na_assessor_4326,
                    radius = 2,
