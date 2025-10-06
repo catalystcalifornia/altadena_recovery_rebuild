@@ -627,11 +627,9 @@ all_sept_results <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/
 #           row.names=FALSE,
 #           fileEncoding = "UTF-8")
 
-# import
+# read in
 all_sept_results <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_sept_2025.csv")
 
-# compare to jan ain universe
-# in csv, but not in universe
 
 
 
