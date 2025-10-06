@@ -497,46 +497,46 @@ table(jan_mismatch_2$use_code, useNA = "ifany")
 # Note some of these look to overlap with some addresses that matched to Calfire data in mismatch_1
 
 
-# September- standard
-# filter csvs
-sept_1_results <- batch_filter_csv_data(
-  csv_file=sept_csv_1,
-  target_list = city_list,
-  filter_column="City State",
-  chunk_size = 10000,
-  debug_filter=TRUE,
-  exact_match=FALSE)
-
-sept_2_results <- batch_filter_csv_data(
-  csv_file=sept_csv_2,
-  target_list = city_list,
-  filter_column="City State",
-  chunk_size = 10000,
-  debug_filter=TRUE,
-  exact_match=FALSE)
-
-sept_3_results <- batch_filter_csv_data(
-  csv_file=sept_csv_3,
-  target_list = city_list,
-  filter_column="City State",
-  chunk_size = 10000,
-  debug_filter=TRUE,
-  exact_match=FALSE)
-
-# combine
-all_sept_results <- bind_rows(sept_1_results, sept_2_results, sept_3_results) #62183
-
-# clean column names
-colnames(all_sept_results)
-colnames(all_sept_results)[1] <- "AIN"
-colnames(all_sept_results) <- gsub(" ", "_", tolower(colnames(all_sept_results)))
-colnames(all_sept_results)
-
-# unique AIN for each row
-length(unique(all_sept_results$ain)) #62183
-
-# frequency table of situs 'city_state' field
-table(all_sept_results$city_state, useNA = "ifany")
+# # September- standard
+# # filter csvs
+# sept_1_results <- batch_filter_csv_data(
+#   csv_file=sept_csv_1,
+#   target_list = city_list,
+#   filter_column="City State",
+#   chunk_size = 10000,
+#   debug_filter=TRUE,
+#   exact_match=FALSE)
+# 
+# sept_2_results <- batch_filter_csv_data(
+#   csv_file=sept_csv_2,
+#   target_list = city_list,
+#   filter_column="City State",
+#   chunk_size = 10000,
+#   debug_filter=TRUE,
+#   exact_match=FALSE)
+# 
+# sept_3_results <- batch_filter_csv_data(
+#   csv_file=sept_csv_3,
+#   target_list = city_list,
+#   filter_column="City State",
+#   chunk_size = 10000,
+#   debug_filter=TRUE,
+#   exact_match=FALSE)
+# 
+# # combine
+# all_sept_results <- bind_rows(sept_1_results, sept_2_results, sept_3_results) #62183
+# 
+# # clean column names
+# colnames(all_sept_results)
+# colnames(all_sept_results)[1] <- "AIN"
+# colnames(all_sept_results) <- gsub(" ", "_", tolower(colnames(all_sept_results)))
+# colnames(all_sept_results)
+# 
+# # unique AIN for each row
+# length(unique(all_sept_results$ain)) #62183
+# 
+# # frequency table of situs 'city_state' field
+# table(all_sept_results$city_state, useNA = "ifany")
 
 
 # # export results to csv (keeping all columns for QA)
@@ -548,84 +548,84 @@ table(all_sept_results$city_state, useNA = "ifany")
 # import
 all_sept_results <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_sept_2025.csv")
 
-# compare to jan ain universe
-# in csv, but not in universe
-sept_mismatch_2 <- data.frame(ain=setdiff(all_sept_results$ain, sept_ain_universe)) %>% # 9915
-  left_join(all_sept_results, by="ain") 
-
-table(sept_mismatch_2$use_code) 
-
-# check if these are in .shp (to cross out possibility they are outside the city perimeters)
-sept_csv_ains <- sept_mismatch_2 %>% select(ain) %>% pull()
-
-check_sept_ <- batch_filter_shapefile(shp_path=sept_shp_path, target_ains=sept_csv_ains, chunk_size = 10000, ain_column = "AIN") # 9862
-
-sept_mismatch_2 <- sept_mismatch_2 %>%
-  mutate(shp_match = ifelse(ain %in% check_sept_$AIN, 1,0)) %>%
-  filter(shp_match==0) %>% # 53
-  filter(grepl("^0", use_code)) %>% # 27 residential, 3 are vacant lots
-  mutate(sept=1)
-
-# with relevant use codes
-
-table(sept_mismatch_2$use_code, useNA = "ifany")
-
-# Note some of these look to overlap with some addresses came up when dealing with mismatch_1
-
-all_mismatch_2 <- full_join(jan_mismatch_2, sept_mismatch_2, by="ain") %>%
-  select(ain, jan, sept, use_code.x, use_code.y, everything()) # 30, 27 if we exclude vacant lots
+# # compare to jan ain universe
+# # in csv, but not in universe
+# sept_mismatch_2 <- data.frame(ain=setdiff(all_sept_results$ain, sept_ain_universe)) %>% # 9915
+#   left_join(all_sept_results, by="ain") 
+# 
+# table(sept_mismatch_2$use_code) 
+# 
+# # check if these are in .shp (to cross out possibility they are outside the city perimeters)
+# sept_csv_ains <- sept_mismatch_2 %>% select(ain) %>% pull()
+# 
+# check_sept_ <- batch_filter_shapefile(shp_path=sept_shp_path, target_ains=sept_csv_ains, chunk_size = 10000, ain_column = "AIN") # 9862
+# 
+# sept_mismatch_2 <- sept_mismatch_2 %>%
+#   mutate(shp_match = ifelse(ain %in% check_sept_$AIN, 1,0)) %>%
+#   filter(shp_match==0) %>% # 53
+#   filter(grepl("^0", use_code)) %>% # 27 residential, 3 are vacant lots
+#   mutate(sept=1)
+# 
+# # with relevant use codes
+# 
+# table(sept_mismatch_2$use_code, useNA = "ifany")
+# 
+# # Note some of these look to overlap with some addresses came up when dealing with mismatch_1
+# 
+# all_mismatch_2 <- full_join(jan_mismatch_2, sept_mismatch_2, by="ain") %>%
+#   select(ain, jan, sept, use_code.x, use_code.y, everything()) # 30, 27 if we exclude vacant lots
+# 
+# # # export results to csv (keeping all columns for QA)
+# # write.csv(all_mismatch_2,
+# #           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/all_mismatch_2.csv",
+# #           row.names=FALSE,
+# #           fileEncoding = "UTF-8")
+# 
+# 
+# 
+# # September (standard and custom csvs)
+# # filter csvs
+# sept_1_results <- batch_filter_csv_data(
+#   csv_file=sept_csv_1,
+#   target_list = city_list,
+#   filter_column="City State",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# sept_2_results <- batch_filter_csv_data(
+#   csv_file=sept_csv_2,
+#   target_list = city_list,
+#   filter_column="City State",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# sept_3_results <- batch_filter_csv_data(
+#   csv_file=sept_csv_3,
+#   target_list = city_list,
+#   filter_column="City State",
+#   chunk_size = 10000,
+#   debug_filter=TRUE)
+# 
+# # combine
+# all_sept_results <- bind_rows(sept_1_results, sept_2_results, sept_3_results)
+# 
+# # clean column names
+# colnames(all_sept_results)
+# colnames(all_sept_results)[1] <- "AIN"
+# colnames(all_sept_results) <- gsub(" ", "_", tolower(colnames(all_sept_results)))
+# colnames(all_sept_results)
+# 
+# # unique AIN for each row
+# length(unique(all_sept_results$ain)) # 66096
+# 
+# # frequency table of situs 'city_state' field
+# sept_city_results <- as.data.frame(table(all_sept_results$city_state, useNA = "ifany"))
 
 # # export results to csv (keeping all columns for QA)
-# write.csv(all_mismatch_2,
-#           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/all_mismatch_2.csv",
+# write.csv(all_sept_results,
+#           file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_sept_2025.csv",
 #           row.names=FALSE,
 #           fileEncoding = "UTF-8")
-
-
-
-# September (standard and custom csvs)
-# filter csvs
-sept_1_results <- batch_filter_csv_data(
-  csv_file=sept_csv_1,
-  target_list = city_list,
-  filter_column="City State",
-  chunk_size = 10000,
-  debug_filter=TRUE)
-
-sept_2_results <- batch_filter_csv_data(
-  csv_file=sept_csv_2,
-  target_list = city_list,
-  filter_column="City State",
-  chunk_size = 10000,
-  debug_filter=TRUE)
-
-sept_3_results <- batch_filter_csv_data(
-  csv_file=sept_csv_3,
-  target_list = city_list,
-  filter_column="City State",
-  chunk_size = 10000,
-  debug_filter=TRUE)
-
-# combine
-all_sept_results <- bind_rows(sept_1_results, sept_2_results, sept_3_results)
-
-# clean column names
-colnames(all_sept_results)
-colnames(all_sept_results)[1] <- "AIN"
-colnames(all_sept_results) <- gsub(" ", "_", tolower(colnames(all_sept_results)))
-colnames(all_sept_results)
-
-# unique AIN for each row
-length(unique(all_sept_results$ain)) # 66096
-
-# frequency table of situs 'city_state' field
-sept_city_results <- as.data.frame(table(all_sept_results$city_state, useNA = "ifany"))
-
-# export results to csv (keeping all columns for QA)
-write.csv(all_sept_results,
-          file="W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_sept_2025.csv",
-          row.names=FALSE,
-          fileEncoding = "UTF-8")
 
 # import
 all_sept_results <- read.csv("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_sept_2025.csv")
