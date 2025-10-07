@@ -106,9 +106,12 @@ data_altadena %>%
 
 # Just to check consistency in units and square footage -- calculate units and square footage with bedrooms
 # create units column list--remove totals
-unit_cols <- names(data_altadena_res)[str_detect(names(data_altadena_res), "_units")]
+unit_cols <- names(data_altadena)[str_detect(names(data_altadena), "_units")]
 unit_cols <- unit_cols[unit_cols != "landlord_units"]
 unit_cols <- unit_cols[unit_cols != "total_units"]
+
+# QA look at result
+check<-as.data.frame(unit_cols)
 
 # create bedroom columns list
 bed_cols  <- str_replace(unit_cols, "_units", "_bedrooms")
