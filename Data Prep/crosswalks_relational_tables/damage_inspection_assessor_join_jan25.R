@@ -116,7 +116,7 @@ table(assessor_data_condos$use_code)
 assessor_data <- assessor_data %>% filter(!ain %in% assessor_data_condos$ain)
 
 # QA check
-table(assessor_data$use_code)
+# table(assessor_data$use_code)
 
 # make a condo assessor parcel df object
 assessor_parcels_condos <- assessor_parcels %>% filter(ain %in% assessor_data_condos$ain)
@@ -253,6 +253,9 @@ nrow(na_assessor_points)
 
 na_assessor_name <- joined_name %>% filter(is.na(ain))
 
+# QA: explore types
+table(na_assessor_name$structure_category)  # only 7 other minor structure 
+
 ## Check the ones that didn't join ------
 # focus on residential
 na_assessor_name_residential <- na_assessor_name %>% filter(structure_category %in% c("Single Residence","Multiple Residence")) %>% st_transform(4326)
@@ -274,7 +277,7 @@ leaflet () %>%
               color="green",
               weight=1.5,
               opacity=1,
-              popup=~NAME,
+              popup=~name,
               group="Cities") %>%
   addCircleMarkers(data=na_assessor_name_residential,
                    # lng = ~longitude,
@@ -368,7 +371,7 @@ leaflet () %>%
               color="green",
               weight=1.5,
               opacity=1,
-              popup=~NAME,
+              popup=~name,
               group="Cities") %>%
   addCircleMarkers(data=na_assessor_address_residential,
                    radius = 2,
@@ -406,6 +409,7 @@ joined_structures_noncondos <- rbind(joined_points %>%
                       select(1:19,ain) %>%
                       mutate(join_type="address")) 
 
+
 nrow(dins_reduced)-nrow(joined_structures_noncondos) # just 78 missing--see if they are condos
 length(unique(joined_structures_noncondos$din_id)) # 16975
 nrow(joined_structures_noncondos) #same count
@@ -436,11 +440,28 @@ unique(na_assessor_condo_address$apn)
 
 unique(na_assessor_condo_address$site_address_parcel)
 
+# look at just the addresses in the assessor condo data and do a side by side comparison with the unique addresses that didn't join
+
+qa<-assessor_data_condos%>%select(ain, site_address)
+
 # E Sacramento Street should just be Sacramento st
 # E Palm Street should be E Palm St
+# JZ QA:
+## 2650 LAKE AVE APT 2, ALTADENA, CA 91001 we should remove APT 2 
+## Not sure why 2389 EL MOLINO AVE isn't joining I see it in the assessor condo data
+# Need to make 770 E MARIPOSA ST not have the APT C part
+# Not sure why 1203 DEL REY AVE didn't join I see it in the assessor condo data
+# # Not sure why 804 E MENDOCINO ST didn't join I see it in the assessor condo data
+# 801 E MENDOCINO ST APT 2A needs to remove the APT 2A part to join
+# 1512 CREEKSIDE CT # A needs to remove the # A part to join
+
+
 dins_reduced_condos <- dins_reduced_condos %>%
   mutate(street_address=gsub("E SACRAMENTO STREET", "SACRAMENTO ST", street_address)) %>%
   mutate(street_address=gsub("E PALM STREET", "E PALM ST", street_address))
+
+nrow(dins_reduced_condos)
+nrow(joined_site_addres_condos_qa)
 
 joined_site_addres_condos <- dins_reduced_condos %>%
   left_join(assessor_data_condos, keep=TRUE, by=c("street_address"="site_address"))
@@ -467,6 +488,10 @@ na_assessor_universe <- na_assessor_condo_address %>% select(1:19)
 
 # bring in manual condo matches
 condos_manual_match <- read_excel("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Prepped\\missing_jan_parcels_100125_MTK.xlsx")
+
+# Quick QA check of the ain_list column in the condos_manual_match
+
+# unique(assessor_data_condos$ain[assessor_data_condos$site_address=="2650 LAKE AVE, ALTADENA, CA 91001"]) # looks good
 
 # Step 1: I need a row for every assessor ID that matched to a din id. Basically assessor data gives each condo it's own ain, but for CalFire, 
 # if a condo building had 2 or more units in it, the building only has one record. So I have on record in calfire that needs to match to several in the assessor data
