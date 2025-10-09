@@ -49,15 +49,30 @@ class(parcels_join) # check object type is sf data frame which is what we want
 names(parcels_join) <- gsub("\\.x$", "_jan", names(parcels_join))
 names(parcels_join) <- gsub("\\.y$", "_sept", names(parcels_join))
 
-# see how many unique AINs are there for jan and sept: same number
+# Perform checks on the intersect------------------------------------------
+
+# See how many unique AINs are there for jan and sept: same number
 
 length(unique(parcels_join$ain_jan)) #54874
 length(unique(parcels_join$ain_sept)) #54874
 
-# look at result just the AIN column
+# look at result just the AIN column:
+# This is definitely not a clean 1:1 for most of the AINs. It also seems there might be a many to many relationship
+# with the AINs as well. 
+
+# For example, AIN 5317001003 in Jan matches with 5 different Sept AINs, one of which matches 5317001003
+
 join_ain<-parcels_join%>%select(ain_jan, ain_sept)
 
-# Pull out rows where teh AINs are matching
+# See if any AINs are NA after the join 
+
+sept_not_joined <- parcels_join %>%
+  filter(is.na(ain_sept))%>%View() # None
+
+jan_not_joined <- parcels_join %>%
+  filter(is.na(ain_sept))%>%View() # None
+
+# Pull out rows where the AINs are matching
 same_ain <- parcels_join %>%
   filter(!is.na(ain_jan) & ain_jan == ain_sept)%>%select(ain_jan, ain_sept)
 
@@ -70,15 +85,6 @@ not_matching_ain <- parcels_join %>%
 
 # See how many AINs is that:
 length(unique(not_matching_ain$ain_sept)) #54813 
-
-
-# See if any AINs are NA after the join 
-
-sept_not_joined <- parcels_join %>%
-  filter(is.na(ain_sept))%>%View() # None
-
-jan_not_joined <- parcels_join %>%
-  filter(is.na(ain_sept))%>%View() # None
 
 # Pull out duplicate AINs and count
 
