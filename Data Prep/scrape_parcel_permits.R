@@ -33,13 +33,47 @@ jan_parcels <- dbGetQuery(con,
 # 1. Confirm chromote is working properly with simple site like google.com
 test_chromote()
 
-# 2. If above works, try to extract data from test url
-url_ <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=10&pn=1&em=true&st=2204%20Grand%20Oaks%20Avenue"
+# 2. If above works, try to extract data from one test url to get general data fields
+url_ <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=2204%20Grand%20Oaks%20Avenue"
 message(paste("Current search URL:", url_))
-html_response <- wait_for_spa_load(url=url_)
-permits <- extract_permit_data_specific(html_response)  # Extract the data
+page_response <- wait_for_spa_load(url=url_)
+permits <- extract_permit_data_general(url=url_, html_content=page_response)  # Extract the data
 Sys.sleep(5)
 
-# 3. If above works, scale it up with Jan parcels
-result <- scrape_permits_chromote(lac_permits_url)
+# 3. If above works, scale it up to loop through a list of addresses and return all permits (with general data fields)
+# using 10 Jan parcels (Altadena Only)
+test <- jan_parcels %>%
+  mutate(city = case_when(grepl("ALTADENA, CA", site_address_parcel)~"Altadena",
+                          grepl("PASADENA, CA", site_address_parcel)~"Pasadena",
+                          .default="something else!")) %>%
+  filter(city=='Altadena') %>%
+  mutate(portal_url = paste0(lac_permits_url, ain)) %>%
+  tail(10)
+
+
+final_data <- NULL
+
+for (row_ in 1:nrow(test)) {
+  
+  address_url <- test[row_, "portal_url"]
+  message(paste(row_, ":", address_url))
+  result <- scrape_permits_chromote(url=address_url, wait_time = 15)
+  result <- result %>%
+    mutate(ain=test[row_, "ain"],
+           site_address_parcel=test[row_, "site_address_parcel"],
+           damage_category=test[row_, "damage_category"])
+  
+  if(is.null(final_data)) {
+        final_data <- result
+  } else {
+    final_data <- bind_rows(final_data, result)
+  }
+  
+  Sys.sleep(5)
+}
+
+
+##### Methods to improve
+# wait_for_spa_load(): may be able to cut wait time short, e.g., if "No results were found" appears, end/break
+# wait_for_spa_load(): need a way to know how many total permits (results) there are and if we need to repeat scrape for subsequent pages - for now we assume all parcels have 100 permits or fewer
 
