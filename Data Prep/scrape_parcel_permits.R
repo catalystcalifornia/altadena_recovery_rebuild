@@ -47,8 +47,7 @@ test <- jan_parcels %>%
                           grepl("PASADENA, CA", site_address_parcel)~"Pasadena",
                           .default="something else!")) %>%
   filter(city=='Altadena') %>%
-  mutate(portal_url = paste0(lac_permits_url, ain)) %>%
-  tail(10)
+  mutate(portal_url = paste0(lac_permits_url, ain)) 
 
 
 final_data <- NULL
