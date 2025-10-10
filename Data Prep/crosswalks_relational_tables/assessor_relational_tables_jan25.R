@@ -106,19 +106,29 @@ data_altadena %>%
 
 # Just to check consistency in units and square footage -- calculate units and square footage with bedrooms
 # create units column list--remove totals
-unit_cols <- names(data_altadena_res)[str_detect(names(data_altadena_res), "_units")]
+
+unit_cols <- names(data_altadena)[str_detect(names(data_altadena), "_units")]
 unit_cols <- unit_cols[unit_cols != "landlord_units"]
 unit_cols <- unit_cols[unit_cols != "total_units"]
+
+# QA view result
+View(as.data.frame(unit_cols))
 
 # create bedroom columns list
 bed_cols  <- str_replace(unit_cols, "_units", "_bedrooms")
 
+# QA view result
+View(as.data.frame(bed_cols))
+
 # create square feet columns list--remove total
-square_feet_cols <- names(data_altadena_res)[str_detect(names(data_altadena_res), "_square_feet")]
+square_feet_cols <- names(data_altadena)[str_detect(names(data_altadena), "_square_feet")]
 square_feet_cols <- square_feet_cols[square_feet_cols != "total_square_feet"]
 
+# QA view result
+View(as.data.frame(square_feet_cols))
+
 # sum unit and square feet columns when corresponding building column is greater than 0, e.g., to sum b1_units, b1_bedrooms has to be >0
-data_altadena_res <- data_altadena_res %>%
+data_altadena <- data_altadena %>%
   rowwise() %>%
   mutate(
     units_with_bedrooms = sum(map2_dbl( # sum units if bedroom column is > 0
@@ -133,10 +143,13 @@ data_altadena_res <- data_altadena_res %>%
   ungroup()
 
 # check units and total square footage again look at discrepancies to see what to use moving forward
-data_altadena_res %>%
+data_altadena %>%
   filter(units_with_bedrooms!=total_units)%>%
-  select(units_with_bedrooms, square_feet_with_bedrooms, ends_with("_units"),ends_with("_square_feet"), ends_with("_bedrooms"),res_type,everything()) %>%
+  select(units_with_bedrooms, square_feet_with_bedrooms, ends_with("_units"),ends_with("_square_feet"), ends_with("_bedrooms"),
+         # res_type,
+         everything()) %>%
   View()
+
 # See https://portal.assessor.lacounty.gov/parceldetail/5743003001, seems like total_units and total_square_feet will be a more accurate match
 
 # STEP 3: TABLE 1: RESIDENTIAL PROPERTIES INFO ------
@@ -151,13 +164,24 @@ table(data_altadena_res_temp$use_code)
 
 # pull out x and v suffixes which are vacant or vacant parcel with improvements that are non-structural
 
+# QA: Looking at the Use Code 2023.pdf do we also want to include the suffix U:  Vacant parcel under UAIZ contract? I believe UAIZ contract =Urban Agriculture Incentive Zone
+# Check if there are any U suffix values
+data_altadena_res_temp_u<-data_altadena_res_temp %>%
+  filter(str_detect(use_code, "U$") ) # there are none so we can move forward
+
+# Proceed with other residential types:
+
 data_altadena_res_vacant <- data_altadena_res_temp %>%
   filter(str_detect(use_code, "V$") | str_detect(use_code, "X$") ) 
+
+table(data_altadena_res_vacant$use_code)
 
 data_altadena_res_vacant %>%
   select(total_units, total_square_feet, total_bedrooms, use_code, everything()) %>%
   View()
 # sort by units descending
+
+View(as.data.frame((unique(data_altadena_res_vacant$ain))))
 
 # one has incorrect use code 5841019007 https://portal.assessor.lacounty.gov/parceldetail/5841019007
 # remove from vacant land
@@ -203,6 +227,11 @@ data_altadena_mixed %>%
 data_altadena_mixed <- data_altadena_mixed  %>%
   filter(ain!="5825002062")
 
+# QA: just noting for extra context that AIN 5825002062 is a disaster recovery center https://recovery.lacounty.gov/2025/01/24/new-altadena-disaster-recovery-center-opens-monday/
+# Makes sense to exclude
+
+# QA: I also double checked AIN 5845018003 because it had 0 bedrooms but looks residental and OK to keep: https://www.zillow.com/homedetails/848-Marcheta-St-Altadena-CA-91001/82875015_zpid/
+
 ## Add column flags and then merge two property types ----
 use_codes <- table(data_altadena_res$use_code) %>% as.data.frame()
 View(use_codes)
@@ -236,6 +265,12 @@ rel_res_df  <- rel_res_df  %>%
           TRUE ~NA))
 
 table(rel_res_df$res_type,useNA='always')
+
+# QA run some checks on the flag results
+
+qa_01<-use_codes%>%filter(str_detect(Var1, "^01"))%>%mutate(total=sum(Freq))%>%View() # 11987 ----this minus the 181 from condominiums gives us the 11806 we see in rel_res_df so checks out and there is no double counting happening
+qa_ce<-use_codes%>%filter(str_detect(Var1, "C$|E$"))%>%mutate(total=sum(Freq))%>%View() # 181 --checks out with rel_res_df
+
 
 ### Flags for homeowner vs. renter -----
 check <- rel_res_df  %>%
@@ -309,6 +344,12 @@ rel_area_geom_df <- parcels_altadena %>%
 # select just the residential/mixed uses that we found in the assessor data
 rel_area_geom_df <- rel_area_geom_df %>%
   filter(ain %in% rel_res_df_final$ain)
+
+# QA quick check---checks out we got the same AINs
+
+# sum(as.numeric(unique(rel_area_geom_df$ain))) # 75678334063382
+# sum(as.numeric(unique(rel_res_df_final$ain))) # 75678334063382
+
 
 table_name <- "rel_assessor_altadena_parcels_jan2025"
 schema <- "data"
