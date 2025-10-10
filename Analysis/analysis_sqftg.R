@@ -36,9 +36,9 @@ all_df <- housing_jan_e_w  %>%
 #### Step 3: FIRST ANALYSIS- [analysis_sqftg_jan2025] ####
 analysis_sqftg_jan2025 <- all_df %>% 
   group_by(res_type) %>% 
-  summarise(altadena_sqftg_count = sum(total_square_feet, na.rm = TRUE),
-            west_sqftg_count = sum(total_square_feet[area_name == "West"], na.rm = TRUE),
-            east_sqftg_count = sum(total_square_feet[area_name == "East"], na.rm = TRUE),
+  summarise(altadena_sqftg_sum = sum(total_square_feet, na.rm = TRUE),
+            west_sqftg_sum = sum(total_square_feet[area_name == "West"], na.rm = TRUE),
+            east_sqftg_sum = sum(total_square_feet[area_name == "East"], na.rm = TRUE),
             altadena_sqftg_avg = mean(total_square_feet, na.rm = TRUE),
             west_sqftg_avg = mean(total_square_feet[area_name == "West"], na.rm = TRUE),
             east_sqftg_avg = mean(total_square_feet[area_name == "East"], na.rm = TRUE),
@@ -57,114 +57,86 @@ analysis_sqftg_jan2025 <- all_df %>%
             altadena_sqftg_max = max(total_square_feet, na.rm = TRUE), 
             west_sqftg_max = max(total_square_feet[area_name == "West"], na.rm = TRUE),
             east_sqftg_max = max(total_square_feet[area_name == "East"], na.rm = TRUE),
-            .groups = "drop") 
+            .groups = "drop") %>%
+            #making table long vs wide
+              pivot_longer(
+                cols = -res_type,
+                names_to = c("area", ".value"),
+                names_pattern = "(altadena|west|east)_(sqftg_sum|sqftg_avg|sqftg_med|sqftg_sd|sqftg_min|sqftg_max)"
+              ) 
 
-
-  pivot_longer(
-    cols = -res_type,
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(tot_units|rent_units|prc_tot|prc_rent)"
-  ) 
-#### Step 4: SECOND ANALYSIS- [analysis_units_damage] ####
-analysis_units_damage <- all_df %>% 
+#### Step 4: SECOND ANALYSIS- [analysis_sqftg_damage] ####
+analysis_sqftg_damage <- all_df %>% 
   mutate(damage_category = ifelse(is.na(damage_category), "No Damage", damage_category)) %>%
   group_by(res_type, damage_category) %>% 
-  summarise(altadena_tot_units = sum(total_units, na.rm = TRUE),
-            altadena_rent_units = sum(landlord_units, na.rm = TRUE),
-            west_tot_units = sum(total_units[area_name == "West"], na.rm = TRUE),
-            west_rent_units = sum(total_units[area_name == "West"], na.rm = TRUE),
-            east_tot_units = sum(total_units[area_name == "East"], na.rm = TRUE),
-            east_rent_units = sum(total_units[area_name == "East"], na.rm = TRUE),
+  summarise(altadena_sqftg_sum = sum(total_square_feet, na.rm = TRUE),
+            west_sqftg_sum = sum(total_square_feet[area_name == "West"], na.rm = TRUE),
+            east_sqftg_sum = sum(total_square_feet[area_name == "East"], na.rm = TRUE),
+            altadena_sqftg_avg = mean(total_square_feet, na.rm = TRUE),
+            west_sqftg_avg = mean(total_square_feet[area_name == "West"], na.rm = TRUE),
+            east_sqftg_avg = mean(total_square_feet[area_name == "East"], na.rm = TRUE),
+            altadena_sqftg_med = median(total_square_feet, na.rm = TRUE),
+            west_sqftg_med = median(total_square_feet[area_name == "West"], na.rm = TRUE),
+            east_sqftg_med = median(total_square_feet[area_name == "East"], na.rm = TRUE),
+            #running standard deviation to see how spread out the unit sizes are, do they vary a lot or a little 
+            altadena_sqftg_sd = sd(total_square_feet, na.rm = TRUE), 
+            west_sqftg_sd = sd(total_square_feet[area_name == "West"], na.rm = TRUE),
+            east_sqftg_sd = sd(total_square_feet[area_name == "East"], na.rm = TRUE),
+            #running minimum to see the smallest value 
+            altadena_sqftg_min = min(total_square_feet, na.rm = TRUE), 
+            west_sqftg_min = min(total_square_feet[area_name == "West"], na.rm = TRUE),
+            east_sqftg_min = min(total_square_feet[area_name == "East"], na.rm = TRUE),
+            #running maximum to see the largest value 
+            altadena_sqftg_max = max(total_square_feet, na.rm = TRUE), 
+            west_sqftg_max = max(total_square_feet[area_name == "West"], na.rm = TRUE),
+            east_sqftg_max = max(total_square_feet[area_name == "East"], na.rm = TRUE),
             .groups = "drop") %>%
-  mutate(altadena_prc_tot = altadena_tot_units/sum(altadena_tot_units)*100,
-         altadena_prc_rent = altadena_rent_units/sum(altadena_rent_units)*100,
-         west_prc_tot = west_tot_units/sum(west_tot_units)*100,
-         west_prc_rent = west_rent_units/sum(west_rent_units)*100,
-         east_prc_tot = east_tot_units/sum(east_tot_units)*100,
-         east_prc_rent = east_rent_units/sum(east_rent_units)*100) %>%
+  #making table long vs wide
   pivot_longer(
-    cols = c(altadena_tot_units:east_prc_rent),
+    cols = -c(res_type, damage_category),
     names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(tot_units|rent_units|prc_tot|prc_rent)"
+    names_pattern = "(altadena|west|east)_(sqftg_sum|sqftg_avg|sqftg_med|sqftg_sd|sqftg_min|sqftg_max)"
   ) 
 
-#### Step 5: THIRD ANALYSIS- [analysis_multifamily_damage] ####
-analysis_multifamily_damage <- all_df %>% 
-  mutate(damage_category = ifelse(is.na(damage_category), "No Damage", damage_category)) %>%
-  filter(damage_category == "Significant Damage",
-         res_type == "Multifamily") %>% 
-  group_by(total_units) %>%
-  summarise(count_unit = sum(total_units, na.rm = TRUE),
-            avg_unit_size = mean(total_units, na.rm = TRUE),
-            med_unit_size = median(total_units, na.rm = TRUE),
-            .groups = "drop") %>%
-  mutate(prc_unit_size = count_unit/sum(count_unit)*100,
-         total_units = as.character(total_units)) %>%
-  bind_rows( #adding a row for all units
-    summarise(
-      ., 
-      total_units = "all units",
-      count_unit = sum(count_unit),
-      avg_unit_size = sum(count_unit) / nrow(.),  
-      med_unit_size = median(med_unit_size),
-      prc_unit_size = sum(count_unit) / sum(count_unit) * 100  
-    )
-  ) %>%
-  rename(num_of_units = total_units)
 
+#### Step 5: Upload tables to postgres and add table/column comments ####
 
+dbWriteTable(con, name = "analysis_sqftg_jan2025", value = analysis_sqftg_jan2025, overwrite = FALSE)
+schema <- "data"
+table_name <- "analysis_sqftg_jan2025"
+indicator <- "Data on average & median square footage of properties in Altadena, West Altadena, East Altadena by residential type in Jan 2025 (e.g., what was the average square footage of single family properties in Altadena)"
+source <- "Source: LA County Assessor Data, January 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_sqftg.docx"
+column_names <- colnames(analysis_sqftg_jan2025) # Get column names
+column_comments <- c(
+  "type of residence",
+  "area",
+  "sum of square footage",
+  "average of square footage",
+  "median of square footage",
+  "standard deviation of square footage",
+  "minimum of square footage",
+  "maximum of square footage")
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
+dbWriteTable(con, name = "analysis_sqftg_damage", value = analysis_sqftg_damage, overwrite = FALSE)
+schema <- "data"
+table_name <- "analysis_sqftg_damage"
+indicator <- "Data on average & median square footage of properties lost in Altadena, West Altadena, East Altadena by residential type  (what was the median square footage of multifamily properties that sustained significant damage in West Altadena)"
+source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_sqftg.docx"
+column_names <- colnames(analysis_sqftg_damage) # Get column names
+column_comments <- c(
+  "type of residence",
+  "damage category",
+  "area",
+  "sum of square footage",
+  "average of square footage",
+  "median of square footage",
+  "standard deviation of square footage",
+  "minimum of square footage",
+  "maximum of square footage")
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
-#### Step 6: Upload tables to postgres and add table/column comments ####
-# 
-# dbWriteTable(con, name = "analysis_units_jan2025", value = analysis_units_jan2025, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_units_jan2025"
-# indicator <- "Data on total units, total rental units (landlord_units column) in Altadena, West Altadena, East Altadena by residential type (e.g., total units in single family homes, total rental units in single family homes) in January 2025 (before the fire)"
-# source <- "Source: LA County Assessor Data, January 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
-# column_names <- colnames(analysis_units_jan2025) # Get column names
-# column_comments <- c(
-#   "type of residence",
-#   "area",
-#   "count of total units",
-#   "count of rental units",
-#   "percent of total units",
-#   "percent of rental units")
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-# 
-# dbWriteTable(con, name = "analysis_units_damage", value = analysis_units_damage, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_units_damage"
-# indicator <- "Data on total units lost, total rental units lost in Altadena, West Altadena, East Altadena by residential type (e.g., total rental units lost in multifamily homes) → count lost as significant damage, but include separately units that sustained some damage"
-# source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
-# column_names <- colnames(analysis_units_damage) # Get column names
-# column_comments <- c(
-#   "type of residence",
-#   "damage category",
-#   "area",
-#   "count of total units",
-#   "count of rental units",
-#   "percent of total units",
-#   "percent of rental units"
-# )
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-# 
-# dbWriteTable(con, name = "analysis_multifamily_damage", value = analysis_multifamily_damage, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_multifamily_damage"
-# indicator <- "Data on the multifamily units lost (significant damage), what were their sizes? e.g., what was the average unit size, what was the median size, what percentage were 2 units, 3-4 units, or 5 or more units"
-# source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
-# column_names <- colnames(analysis_multifamily_damage) # Get column names
-# column_comments <- c(
-#   "number of units in a building",
-#   "count of units of this many",
-#   "average unit size",
-#   "median unit size",
-#   "percentge unit size") 
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-
-#### Step 7: close connection ####
+#### Step 6: close connection ####
 dbDisconnect(con)
