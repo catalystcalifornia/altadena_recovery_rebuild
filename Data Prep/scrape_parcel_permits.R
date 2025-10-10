@@ -56,7 +56,7 @@ for (row_ in 1:nrow(test)) {
   
   address_url <- test[row_, "portal_url"]
   message(paste(row_, ":", address_url))
-  result <- scrape_permits_chromote(url=address_url, wait_time = 15)
+  result <- scrape_permits_chromote(url=address_url, wait_time = 30)
   result <- result %>%
     mutate(ain=test[row_, "ain"],
            site_address_parcel=test[row_, "site_address_parcel"],
@@ -68,11 +68,21 @@ for (row_ in 1:nrow(test)) {
     final_data <- bind_rows(final_data, result)
   }
   
-  Sys.sleep(5)
+  Sys.sleep(3)
 }
 
 
 ##### Methods to improve
-# wait_for_spa_load(): may be able to cut wait time short, e.g., if "No results were found" appears, end/break
-# wait_for_spa_load(): need a way to know how many total permits (results) there are and if we need to repeat scrape for subsequent pages - for now we assume all parcels have 100 permits or fewer
+# wait_for_spa_load(): need a way to know how many total permits (results) there are and if we need to repeat scrape for subsequent pages 
+## - for now we assume all parcels have 100 permits or fewer - can see if any have 100 permits and then look to see if there are more
 
+# if a ain is associated with a timeout/error status, we'll need to add a section to this script that perhaps reruns them with a
+# longer max_wait time.
+
+# will want to put this on a lambda/aws schedule to run monthly without worrying about RDP staying connected
+
+# try to make sure no errors come up that break the loop, e.g., 1701 : https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=10&pn=1&em=true&st=5833002004
+# Scraping: https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=10&pn=1&em=true&st=5833002004
+#   âœ— Error during page load: Chromote: timed out waiting for response to command Page.navigate
+# Error in UseMethod("read_xml") : 
+#   no applicable method for 'read_xml' applied to an object of class "NULL"

@@ -46,31 +46,37 @@ wait_for_spa_load <- function(url, max_wait = 20) {
     start_time <- Sys.time()
     while(difftime(Sys.time(), start_time, units = "secs") < max_wait) {
       
-      # Check for results
-      results_count <- tryCatch({
-        b$Runtime$evaluate('document.querySelectorAll("div[name=\\"label-SearchResult\\"]").length')$result$value
-      }, error = function(e) {
-        message("Warning: Could not check results count")
-        return(0)
-      })
+      elapsed_time <- difftime(Sys.time(), start_time, units = "secs")
       
-      # Check for "No results found" message
-      no_results_found <- tryCatch({
-        b$Runtime$evaluate('document.body.innerText.includes("No results were found")' )$result$value
+      # Check if the moduleResultMessage container is visible (page loaded indicator)
+      module_loaded <- tryCatch({
+        b$Runtime$evaluate('document.querySelector("#moduleResultMessage[aria-hidden=\\"false\\"]") !== null')$result$value
       }, error = function(e) {
-        message("Warning: Could not check for no results message")
+        message("Warning: Could not check module loaded status")
         return(FALSE)
       })
       
-      message(paste("Results found:", results_count, "| No results message:", no_results_found))
+      message(paste("Waiting for results module... (", round(elapsed_time, 1), "s elapsed)"))
       
-      # Page is loaded if we have results OR see the no results message
-      if(results_count > 0 || no_results_found) {
+      if(module_loaded) {
+        message("✓ Results module loaded!")
+        
+        # Now check for actual results
+        results_count <- tryCatch({
+          b$Runtime$evaluate('document.querySelectorAll("div[name=\\"label-SearchResult\\"]").length')$result$value
+        }, error = function(e) {
+          message("Warning: Could not check results count")
+          return(0)
+        })
+        
+        message(paste("Results found:", results_count))
+        
         if(results_count > 0) {
           message("✓ Search results loaded!")
         } else {
           message("✓ Page loaded - No results found")
         }
+        
         status <- "success"
         break
       }
@@ -80,7 +86,7 @@ wait_for_spa_load <- function(url, max_wait = 20) {
     
     # If we exited loop without confirming page load, mark as timeout
     if(status != "success") {
-      message("⚠ Timeout: Page did not finish loading within wait period")
+      message("⚠ Timeout: Results module did not load within wait period")
       status <- "timeout"
     }
     
@@ -114,10 +120,9 @@ extract_permit_data_general <- function(html_content, response_status = "success
   
   all_permits <- data.frame()
   
-  if (length(result_containers)==0) {
-    message("This address has no associated permits")
+  if(is.null(html_content) || html_content == "" || nchar(html_content) < 50) {
+    message("Invalid or empty HTML content received")
     
-    # Convert to data frame row with NA
     permit_df <- data.frame(
       record_id = NA,
       permit_number = NA,
@@ -131,11 +136,11 @@ extract_permit_data_general <- function(html_content, response_status = "success
       main_parcel = NA,
       address = NA,
       description = NA,
-      response_status = response_status,  # Add status
+      response_status = response_status,  # Will be "error" or "timeout"
       stringsAsFactors = FALSE
     )
     
-    all_permits <- bind_rows(all_permits, permit_df)
+    return(permit_df)
     
   } else {
     
@@ -173,7 +178,7 @@ extract_permit_data_general <- function(html_content, response_status = "success
         main_parcel = ifelse(is.na(permit_data$main_parcel), NA, permit_data$main_parcel),
         address = ifelse(is.na(permit_data$address), NA, permit_data$address),
         description = ifelse(is.na(permit_data$description), NA, permit_data$description),
-        response_status = response_status,  # Add status to each permit
+        response_status = response_status,
         stringsAsFactors = FALSE
       )
       
@@ -191,7 +196,7 @@ scrape_permits_chromote <- function(url, wait_time = 15) {
   message(paste("Scraping:", url))
   
   # Parse html with rvest - now returns list with html and status
-  result <- wait_for_spa_load(url, max_wait = 25)
+  result <- wait_for_spa_load(url, max_wait = wait_time)
   
   # Use custom function to get general data fields, passing status
   permits <- extract_permit_data_general(html_content = result$html, 
