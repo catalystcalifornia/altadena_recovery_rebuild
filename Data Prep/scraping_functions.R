@@ -113,12 +113,6 @@ wait_for_spa_load <- function(url, max_wait = 20) {
 
 # Helper Function to extract required permit data from the structured div layout of LAC Portal search result
 extract_permit_data_general <- function(html_content, response_status = "success") {
-  page <- read_html(html_content)
-  
-  # Find all search result containers
-  result_containers <- page %>% html_nodes('div[name="label-SearchResult"]')
-  
-  all_permits <- data.frame()
   
   if(is.null(html_content) || html_content == "" || nchar(html_content) < 50) {
     message("Invalid or empty HTML content received")
@@ -136,11 +130,43 @@ extract_permit_data_general <- function(html_content, response_status = "success
       main_parcel = NA,
       address = NA,
       description = NA,
-      response_status = response_status,  # Will be "error" or "timeout"
+      response_status = response_status,
       stringsAsFactors = FALSE
     )
     
     return(permit_df)
+  }
+  
+  # Now safe to parse HTML
+  page <- read_html(html_content)
+  
+  # Find all search result containers
+  result_containers <- page %>% html_nodes('div[name="label-SearchResult"]')
+  
+  all_permits <- data.frame()
+  
+  if (length(result_containers)==0) {
+    message("This address has no associated permits")
+    
+    # Convert to data frame row with NA
+    permit_df <- data.frame(
+      record_id = NA,
+      permit_number = NA,
+      permit_href = NA,
+      applied_date = NA,
+      type = NA,
+      issued_date = NA,
+      expiration_date = NA,
+      status = NA,
+      finalized_date = NA,
+      main_parcel = NA,
+      address = NA,
+      description = NA,
+      response_status = response_status,
+      stringsAsFactors = FALSE
+    )
+    
+    all_permits <- bind_rows(all_permits, permit_df)
     
   } else {
     
@@ -188,6 +214,7 @@ extract_permit_data_general <- function(html_content, response_status = "success
   
   return(all_permits)
 }
+
 
 
 # Function to receive a portal url (configured to start a search for permits based on provided address)
