@@ -510,12 +510,12 @@ Table includes all residential parcels in Altadena. If they werent assessed then
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
 qa_filepath<-"  QA_sheet_relational_tables.docx "
 
-# dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final,
+# dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final_final,
 #              overwrite = FALSE, row.names = FALSE)
 
 
 # Add metadata
-column_names <- colnames(rel_assessor_dins_final) # Get column names
+column_names <- colnames(rel_assessor_dins_final_final) # Get column names
 column_names
 column_comments <- c('Assessor ID number - use this to match to other relational tables',
                      'Overall damage category level -- top coded so highest damage level of a building on the property takes precedent',
