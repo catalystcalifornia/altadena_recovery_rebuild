@@ -109,10 +109,8 @@ wait_for_spa_load <- function(url, max_wait = 20) {
   return(list(html = page_source, status = status))
 }
 
-
-
 # Helper Function to extract required permit data from the structured div layout of LAC Portal search result
-extract_permit_data_general <- function(html_content, response_status = "success") {
+extract_permit_data_general <- function(html_content, response_status = "success", ain = NA, retried = FALSE) {
   
   if(is.null(html_content) || html_content == "" || nchar(html_content) < 50) {
     message("Invalid or empty HTML content received")
@@ -124,6 +122,7 @@ extract_permit_data_general <- function(html_content, response_status = "success
       applied_date = NA,
       type = NA,
       issued_date = NA,
+      project_name = NA,
       expiration_date = NA,
       status = NA,
       finalized_date = NA,
@@ -131,6 +130,8 @@ extract_permit_data_general <- function(html_content, response_status = "success
       address = NA,
       description = NA,
       response_status = response_status,
+      ain = ain,
+      retried = retried,
       stringsAsFactors = FALSE
     )
     
@@ -156,6 +157,7 @@ extract_permit_data_general <- function(html_content, response_status = "success
       applied_date = NA,
       type = NA,
       issued_date = NA,
+      project_name = NA,
       expiration_date = NA,
       status = NA,
       finalized_date = NA,
@@ -163,6 +165,8 @@ extract_permit_data_general <- function(html_content, response_status = "success
       address = NA,
       description = NA,
       response_status = response_status,
+      ain = ain,
+      retried = retried,
       stringsAsFactors = FALSE
     )
     
@@ -205,6 +209,8 @@ extract_permit_data_general <- function(html_content, response_status = "success
         address = ifelse(is.na(permit_data$address), NA, permit_data$address),
         description = ifelse(is.na(permit_data$description), NA, permit_data$description),
         response_status = response_status,
+        ain = ain,
+        retried = retried,
         stringsAsFactors = FALSE
       )
       
@@ -215,19 +221,39 @@ extract_permit_data_general <- function(html_content, response_status = "success
   return(all_permits)
 }
 
-
-
 # Function to receive a portal url (configured to start a search for permits based on provided address)
 # and return a data frame of permits
-scrape_permits_chromote <- function(url, wait_time = 15) {
+# Now includes automatic retry logic and tracking
+scrape_permits_chromote <- function(url, ain = NA, wait_time = 30, max_retries = 1, retry_wait_time = 60) {
   message(paste("Scraping:", url))
   
-  # Parse html with rvest - now returns list with html and status
+  # First attempt
   result <- wait_for_spa_load(url, max_wait = wait_time)
   
-  # Use custom function to get general data fields, passing status
+  # Check if retry is needed
+  is_retry <- FALSE
+  if(result$status %in% c("timeout", "error") && max_retries > 0) {
+    message(paste("⚠ First attempt failed with status:", result$status))
+    message(paste("🔄 Retrying with longer wait time (", retry_wait_time, "seconds)..."))
+    
+    Sys.sleep(5)  # Brief pause before retry
+    
+    # Retry with longer wait time
+    result <- wait_for_spa_load(url, max_wait = retry_wait_time)
+    is_retry <- TRUE
+    
+    if(result$status == "success") {
+      message("✓ Retry successful!")
+    } else {
+      message(paste("✗ Retry also failed with status:", result$status))
+    }
+  }
+  
+  # Use custom function to get general data fields, passing all tracking info
   permits <- extract_permit_data_general(html_content = result$html, 
-                                         response_status = result$status)
+                                         response_status = result$status,
+                                         ain = ain,
+                                         retried = is_retry)
   
   return(permits)
 }
@@ -292,4 +318,4 @@ scrape_permits_chromote <- function(url, wait_time = 15) {
 #   b$close()
 # }
 # # example use: inspect_search_form()
-# 
+#
