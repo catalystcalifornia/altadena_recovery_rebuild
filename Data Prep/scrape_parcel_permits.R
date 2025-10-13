@@ -31,40 +31,88 @@ altadena_parcels <- jan_parcels %>%
   mutate(city = case_when(grepl("ALTADENA, CA", site_address_parcel)~"Altadena",
                           grepl("PASADENA, CA", site_address_parcel)~"Pasadena",
                           .default="something else!")) %>%
-  filter(city=='Altadena') %>%
-  mutate(portal_url = paste0(lac_permits_url, ain)) 
+  filter(city=='Altadena') 
 
+unique_ains <- altadena_parcels %>%
+  select(ain) %>%
+  unique
 
-final_data <- NULL
+# set some metadata for exporting results
+table_name <- paste("general_permit_data", 
+                    strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
+                    strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
+                    sep="_") 
 
-for (row_ in 1:nrow(altadena_parcels)) { 
+date_ran <- as.character(Sys.Date())
+
+csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", table_name, ".csv")
+
+##### Start scraping #####
+# # if csv already  exists for this table see where it left off, pull in results and pick up on next row
+
+if (file.exists(csv_filepath)) {
+  prev_data <- read.csv(csv_filepath,
+                        encoding = "UTF-8",
+                        colClasses = c("character"))
   
-  address_url <- altadena_parcels[row_, "portal_url"]
-  message(paste(row_, ":", address_url))
-  result <- scrape_permits_chromote(url=address_url, wait_time = 30)
+  na_ains <- prev_data  %>% filter(is.na(record_id)) %>% select(response_status) %>% rename(ain=response_status)
+  
+  scraped_ains <- prev_data %>%
+    select(ain) %>%
+    rbind(na_ains) %>%
+    unique()
+  
+  remaining <- data.frame(ain=setdiff(unique_ains, scraped_ains))
+  
+  include_headers <- FALSE
+  append_value <- TRUE
+  
+} else {
+  print("boo")
+  
+  remaining <- unique_ains
+  include_headers <- TRUE
+  append_value <- FALSE
+}
+
+closeAllConnections()
+gc() 
+
+for (row_ in 1:nrow(remaining)) { 
+  
+  portal_url = paste0(lac_permits_url, remaining[row_, "ain"])
+  message(paste(row_, ":", portal_url))
+  result <- scrape_permits_chromote(url=portal_url, wait_time = 30)
   result <- result %>%
-    mutate(ain=altadena_parcels[row_, "ain"],
-           site_address_parcel=altadena_parcels[row_, "site_address_parcel"],
-           damage_category=altadena_parcels[row_, "damage_category"])
+    mutate(ain=remaining[row_, "ain"])
+
+  # Write initial data (with header)
+  write.table(result, 
+                file = csv_filepath, 
+                sep = ",", 
+                row.names = FALSE, 
+                col.names = include_headers,
+                append = append_value,
+                fileEncoding = "UTF-8",
+                quote = TRUE,
+                qmethod = "double")
   
-  if(is.null(final_data)) {
-        final_data <- result
-  } else {
-    final_data <- bind_rows(final_data, result)
-  }
   
   Sys.sleep(3)
 }
 
+final_data <- read.csv(csv_filepath,
+                       encoding = "UTF-8",
+                       colClasses = c("character"))
 
-# dbWriteTable(con, Id(schema="data", table_name="general_permit_data_10_2025"), final_data, 
-#              overwrite = FALSE, row.names = FALSE) 
-# 
-# dbSendQuery(con, "COMMENT ON TABLE data.general_permit_data_10_2025 IS
-#             'General permit data for Altadena parcels with some or significant damage,
-#             Data imported on 10-12-25
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
-#             Source: https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=[ain]'")
+dbWriteTable(con, Id(schema="data", table_name=table_name), final_data,
+             overwrite = FALSE, row.names = FALSE)
+
+dbSendQuery(con, paste0("COMMENT ON TABLE data.", table_name, " IS
+            'General permit data for Altadena parcels with some or significant damage,
+            Data imported on ",date_ran, "
+            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
+            Source: https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=[ain]'"))
 
 
 ##### Methods to improve
@@ -74,7 +122,10 @@ for (row_ in 1:nrow(altadena_parcels)) {
 # if an ain is associated with a timeout/error status, we'll need to add a section to this script that perhaps reruns them with a
 # longer max_wait time.
 
-# will want to put this on a lambda/aws schedule to run monthly without worrying about RDP staying connected
+# perhaps put this on a lambda/aws schedule to run monthly without worrying about RDP staying connected
+
+# originally created the csv to retain damage categories and then took them out part way through - will only impact 10/2025 and the results
+# can be salvaged but should clean up old references to these columns in fns
 
 # next steps:
 ## export ALL permits to postgres
