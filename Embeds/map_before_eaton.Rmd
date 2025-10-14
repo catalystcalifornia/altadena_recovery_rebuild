@@ -18,13 +18,6 @@ library(dplyr)
 library(rmapshaper)
 library(leaflet)
 library(htmlwidgets)
-# library(stringr)
-# library(tidyverse)
-# library(janitor)
-# library(flextable)
-# library(kableExtra)
-# library(ggplot2)
-# options(highcharter.theme = hc_theme_smpl(tooltip = list(valueDecimals = 2)))
 options(scipen=999)
 
 # Colors and Fonts ----
@@ -38,15 +31,6 @@ ccblue <- "#0860BC"
 black <- "#000000"
 alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
-
-# ## FONTS ## 
-# 
-# font_add_google("Inter")
-# 
-# # font_import()
-# loadfonts(device = "win")
-# windowsFonts()
-# showtext_auto()
 
 # Load in and prep shapes ----
 source("W:\\RDA Team\\R\\credentials_source.R")
@@ -66,14 +50,11 @@ parcels <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_altadena_parc
 # residential characteristics
 res_data <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_residential_jan2025")
 
-# damage levels
-damage <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_damage_level")
-
 # transform all shapes
 west <- st_transform(west,4326) %>% ms_simplify()
 east <- st_transform(east,4326) %>% ms_simplify()
 eaton_fire <- st_transform(eaton_fire, 4326) %>% ms_simplify()
-parcels <- st_transform(parcels,4326) %>% ms_simplify()
+parcels <- st_transform(parcels,4326) 
 
 # join parcel shapes to residential data
 parcels <- parcels %>% left_join(res_data, by="ain")
@@ -182,7 +163,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               popup=~popup_res,
               group="Residential Property Types") %>%
         addLegend(
-        position = "topright",
+        position = "bottomleft",
         pal = res_pal,
         values =  parcels_res$res_type_factor,
         group="Residential Property Types",
@@ -197,7 +178,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               popup=~popup_res,
               group="Residential Unit Sizes") %>%
         addLegend(
-        position = "topright",
+        position = "bottomleft",
         pal = unit_pal,
         values =  parcels_res$unit_category_factor,
         group="Residential Unit Sizes",
@@ -212,7 +193,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               popup=~popup_res,
               group="Owner or Renter Occupied") %>%
         addLegend(
-        position = "topright",
+        position = "bottomleft",
         pal = owner_pal,
         values =  parcels_res$owner_renter_factor,
         group="Owner or Renter Occupied",
