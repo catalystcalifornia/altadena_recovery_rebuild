@@ -43,14 +43,15 @@ gainsboro <- "#DEDEDE"
 East Altadena has a few more homeowners but overall the region is made up of majority homeowners
 ```{r}
 #### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
-df <- st_read(con, query="Select * from data.analysis_owner_renter_jan2025") %>%
+df <- st_read(con, query="Select * from data.analysis_owner_renter_damage") %>%
+    filter(damage_category == "Significant Damage") %>%
 pivot_longer(
     cols = -owner_renter,
     names_to = c("area", ".value"),
     names_pattern = "(altadena|west|east)_(count|prc)" 
   ) %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
-         "Housing Stock"=prc,
+         "Housing Loss"=prc,
          "Owner/Renter" = owner_renter,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -58,13 +59,13 @@ pivot_longer(
 
 
 table<- df %>%
-  select("Area","Owner/Renter", "Housing Stock", "Count (%)")%>%
+  select("Area","Owner/Renter", "Housing Loss", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Owner/Renter") %>%
   # tab_header(title= str_wrap("East Altadena has a few more homeowners but overall the region is made up of majority homeowners", width = 20))%>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025."),placement="left") 
+  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Housing Stock', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Housing Loss', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   cols_width(1~px(210),2~px(100),
              3~px(125))%>%
@@ -91,10 +92,7 @@ table<- df %>%
             cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
    tab_style(style=
             cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
-
-
 ```
-
 
 ```{r, include=FALSE}
 dbDisconnect(con) 

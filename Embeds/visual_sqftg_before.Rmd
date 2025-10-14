@@ -87,5 +87,8 @@ table<- df %>%
    tab_style(style=
             cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
 
+```
 
+```{r, include=FALSE}
+dbDisconnect(con) 
 ```

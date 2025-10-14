@@ -2,6 +2,7 @@
 title: ""
 output: html_document
 css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
 ---
 
 ```{r setup, include=FALSE}
@@ -40,31 +41,28 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-East Altadena has a few more homeowners but overall the region is made up of majority homeowners
+The majority of Alatadena comprises of single-family homes before the fire
 ```{r}
-#### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
-df <- st_read(con, query="Select * from data.analysis_owner_renter_jan2025") %>%
-pivot_longer(
-    cols = -owner_renter,
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(count|prc)" 
-  ) %>%
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
-         "Housing Stock"=prc,
-         "Owner/Renter" = owner_renter,
+#### VISUAL ####
+df <- st_read(con, query="Select res_type, damage_category, area, rent_units, prc_rent from data.analysis_units_damage") %>%
+  filter(res_type != "Boarding house",
+         damage_category == "Significant Damage") %>% 
+  mutate("Count (%)"=paste0(comma(rent_units)," (",round(prc_rent,0),"%)"),
+         "Rental Units Lost"=prc_rent,
+         "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(count)) 
+  arrange(desc(rent_units)) 
 
 
 table<- df %>%
-  select("Area","Owner/Renter", "Housing Stock", "Count (%)")%>%
-  gt(groupname_col = "Area", rowname_col = "Owner/Renter") %>%
-  # tab_header(title= str_wrap("East Altadena has a few more homeowners but overall the region is made up of majority homeowners", width = 20))%>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025."),placement="left") 
+  select("Area","Residential Type", "Rental Units Lost", "Count (%)")%>%
+  gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
+  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Housing Stock', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Rental Units Lost', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   cols_width(1~px(210),2~px(100),
              3~px(125))%>%

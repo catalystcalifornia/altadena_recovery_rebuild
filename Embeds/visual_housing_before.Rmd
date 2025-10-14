@@ -21,6 +21,7 @@ library(htmlwidgets)
 library(gtExtras)
 library(gt)
 library(sf)
+library(scales)
 
 options(scipen=999)
 
@@ -50,7 +51,7 @@ pivot_longer(
     names_to = c("area", ".value"),
     names_pattern = "(altadena|west|east)_(count|prc)" 
   ) %>%
-  mutate("Count (%)"=paste0(count," (",round(prc,0),"%)"),
+  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
          "Housing Stock"=prc,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
