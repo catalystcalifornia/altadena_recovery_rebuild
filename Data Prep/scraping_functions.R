@@ -30,7 +30,7 @@ test_chromote <- function() {
 }
 
 
-# Helper function
+##### General permit scraping functions #####
 # The website is a single page application (SPA) will try a longer wait time
 wait_for_spa_load <- function(url, max_wait = 20) {
   status <- "error"  # Default to error
@@ -258,64 +258,396 @@ scrape_permits_chromote <- function(url, ain = NA, wait_time = 30, max_retries =
   return(permits)
 }
 
-# Not needed
-# debug_scrape <- function(url) {
-#   b <- ChromoteSession$new()
-#   
-#   # Navigate
-#   b$Page$navigate(url)
-#   b$Page$loadEventFired()
-#   Sys.sleep(10)
-#   
-#   # Check what we actually got
-#   current_url <- b$Runtime$evaluate("window.location.href")$result$value
-#   title <- b$Runtime$evaluate("document.title")$result$value
-#   body_text <- b$Runtime$evaluate("document.body.innerText.substring(0, 500)")$result$value
-#   
-#   message("URL: ", current_url)
-#   message("Title: ", title)
-#   message("Body preview: ", body_text)
-#   
-#   # Check for specific elements
-#   search_elements <- b$Runtime$evaluate("document.querySelectorAll('div[name*=\"label-\"]').length")$result$value
-#   message("Found label elements: ", search_elements)
-#   
-#   b$close()
-# }
-# 
-# 
-# inspect_search_form <- function() {
-#   b <- ChromoteSession$new()
-#   b$Page$navigate("https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=10&pn=1&em=true&st=2204%20Grand%20Oaks%20Avenue")
-#   b$Page$loadEventFired()
-#   Sys.sleep(5)
-#   
-#   # Get all input elements
-#   inputs <- b$Runtime$evaluate("
-#     Array.from(document.querySelectorAll('input')).map(input => ({
-#       type: input.type,
-#       name: input.name,
-#       id: input.id,
-#       placeholder: input.placeholder,
-#       className: input.className
-#     }))
-#   ")$result$value
-#   
-#   # Get all buttons
-#   buttons <- b$Runtime$evaluate("
-#     Array.from(document.querySelectorAll('button')).map(btn => ({
-#       text: btn.textContent.trim(),
-#       type: btn.type,
-#       className: btn.className
-#     }))
-#   ")$result$value
-#   
-#   message("Input elements found:")
-#   print(inputs)
-#   message("Button elements found:")
-#   print(buttons)
-#   
-#   b$close()
-# }
-# # example use: inspect_search_form()
-#
+
+
+##### Detailed permit scraping functions #####
+wait_for_permit_detail_load <- function(url, max_wait = 20) {
+  status <- "error"  # Default to error
+  page_source <- NULL
+  
+  tryCatch({
+    b <- ChromoteSession$new()
+    b$Page$navigate(url)
+    b$Page$loadEventFired()
+    
+    message("Waiting for permit detail page to fully load...")
+    
+    start_time <- Sys.time()
+    while(difftime(Sys.time(), start_time, units = "secs") < max_wait) {
+      
+      elapsed_time <- difftime(Sys.time(), start_time, units = "secs")
+      
+      # Check if the permit number container has actual content
+      permit_loaded <- tryCatch({
+        b$Runtime$evaluate('
+          var elem = document.querySelector("#focusText span.ng-binding");
+          elem !== null && elem.textContent.trim().length > 0
+        ')$result$value
+      }, error = function(e) {
+        message("Warning: Could not check permit detail loaded status")
+        return(FALSE)
+      })
+      
+      message(paste("Waiting for permit detail... (", round(elapsed_time, 1), "s elapsed)"))
+      
+      if(permit_loaded) {
+        message("✓ Permit detail page loaded!")
+        
+        # Give Angular time to finish rendering
+        Sys.sleep(2)
+        
+        status <- "success"
+        break
+      }
+      
+      Sys.sleep(2)
+    }
+    
+    # If we exited loop without confirming page load, mark as timeout
+    if(status != "success") {
+      message("⚠ Timeout: Permit detail did not load within wait period")
+      status <- "timeout"
+    }
+    
+    # Get final page state
+    page_source <- tryCatch({
+      b$Runtime$evaluate("document.documentElement.outerHTML")$result$value
+    }, error = function(e) {
+      message("Error getting page source")
+      return("")
+    })
+    
+    b$close()
+    
+  }, error = function(e) {
+    message(paste("✗ Error during page load:", e$message))
+    status <- "error"
+    page_source <- ""
+  })
+  
+  # ALWAYS return a list
+  return(list(html = page_source, status = status))
+}
+
+
+# scrape detailed permit data
+extract_permit_data_detailed <- function(html_content_main, 
+                                         html_content_locations = NULL, 
+                                         response_status = "success", 
+                                         permit_number = NA,
+                                         ain=NA,
+                                         retried = FALSE) {
+  
+  # Initialize empty return structure
+  empty_details <- data.frame(
+    permit_number = permit_number, ain=ain,
+    type = NA, status = NA, project_name = NA, project_name_href = NA,
+    applied_date = NA, issued_date = NA, district = NA, assigned_to = NA,
+    expire_date = NA, valuation = NA, finalized_date = NA, description = NA,
+    completed_percent = NA, in_progress_percent = NA, not_started_percent = NA,
+    address = NA, main_address = NA, parcel_number = NA, main_parcel = NA,
+    response_status = response_status, retried = retried,
+    stringsAsFactors = FALSE
+  )
+  
+  empty_workflow <- data.frame(
+    permit_number = character(0),
+    ain=character(0),
+    workflow_item = character(0),
+    status = character(0),
+    status_date = character(0),
+    stringsAsFactors = FALSE
+  )
+  
+  # Check for invalid HTML
+  if(is.null(html_content_main) || html_content_main == "" || nchar(html_content_main) < 50) {
+    message("Invalid or empty HTML content received for main page")
+    return(list(permit_details = empty_details, workflow = empty_workflow))
+  }
+  
+  # Parse main HTML
+  page_main <- tryCatch({
+    read_html(html_content_main)
+  }, error = function(e) {
+    message("Error parsing main HTML: ", e$message)
+    return(NULL)
+  })
+  
+  if(is.null(page_main)) {
+    return(list(permit_details = empty_details, workflow = empty_workflow))
+  }
+  
+  # ===== SECTION 1: Extract Permit Details =====
+  extract_safe <- function(node, selector, attr = NULL) {
+    tryCatch({
+      element <- node %>% html_node(selector)
+      if(is.na(element)) return(NA)
+      if(!is.null(attr)) {
+        return(element %>% html_attr(attr))
+      } else {
+        return(element %>% html_text(trim = TRUE))
+      }
+    }, error = function(e) {
+      return(NA)
+    })
+  }
+  
+  type <- extract_safe(page_main, '#label-PermitDetail-Type p.form-control-static')
+  status <- extract_safe(page_main, '#label-PermitDetail-Status p.form-control-static')
+  project_name <- extract_safe(page_main, '#label-PermitDetail-ProjectName a')
+  project_name_href <- extract_safe(page_main, '#label-PermitDetail-ProjectName a', 'href')
+  applied_date <- extract_safe(page_main, '#label-PermitDetail-ApplicationDate p.form-control-static')
+  issued_date <- extract_safe(page_main, '#label-PermitDetail-IssuedDate p.form-control-static')
+  district <- extract_safe(page_main, '#label-PermitDetail-District p.form-control-static')
+  assigned_to <- extract_safe(page_main, '#label-PermitDetail-AssignedTo a')
+  expire_date <- extract_safe(page_main, '#label-PermitDetail-ExpirationDate p.form-control-static')
+  valuation <- extract_safe(page_main, '#label-PermitDetail-Valuation p.form-control-static')
+  finalized_date <- extract_safe(page_main, '#label-PermitDetail-FinalizedDate p.form-control-static')
+  description <- extract_safe(page_main, '#label-PermitDetail-Description')
+  
+  # ===== SECTION 2: Extract Progress Chart Data =====
+  completed_pct <- NA
+  in_progress_pct <- NA
+  not_started_pct <- NA
+  
+  tryCatch({
+    chart_paths <- page_main %>% html_nodes('#Donut-chart-render path[aria-label]')
+    if(length(chart_paths) >= 3) {
+      labels <- chart_paths %>% html_attr('aria-label')
+      
+      # Extract percentages from aria-labels
+      for(label in labels) {
+        if(grepl("Completed", label)) {
+          completed_pct <- stringr::str_extract(label, "\\d+") 
+        } else if(grepl("Active", label)) {
+          in_progress_pct <- stringr::str_extract(label, "\\d+")
+        } else if(grepl("Remaining", label)) {
+          not_started_pct <- stringr::str_extract(label, "\\d+")
+        }
+      }
+    }
+  }, error = function(e) {
+    message("Could not extract progress chart data: ", e$message)
+  })
+  
+  # ===== SECTION 3: Extract Workflow Items =====
+  workflow_df <- empty_workflow
+  
+  tryCatch({
+    workflow_divs <- page_main %>% html_nodes('div[ng-repeat="activity in vm.workflowActivities"]')
+    
+    if(length(workflow_divs) > 0) {
+      workflow_list <- list()
+      
+      for(i in 1:length(workflow_divs)) {
+        div <- workflow_divs[i]
+        
+        # Check icon class to determine if active
+        icon_class <- div %>% html_node('i') %>% html_attr('class')
+        
+        if(is.na(icon_class) || grepl('wf-activity-NotStarted', icon_class)) {
+          next  # Skip not started items
+        }
+        
+        # Extract workflow item name
+        workflow_item <- div %>% 
+          html_node('span[ng-class*="vm.getActivityCssClass"]') %>% 
+          html_text(trim = TRUE)
+        
+        # Extract status text
+        status_span <- div %>% html_node('span.wf-summaryLabels')
+        status_text <- if(!is.na(status_span)) {
+          status_span %>% html_text(trim = TRUE)
+        } else {
+          ""
+        }
+        
+        # Determine status (check "Not Passed" before "Passed")
+        item_status <- NA
+        if(grepl("Not Passed", status_text)) {
+          item_status <- "Not Passed"
+        } else if(grepl("Partial Pass", status_text)) {
+          item_status <- "Partial Pass"
+        } else if(grepl("Passed", status_text)) {
+          item_status <- "Passed"
+        } else if(grepl("\\bPass\\b", status_text)) {
+          # Match standalone "Pass" using word boundary
+          item_status <- "Pass"
+        } else if(grepl("Started", status_text)) {
+          item_status <- "Started"
+        } else if(grepl("Scheduled for", status_text)) {
+          item_status <- "Scheduled"
+        }
+        
+        # Extract date
+        item_date <- NA
+        
+        if(!is.na(status_span)) {
+          # Get all text from the status span
+          full_status_text <- status_span %>% html_text(trim = TRUE)
+          
+          # Try to extract date from the ng-binding span first (for Passed/Not Passed)
+          date_span <- status_span %>% html_node('span.ng-binding')
+          if(!is.na(date_span)) {
+            date_text <- date_span %>% html_text(trim = TRUE)
+            # Remove the colon and trim
+            date_text <- gsub("^:\\s*", "", date_text)
+            date_text <- trimws(date_text)
+            if(nchar(date_text) > 0) {
+              item_date <- date_text
+            }
+          }
+        }
+        
+        # If no date yet, look for scheduled date in ALL wf-summaryLabels spans in this div
+        if(is.na(item_date) || item_date == "") {
+          all_status_spans <- div %>% html_nodes('span.wf-summaryLabels')
+          
+          for(span in all_status_spans) {
+            span_text <- span %>% html_text(trim = TRUE)
+            if(grepl("Scheduled for", span_text)) {
+              # Extract the date after "Scheduled for"
+              date_match <- stringr::str_extract(span_text, "\\d{2}/\\d{2}/\\d{4}")
+              if(!is.na(date_match)) {
+                item_date <- date_match
+                break
+              }
+            }
+          }
+        }
+        
+        # Add to list if we have a workflow item name
+        if(!is.na(workflow_item) && workflow_item != "") {
+          workflow_list[[length(workflow_list) + 1]] <- data.frame(
+            permit_number = permit_number,
+            ain=ain,
+            workflow_item = workflow_item,
+            status = ifelse(is.na(item_status), "", item_status),
+            status_date = ifelse(is.na(item_date), "", item_date),
+            stringsAsFactors = FALSE
+          )
+        }
+      }
+      
+      # Combine all workflow items
+      if(length(workflow_list) > 0) {
+        workflow_df <- bind_rows(workflow_list)
+      }
+    }
+  }, error = function(e) {
+    message("Error extracting workflow data: ", e$message)
+  })
+  
+  # ===== SECTION 4: Extract Location Data =====
+  address <- NA
+  main_address <- NA
+  parcel_number <- NA
+  main_parcel <- NA
+  
+  if(!is.null(html_content_locations) && html_content_locations != "") {
+    tryCatch({
+      page_locations <- read_html(html_content_locations)
+      
+      # Extract address
+      address <- page_locations %>% 
+        html_node('p[id^="Address_State_Info"]') %>% 
+        html_text(trim = TRUE)
+      
+      # Check if main address
+      main_address_input <- page_locations %>% 
+        html_node('input[id^="chk_address_main"]')
+      main_address <- !is.na(main_address_input) && 
+        !is.na(html_attr(main_address_input, 'checked'))
+      
+      # Extract parcel number
+      parcel_number <- page_locations %>% 
+        html_node('div[id^="Parcel_Number"] p') %>% 
+        html_text(trim = TRUE)
+      
+      # Check if main parcel
+      main_parcel_input <- page_locations %>% 
+        html_node('input[id^="chk_parcel_main"]')
+      main_parcel <- !is.na(main_parcel_input) && 
+        !is.na(html_attr(main_parcel_input, 'checked'))
+      
+    }, error = function(e) {
+      message("Error extracting location data: ", e$message)
+    })
+  }
+  
+  # ===== Build permit_details data frame =====
+  permit_details <- data.frame(
+    permit_number = permit_number,
+    ain = ain,
+    type = ifelse(is.na(type), NA, type),
+    status = ifelse(is.na(status), NA, status),
+    project_name = ifelse(is.na(project_name), NA, project_name),
+    project_name_href = ifelse(is.na(project_name_href), NA, project_name_href),
+    applied_date = ifelse(is.na(applied_date), NA, applied_date),
+    issued_date = ifelse(is.na(issued_date), NA, issued_date),
+    district = ifelse(is.na(district), NA, district),
+    assigned_to = ifelse(is.na(assigned_to), NA, assigned_to),
+    expire_date = ifelse(is.na(expire_date), NA, expire_date),
+    valuation = ifelse(is.na(valuation), NA, valuation),
+    finalized_date = ifelse(is.na(finalized_date), NA, finalized_date),
+    description = ifelse(is.na(description), NA, description),
+    completed_percent = ifelse(is.na(completed_pct), NA, completed_pct),
+    in_progress_percent = ifelse(is.na(in_progress_pct), NA, in_progress_pct),
+    not_started_percent = ifelse(is.na(not_started_pct), NA, not_started_pct),
+    address = ifelse(is.na(address), NA, address),
+    main_address = ifelse(is.na(main_address), NA, main_address),
+    parcel_number = ifelse(is.na(parcel_number), NA, parcel_number),
+    main_parcel = ifelse(is.na(main_parcel), NA, main_parcel),
+    response_status = response_status,
+    retried = retried,
+    stringsAsFactors = FALSE
+  )
+  
+  # Return list with both data frames
+  return(list(
+    permit_details = permit_details,
+    workflow = workflow_df
+  ))
+}
+
+scrape_permits_detailed <- function(url, url_suffix, ain = NA, permit_number=NA, wait_time = 30, max_retries = 1, retry_wait_time = 60) {
+  message(paste("Scraping:", url))
+  
+  # First attempt
+  result1 <- wait_for_permit_detail_load(url, max_wait = wait_time)
+  Sys.sleep(2)
+  result2 <- wait_for_permit_detail_load(url=paste0(url,url_suffix), max_wait = wait_time)
+  
+  # Check if retry is needed
+  is_retry <- FALSE
+  if(result1$status %in% c("timeout", "error") && max_retries > 0) {
+    message(paste("⚠ First attempt failed with status:", result1$status))
+    message(paste("🔄 Retrying with longer wait time (", retry_wait_time, "seconds)..."))
+    
+    Sys.sleep(1)  # Brief pause before retry
+    
+    # Retry with longer wait time
+    result1 <- wait_for_permit_detail_load(url, max_wait = retry_wait_time)
+    Sys.sleep(1)
+    result2 <- wait_for_permit_detail_load(url=paste0(url,url_suffix), max_wait=retry_wait_time)
+    is_retry <- TRUE
+    
+    if(result1$status == "success") {
+      message("✓ Retry successful!")
+    } else {
+      message(paste("✗ Retry also failed with status:", result1$status))
+    }
+  }
+  
+  # Use custom function to get general data fields, passing all tracking info
+  permits_detailed <- extract_permit_data_detailed(
+    html_content_main = result1$html,
+    response_status = result1$status,
+    html_content_locations=result2$html,
+    ain = ain,
+    permit_number=permit_number,
+    retried = is_retry)
+  
+  return(permits_detailed)
+}
+
