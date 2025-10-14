@@ -1,4 +1,4 @@
-# Objective: Scrape two different sites for information on building permits
+# Objective: Scrape LA County Permit Portal for information on building permits
 # for thousands of addresses/parcels, and assess possibility of regularly 
 # scraping these sites.
 
@@ -56,11 +56,8 @@ if (file.exists(csv_filepath)) {
                         encoding = "UTF-8",
                         colClasses = c("character"))
   
-  na_ains <- prev_data  %>% filter(is.na(record_id)) %>% select(response_status) %>% rename(ain=response_status)
-  
   scraped_ains <- prev_data %>%
     select(ain) %>%
-    rbind(na_ains) %>%
     unique()
   
   remaining <- data.frame(ain=setdiff(unique_ains, scraped_ains))
@@ -102,6 +99,9 @@ for (row_ in 1:nrow(remaining)) {
                 fileEncoding = "UTF-8",
                 quote = TRUE,
                 qmethod = "double")
+  
+  include_headers <- FALSE
+  append_value <- TRUE
   
   Sys.sleep(3)
 }
