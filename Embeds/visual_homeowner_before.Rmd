@@ -60,7 +60,7 @@ table<- res_type_housing_jan2025 %>%
   select("Area","Residential Type", "Housing Stock", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
   # question
-  tab_header(title=glue::glue(""))%>%
+  tab_header(title=glue::glue("The majority of Alatadena comprises of single-family homes before the fire"))%>%
   # any data notes in footer
   tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025."),placement="left") 
 
@@ -97,3 +97,6 @@ table<- res_type_housing_jan2025 %>%
 ```
 
 
+```{r, include=FALSE}
+dbDisconnect(con) 
+```
