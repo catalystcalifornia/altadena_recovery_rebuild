@@ -123,7 +123,7 @@ for (row_ in 1:nrow(remaining)) {
   include_headers <- FALSE
   append_value <- TRUE
   
-  Sys.sleep(2)
+  Sys.sleep(1)
 }
 
 #### Get final data and export to pg
