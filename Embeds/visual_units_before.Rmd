@@ -41,7 +41,8 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-The majority of Alatadena comprises of single-family homes before the fire
+Overall, West Altadena has a higher number of rental units than East Altadena at a count of almost 6,800. 80% of single-family homes have rental units in West Altadena. 77% of single-family homes have rental units in East Altadena. All of Altadena has much more comparable rental units across different property types.  
+
 ```{r}
 #### VISUAL ####
 df <- st_read(con, query="Select res_type, area, rent_units, prc_rent from data.analysis_units_jan2025") %>%

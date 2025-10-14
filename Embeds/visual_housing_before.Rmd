@@ -41,9 +41,10 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-The majority of Alatadena comprises of single-family homes before the fire
+Altadena is largely comprise of mostly single-family homes at 91% before the fires in early January 2025. West Altadena has a higher count of single-family homes than East Altadena but they share the same percentage of these homes in their respective areas. Of the differing residential types, condominiums are least likely to be found in the Altadena area.  
+
 ```{r}
-#### VISUAL: Residential Housing Types in Altadena, East Altadena, West Altadena, before the fire ####
+#### VISUAL ####
 df <- st_read(con, query="Select * from data.analysis_restype_jan2025") %>%
   filter(res_type != "Boarding house") %>% 
 pivot_longer(

@@ -40,12 +40,13 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-East Altadena homes have a higher square footage on average compared to West Altadena 
+Across Altadena, multifamily homes have the highest average square footage at 2,911 square feet. Overall, East Altadena homes have a higher average square footage than those in West Altadena with the exception of condominiums. Condominiums in West Altadena on average have 300 more square footage than the ones in East Altadena. 
+
 ```{r}
-#### VISUAL: Average square footage of residential properties prior to the fire in Altadena, East Altadena, West Altadena ####
+#### VISUAL ####
 df <- st_read(con, query="Select res_type, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_jan2025") %>%
   filter(res_type != "Boarding house") %>% 
-  mutate("Average Square Footage"=paste0(comma(round(sqftg_avg,0))," sqftg"),
+  mutate("Average Square Footage"=paste0(comma(round(sqftg_avg,0))," square feet"),
          " "=sqftg_avg,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%

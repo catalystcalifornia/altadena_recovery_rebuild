@@ -40,7 +40,8 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-East Altadena has a few more homeowners but overall the region is made up of majority homeowners
+Many homes in Altadena are occupied by homeowners rather than renters. Overall, 45% of folks in Altadena own their home, a rate comparable to the county of Los Angeles. Families and residents in East Altadena are more likely to own their home with 50% reporting being homeowners and only 42% reporting owning their homes at 42%. It is also noteworthy that more than 30% neither own or rent and therefore, further research into this category is recommended.  
+
 ```{r}
 #### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
 df <- st_read(con, query="Select * from data.analysis_owner_renter_jan2025") %>%

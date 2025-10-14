@@ -40,7 +40,8 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-East Altadena has a few more homeowners but overall the region is made up of majority homeowners
+Unfortunately, many of the homes lost were of those who were homeowners. Similarly, renters also lost their homes at comparable rates. The statistics from this analysis do not reveal any major discrepancies in lost of homes dependent on home ownership for all of Altadena. The outputs for West Altadena do find that many more homeowners lost their properties than homeowners in East Altadena at 60% compared to 32%. Similarly, a greater number of renters lost their homes in West Altadena than in East Altadena.   
+
 ```{r}
 #### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
 df <- st_read(con, query="Select * from data.analysis_owner_renter_damage") %>%

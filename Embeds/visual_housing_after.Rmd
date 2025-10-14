@@ -41,9 +41,10 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-The majority of Alatadena comprises of single-family homes before the fire
+Across Altadena, families and residents have lost homes irrespective of residential type. The majority of homes lost are single-family homes and West Altadena faces a higher loss overall of single-family homes compared to East Altadena. More than half of the single-family homes in West Altadena, around 55%, are significantly damaged or destroyed. In comparison, 31% of single-family homes in East Altadena are significantly damaged or destroyed. While the devastation of the fires impacted all of Altadena, there is a slightly greater loss of the West parts of Altadena.  
+
 ```{r}
-#### VISUAL: Residential Housing Types in Altadena, East Altadena, West Altadena, before the fire ####
+#### VISUAL ####
 df <- st_read(con, query="Select * from data.analysis_restype_damage") %>%
   filter(res_type != "Boarding house",
          damage_category == "Significant Damage") %>% 

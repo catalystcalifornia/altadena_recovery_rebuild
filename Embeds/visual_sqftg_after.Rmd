@@ -40,13 +40,14 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-East Altadena homes have a higher square footage on average compared to West Altadena 
+Unfortunately, the average square footage lost reveals the devastation felt across Altadena. The average square footage lost in homes that are significantly damaged or destroyed is almost all of the previous square footage prior to the fires. The average square footage loss numerizes how many of these damaged homes are unlivable and cannot be returned to.  
+
 ```{r}
-#### VISUAL: Average square footage of residential properties after the fire in Altadena, East Altadena, West Altadena ####
+#### VISUAL ####
 df <- st_read(con, query="Select res_type, damage_category, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_damage") %>%
   filter(res_type != "Boarding house",
          damage_category == "Significant Damage") %>% 
-  mutate("Average Square Footage Lost"=paste0(comma(round(sqftg_avg,0))," sqftg"),
+  mutate("Average Square Footage Lost"=paste0(comma(round(sqftg_avg,0))," square feet"),
          " "=sqftg_avg,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%

@@ -41,7 +41,8 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-The majority of Alatadena comprises of single-family homes before the fire
+West Altadena suffers the highest loss of rental units overall by count of homes that are significant damaged or destroyed. West Altadena renters also lost properties at rates higher than those in East Altadena.  
+
 ```{r}
 #### VISUAL ####
 df <- st_read(con, query="Select res_type, damage_category, area, rent_units, prc_rent from data.analysis_units_damage") %>%
