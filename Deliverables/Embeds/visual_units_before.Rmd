@@ -2,9 +2,10 @@
 title: ""
 output: html_document
 css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
 ---
 
-```{r setup, include=FALSE}
+```{r, include=FALSE}
 knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
 )
 
@@ -40,28 +41,28 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-Unfortunately, the average square footage lost reveals the devastation felt across Altadena. The average square footage lost in homes that are significantly damaged or destroyed is almost all of the previous square footage prior to the fires. The average square footage loss numerizes how many of these damaged homes are unlivable and cannot be returned to.  
+Overall, West Altadena has a higher number of rental units than East Altadena at a count of almost 6,800. 80% of single-family homes have rental units in West Altadena. 77% of single-family homes have rental units in East Altadena. All of Altadena has much more comparable rental units across different property types.  
 
 ```{r}
 #### VISUAL ####
-df <- st_read(con, query="Select res_type, damage_category, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_damage") %>%
-  filter(res_type != "Boarding house",
-         damage_category == "Significant Damage") %>% 
-  mutate("Average Square Footage Lost"=paste0(comma(round(sqftg_avg,0))," square feet"),
-         " "=sqftg_avg,
+df <- st_read(con, query="Select res_type, area, rent_units, prc_rent from data.analysis_units_jan2025") %>%
+  filter(res_type != "Boarding house") %>% 
+  mutate("Count (%)"=paste0(comma(rent_units)," (",round(prc_rent,0),"%)"),
+         "Rental Units"=prc_rent,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(sqftg_sum)) 
+  arrange(desc(rent_units)) 
 
 
 table<- df %>%
-  select("Area","Residential Type", " ", "Average Square Footage Lost")%>%
+  select("Area","Residential Type", "Rental Units", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
+  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= ' ', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Rental Units', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   cols_width(1~px(210),2~px(100),
              3~px(125))%>%
@@ -89,7 +90,9 @@ table<- df %>%
    tab_style(style=
             cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
 
+
 ```
+
 
 ```{r, include=FALSE}
 dbDisconnect(con) 

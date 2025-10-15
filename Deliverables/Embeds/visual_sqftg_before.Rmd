@@ -2,10 +2,9 @@
 title: ""
 output: html_document
 css: "W:\\RDA Team\\R\\cc_brandguide.css"
-
 ---
 
-```{r setup, include=FALSE}
+```{r, include=FALSE}
 knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
 )
 
@@ -41,36 +40,33 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-Altadena is largely comprise of mostly single-family homes at 91% before the fires in early January 2025. West Altadena has a higher count of single-family homes than East Altadena but they share the same percentage of these homes in their respective areas. Of the differing residential types, condominiums are least likely to be found in the Altadena area.  
+
+In January 2025, across Altadena, multifamily homes had the highest average square footage at 2,911 square feet. Overall, East Altadena homes had a higher average square footage than those in West Altadena with the exception of condominiums. Condominiums in West Altadena on average had 300 more square footage than the ones in East Altadena. In West Altadena, the average single-family home was 1,571 square feet.
 
 ```{r}
 #### VISUAL ####
-df <- st_read(con, query="Select * from data.analysis_restype_jan2025") %>%
+df_ <- st_read(con, query="Select res_type, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_jan2025") 
+
+df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
-pivot_longer(
-    cols = -res_type,
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(count|prc)" 
-  ) %>%
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
-         "Housing Stock"=prc,
+  mutate(" "=paste0(comma(round(sqftg_avg,0))," sqft"),
+         "Average Square Footage"=sqftg_avg,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(count)) 
+  arrange(desc(sqftg_sum)) 
 
 
 table<- df %>%
-  select("Area","Residential Type", "Housing Stock", "Count (%)")%>%
+  select("Area","Residential Type", "Average Square Footage", " ")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
-  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025."),placement="left") 
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Housing Stock', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Average Square Footage', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   cols_width(1~px(210),2~px(100),
-             3~px(125))%>%
+             3~px(150))%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
@@ -95,9 +91,7 @@ table<- df %>%
    tab_style(style=
             cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
 
-
 ```
-
 
 ```{r, include=FALSE}
 dbDisconnect(con) 
