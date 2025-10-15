@@ -83,23 +83,23 @@ EMG
 ```
 
 ## Residential Housing Types
-Housing types in Altadena, East Altadena, West Altadena, before the fire
-```{r}
+
+```{r restype-before, child='Embeds/visual_housing_before.Rmd',echo=FALSE}
 ```
 
 ## Homeowner and Rental Properties
 Distribution of homeowner and rental properties prior to the fire in Altadena, East Altadena, West Altadena
-```{r}
+```{r owner-before, child='Embeds/visual_homeowner_before.Rmd', echo=FALSE}
 ```
 
 ## Residential Unit Types
 Total and types of units prior to the fire in Altadena, East Altadena, West Altadena
-```{r}
+```{r units-before, child='Embeds/visual_units_before.Rmd', echo=FALSE}
 ```
 
 ## Square Footage
 Average square footage of residential properties prior to the fire in Altadena, East Altadena, West Altadena
-```{r}
+```{r sqfeet-before, child='Embeds/visual_sqftg_before.Rmd', echo=FALSE}
 ```
 
 # Characteristics of Properties Significantly Damaged -- MTK
@@ -111,22 +111,22 @@ Average square footage of residential properties prior to the fire in Altadena, 
 
 ## Types of Residential Housing Types Lost
 Distribution of housing types destroyed or damaged in Altadena, East, West compared to original percentages
-```{r}
+```{r restype-after, child='Embeds/visual_housing_after.Rmd', echo=FALSE}
 ```
 
 ## Homeowner and Rental Properties Lost
 Distribution of homeowner and rental properties destroyed or damaged in Altadena, East, West compared to original percentages
-```{r}
+```{r owner-after, child='Embeds/visual_homeowner_after.Rmd', echo=FALSE}
 ```
 
 ## Residential Units Lost
 Total and types of units destroyed or damaged in Altadena, East, West
-```{r}
+```{r units-after, child='Embeds/visual_units_after.Rmd', echo=FALSE}
 ```
 
 ## Average Square Footage Lost
 Average square footage of residential properties destroyed or damaged in Altadena, East, West compared to original percentages
-```{r}
+```{r sqftg-after, child='Embeds/visual_sqftg_after.Rmd', echo=FALSE}
 ```
 
 # Changes Since the Fire -- EMG or JZ
