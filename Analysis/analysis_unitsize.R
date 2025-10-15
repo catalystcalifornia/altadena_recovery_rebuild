@@ -116,7 +116,7 @@ analysis_multifamily_damage_jz <- all_df %>%
   filter(damage_category == "Significant Damage",
          res_type == "Multifamily") %>% 
   group_by(total_units) %>%
-  summarise(count_unit = sum(!is.na(unit_number)),
+  summarise(count_unit = sum(!is.na(total_units)),
             avg_unit_size = mean(total_units, na.rm = TRUE),
             med_unit_size = median(total_units, na.rm = TRUE),
             .groups = "drop") %>%
@@ -185,6 +185,24 @@ add_table_comments(con, schema, table_name, indicator, source, qa_filepath, colu
 #   "median unit size",
 #   "percentge unit size") 
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
+
+dbWriteTable(con, name = "analysis_multifamily_damage_jz", value = analysis_multifamily_damage, overwrite = FALSE)
+schema <- "data"
+table_name <- "analysis_multifamily_damage_jz"
+indicator <- "Data on the multifamily units lost (significant damage), what were their sizes? e.g., what was the average unit size, what was the median size, what percentage were 2 units, 3-4 units, or 5 or more units"
+source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
+column_names <- colnames(analysis_multifamily_damage) # Get column names
+column_comments <- c(
+  "number of n units",
+  "count of units of this many",
+  "average unit size",
+  "median unit size",
+  "percentge unit size")
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
+
 
 #### Step 7: close connection ####
 dbDisconnect(con)
