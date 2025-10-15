@@ -101,38 +101,47 @@ analysis_multifamily_damage <- all_df %>%
   ) %>%
   rename(num_of_units = total_units)
 
-# Adding some QA code
-qa<-all_df%>% filter(damage_category == "Significant Damage",
-                     res_type == "Multifamily")
-
 # JZ QA alternative code------------
 
 # I am unclear if by total units we mean, the sum of the units (already in Maria's original code)
 # OR if it should be the count of n-unit units. i.e) how many 5-unit units or how many 13-unit units are there?
-# I am just going to make an alternative analysis with this different interpretation
+# I also am interpreting the average/median size of units out of ALL multifamily severly damaged units.
+# I am just going to make an alternative analysis with my different interpretation and if it is completely wrong it can be deleted.
+# I am NOT overwriting Maria's original analysis_multifamily_damage table in postgres
 
 analysis_multifamily_damage_jz <- all_df %>% 
   mutate(damage_category = ifelse(is.na(damage_category), "No Damage", damage_category)) %>%
   filter(damage_category == "Significant Damage",
          res_type == "Multifamily") %>% 
+  
+  # this is my interpretation of average/median unit size I assumed it was out of all the multifamily severly damaged units
+  # what is the average unit size and median unit size:
+  
+  mutate(total=n(), # grabbing a total for just total multifamily severely damaged units
+    avg_unit_size = mean(total_units, na.rm = TRUE),
+    med_unit_size = median(total_units, na.rm = TRUE),
+    .groups = "drop") %>%
+  
   group_by(total_units) %>%
-  summarise(count_unit = sum(!is.na(total_units)),
-            avg_unit_size = mean(total_units, na.rm = TRUE),
-            med_unit_size = median(total_units, na.rm = TRUE),
-            .groups = "drop") %>%
-  mutate(prc_unit_size = count_unit/sum(count_unit)*100,
-         total_units = as.character(total_units)) %>%
-  bind_rows( #adding a row for all units
-    summarise(
-      ., 
-      total_units = "all units",
-      count_unit = sum(count_unit),
-      avg_unit_size = sum(count_unit) / nrow(.),  
-      med_unit_size = median(med_unit_size),
-      prc_unit_size = sum(count_unit) / sum(count_unit) * 100  
-    )
-  ) %>%
-  rename(num_of_units = total_units)
+  
+  # my interpretation of the numerator we nede for prc calcs is to take the count of each n-unit type. i.e.) how many 5-unit multifamily residents are there
+  mutate(count_unit = sum(!is.na(total_units)),
+         total_units=as.numeric(total_units))%>%
+  
+ungroup()%>%
+  mutate(total_5more_units=sum(!is.na(count_unit)[total_units>=5]))%>%
+  group_by(total_units)%>%
+         
+         # calculate prc unit size for units that are less than 5, and then for all units 
+         # greater than 5, make the numerator the sum of all the units greater than 5 and divide that by the total
+       mutate(prc_unit_size = ifelse(total_units<5, count_unit/total*100,
+                                total_5more_units / total * 100)) %>%
+  slice(1)%>%
+  rename(num_of_units=total_units)%>%
+  select(num_of_units, count_unit, avg_unit_size, med_unit_size, prc_unit_size)%>%
+  arrange(num_of_units)%>%
+  mutate(num_of_units=as.character(num_of_units))
+ 
 
 
 #### Step 6: Upload tables to postgres and add table/column comments ####
@@ -187,7 +196,7 @@ add_table_comments(con, schema, table_name, indicator, source, qa_filepath, colu
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
-dbWriteTable(con, name = "analysis_multifamily_damage_jz", value = analysis_multifamily_damage, overwrite = FALSE)
+dbWriteTable(con, name = "analysis_multifamily_damage_jz", value = analysis_multifamily_damage, overwrite = TRUE)
 schema <- "data"
 table_name <- "analysis_multifamily_damage_jz"
 indicator <- "Data on the multifamily units lost (significant damage), what were their sizes? e.g., what was the average unit size, what was the median size, what percentage were 2 units, 3-4 units, or 5 or more units"
@@ -199,7 +208,7 @@ column_comments <- c(
   "count of units of this many",
   "average unit size",
   "median unit size",
-  "percentge unit size")
+  "percentge unit size. Unit size greater than 5 is all agggregated and it is the percent of all units that are 5 or greater.")
 add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
