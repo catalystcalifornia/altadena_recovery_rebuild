@@ -39,7 +39,7 @@ unique_ains <- altadena_parcels %>%
   unique
 
 # set some metadata for exporting results
-table_name <- paste("general_permit_data", 
+table_name <- paste("scraped_general_permit_data", 
                     strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
                     strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
                     sep="_") 

@@ -7,17 +7,17 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 source("Data Prep\\scraping_functions.R")
 
 # set some metadata for exporting results
-general_table_name <- paste("general_permit_data", 
-                    strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
-                    strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
-                    sep="_") 
+general_table_name <- paste("scraped_general_permit_data", 
+                            strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
+                            strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
+                            sep="_") 
 
-detailed_table_name <- paste("detailed_permit_data", 
+detailed_table_name <- paste("scraped_detailed_permit_data", 
                              strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
                              strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
                              sep="_") 
 
-workflow_table_name <- paste("workflow_permit_data", 
+workflow_table_name <- paste("scraped_workflow_permit_data", 
                              strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
                              strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
                              sep="_") 
@@ -83,7 +83,7 @@ for (row_ in 1:nrow(remaining)) {
   row_permit <- remaining[row_, "permit_number"]
   permit_href <- remaining[row_, "permit_href"]
   permit_url <- paste0(base_url, permit_href,"/")
-
+  
   # note: should add flag to know when page is loaded (<div class="form-group" id="focusText" tabindex="1"><label>Permit Number:</label><span class="ng-binding">UNC-BLDR250826010738</span></div>)
   message(paste(row_, ":", permit_url))
   results <- scrape_permits_detailed(
@@ -129,8 +129,8 @@ for (row_ in 1:nrow(remaining)) {
 #### Get final data and export to pg
 
 final_detailed_data <- read.csv(detailed_csv_filepath,
-                       encoding = "UTF-8",
-                       colClasses = c("character"))
+                                encoding = "UTF-8",
+                                colClasses = c("character"))
 
 final_workflow_data <- read.csv(workflow_csv_filepath,
                                 encoding = "UTF-8",
