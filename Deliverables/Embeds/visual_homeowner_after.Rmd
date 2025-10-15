@@ -40,19 +40,24 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-Unfortunately, many of the homes lost were of those who were homeowners. Similarly, renters also lost their homes at comparable rates. The statistics from this analysis do not reveal any major discrepancies in lost of homes dependent on home ownership for all of Altadena. The outputs for West Altadena do find that many more homeowners lost their properties than homeowners in East Altadena at 60% compared to 32%. Similarly, a greater number of renters lost their homes in West Altadena than in East Altadena.   
+
+Unfortunately, many homeowners and renters in Altadena lost their homes in the fire. A greater share of homeowners and renters in West Altadena lost their properties compared to homeowners and renters in East Altadena. In West Altadena, 60% of owner-occupied properties were significantly damaged or destroyed compared to 32% in East Altadena. Similarly, a greater number of renters lost their homes in West Altadena than in East Altadena.   
 
 ```{r}
 #### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
-df <- st_read(con, query="Select * from data.analysis_owner_renter_damage") %>%
-    filter(damage_category == "Significant Damage") %>%
+df_ <- st_read(con, query="Select * from data.analysis_owner_renter_damage") 
+
+df <- df_ %>%
+    filter(damage_category == "Significant Damage") 
+
+df <- df %>%
 pivot_longer(
-    cols = -owner_renter,
+    cols = -c(damage_category,owner_renter),
     names_to = c("area", ".value"),
     names_pattern = "(altadena|west|east)_(count|prc)" 
   ) %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
-         "Housing Loss"=prc,
+         "Share of Housing Type Lost"=prc,
          "Owner/Renter" = owner_renter,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -60,16 +65,16 @@ pivot_longer(
 
 
 table<- df %>%
-  select("Area","Owner/Renter", "Housing Loss", "Count (%)")%>%
+  select("Area","Owner/Renter", "Share of Housing Type Lost", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Owner/Renter") %>%
   # tab_header(title= str_wrap("East Altadena has a few more homeowners but overall the region is made up of majority homeowners", width = 20))%>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
- table%>%
-  gt_plt_bar_pct(column= 'Housing Loss', scaled=TRUE, fill=meteorite, background="transparent")%>%
+ table %>%
+  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
-  cols_width(1~px(210),2~px(100),
-             3~px(125))%>%
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
