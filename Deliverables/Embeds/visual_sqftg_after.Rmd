@@ -40,15 +40,18 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-Unfortunately, the average square footage lost reveals the devastation felt across Altadena. The average square footage lost in homes that are significantly damaged or destroyed is almost all of the previous square footage prior to the fires. The average square footage loss numerizes how many of these damaged homes are unlivable and cannot be returned to.  
+
+Unfortunately, the average square footage lost reveals the devastation felt across Altadena. In West Altadena, the average square footage of single-family homes significantly damaged or destroyed is 1,533 square feet. This is comparable to the average square footage of all single-family homes in West Altadena before the after. The average square footage of significantly damaged or destroyed single-family and multifamily homes in East Altadena is greater than West Altadena, reflecting differences between these areas in their average home size before the fires. For residents to recuperate their housing lost, they would need the funds to at least replace the square footage of their original properties. Multifamily properties need to recuperate more square footage compared to single-family homes.
 
 ```{r}
 #### VISUAL ####
-df <- st_read(con, query="Select res_type, damage_category, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_damage") %>%
+df_ <- st_read(con, query="Select res_type, damage_category, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_damage") 
+
+df <- df_ %>%
   filter(res_type != "Boarding house",
          damage_category == "Significant Damage") %>% 
-  mutate("Average Square Footage Lost"=paste0(comma(round(sqftg_avg,0))," square feet"),
-         " "=sqftg_avg,
+  mutate(" "=paste0(comma(round(sqftg_avg,0))," sqft"),
+         "Average Square Footage Lost"=sqftg_avg,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -56,15 +59,15 @@ df <- st_read(con, query="Select res_type, damage_category, area, sqftg_avg, sqf
 
 
 table<- df %>%
-  select("Area","Residential Type", " ", "Average Square Footage Lost")%>%
+  select("Area","Residential Type", "Average Square Footage Lost", " ")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= ' ', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Average Square Footage Lost', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   cols_width(1~px(210),2~px(100),
-             3~px(125))%>%
+             3~px(190),4~px(100))%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,

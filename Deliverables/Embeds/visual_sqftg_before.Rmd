@@ -40,14 +40,17 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-Across Altadena, multifamily homes have the highest average square footage at 2,911 square feet. Overall, East Altadena homes have a higher average square footage than those in West Altadena with the exception of condominiums. Condominiums in West Altadena on average have 300 more square footage than the ones in East Altadena. 
+
+In January 2025, across Altadena, multifamily homes had the highest average square footage at 2,911 square feet. Overall, East Altadena homes had a higher average square footage than those in West Altadena with the exception of condominiums. Condominiums in West Altadena on average had 300 more square footage than the ones in East Altadena. In West Altadena, the average single-family home was 1,571 square feet.
 
 ```{r}
 #### VISUAL ####
-df <- st_read(con, query="Select res_type, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_jan2025") %>%
+df_ <- st_read(con, query="Select res_type, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_jan2025") 
+
+df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
-  mutate("Average Square Footage"=paste0(comma(round(sqftg_avg,0))," square feet"),
-         " "=sqftg_avg,
+  mutate(" "=paste0(comma(round(sqftg_avg,0))," sqft"),
+         "Average Square Footage"=sqftg_avg,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -55,15 +58,15 @@ df <- st_read(con, query="Select res_type, area, sqftg_avg, sqftg_sum from data.
 
 
 table<- df %>%
-  select("Area","Residential Type", " ", "Average Square Footage")%>%
+  select("Area","Residential Type", "Average Square Footage", " ")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025."),placement="left") 
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= ' ', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Average Square Footage', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   cols_width(1~px(210),2~px(100),
-             3~px(125))%>%
+             3~px(150))%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
