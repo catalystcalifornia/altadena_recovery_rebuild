@@ -39,9 +39,9 @@ analysis_units_jan2025 <- all_df %>%
   summarise(altadena_tot_units = sum(total_units, na.rm = TRUE),
             altadena_rent_units = sum(landlord_units, na.rm = TRUE),
             west_tot_units = sum(total_units[area_name == "West"], na.rm = TRUE),
-            west_rent_units = sum(total_units[area_name == "West"], na.rm = TRUE),
+            west_rent_units = sum(landlord_units[area_name == "West"], na.rm = TRUE),
             east_tot_units = sum(total_units[area_name == "East"], na.rm = TRUE),
-            east_rent_units = sum(total_units[area_name == "East"], na.rm = TRUE),
+            east_rent_units = sum(landlord_units[area_name == "East"], na.rm = TRUE),
             .groups = "drop") %>%
   mutate(altadena_prc_tot = altadena_tot_units/sum(altadena_tot_units)*100,
          altadena_prc_rent = altadena_rent_units/sum(altadena_rent_units)*100,
@@ -61,9 +61,9 @@ analysis_units_damage <- all_df %>%
   summarise(altadena_tot_units = sum(total_units, na.rm = TRUE),
             altadena_rent_units = sum(landlord_units, na.rm = TRUE),
             west_tot_units = sum(total_units[area_name == "West"], na.rm = TRUE),
-            west_rent_units = sum(total_units[area_name == "West"], na.rm = TRUE),
+            west_rent_units = sum(landlord_units[area_name == "West"], na.rm = TRUE),
             east_tot_units = sum(total_units[area_name == "East"], na.rm = TRUE),
-            east_rent_units = sum(total_units[area_name == "East"], na.rm = TRUE),
+            east_rent_units = sum(landlord_units[area_name == "East"], na.rm = TRUE),
             .groups = "drop") %>%
   mutate(altadena_prc_tot = altadena_tot_units/sum(altadena_tot_units)*100,
          altadena_prc_rent = altadena_rent_units/sum(altadena_rent_units)*100,
@@ -101,45 +101,76 @@ analysis_multifamily_damage <- all_df %>%
   ) %>%
   rename(num_of_units = total_units)
 
+# Adding some QA code
+qa<-all_df%>% filter(damage_category == "Significant Damage",
+                     res_type == "Multifamily")
 
+# JZ QA alternative code------------
+
+# I am unclear if by total units we mean, the sum of the units (already in Maria's original code)
+# OR if it should be the count of n-unit units. i.e) how many 5-unit units or how many 13-unit units are there?
+# I am just going to make an alternative analysis with this different interpretation
+
+analysis_multifamily_damage_jz <- all_df %>% 
+  mutate(damage_category = ifelse(is.na(damage_category), "No Damage", damage_category)) %>%
+  filter(damage_category == "Significant Damage",
+         res_type == "Multifamily") %>% 
+  group_by(total_units) %>%
+  summarise(count_unit = sum(!is.na(unit_number)),
+            avg_unit_size = mean(total_units, na.rm = TRUE),
+            med_unit_size = median(total_units, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(prc_unit_size = count_unit/sum(count_unit)*100,
+         total_units = as.character(total_units)) %>%
+  bind_rows( #adding a row for all units
+    summarise(
+      ., 
+      total_units = "all units",
+      count_unit = sum(count_unit),
+      avg_unit_size = sum(count_unit) / nrow(.),  
+      med_unit_size = median(med_unit_size),
+      prc_unit_size = sum(count_unit) / sum(count_unit) * 100  
+    )
+  ) %>%
+  rename(num_of_units = total_units)
 
 
 #### Step 6: Upload tables to postgres and add table/column comments ####
 # 
-# dbWriteTable(con, name = "analysis_units_jan2025", value = analysis_units_jan2025, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_units_jan2025"
-# indicator <- "Data on total units, total rental units (landlord_units column) in Altadena, West Altadena, East Altadena by residential type (e.g., total units in single family homes, total rental units in single family homes) in January 2025 (before the fire)"
-# source <- "Source: LA County Assessor Data, January 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
-# column_names <- colnames(analysis_units_jan2025) # Get column names
-# column_comments <- c(
-#   "type of residence",
-#   "area",
-#   "count of total units",
-#   "count of rental units",
-#   "percent of total units",
-#   "percent of rental units")
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-# 
-# dbWriteTable(con, name = "analysis_units_damage", value = analysis_units_damage, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_units_damage"
-# indicator <- "Data on total units lost, total rental units lost in Altadena, West Altadena, East Altadena by residential type (e.g., total rental units lost in multifamily homes) → count lost as significant damage, but include separately units that sustained some damage"
-# source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
-# column_names <- colnames(analysis_units_damage) # Get column names
-# column_comments <- c(
-#   "type of residence",
-#   "damage category",
-#   "area",
-#   "count of total units",
-#   "count of rental units",
-#   "percent of total units",
-#   "percent of rental units"
-# )
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-# 
+dbWriteTable(con, name = "analysis_units_jan2025", value = analysis_units_jan2025, overwrite = TRUE)
+schema <- "data"
+table_name <- "analysis_units_jan2025"
+indicator <- "Data on total units, total rental units (landlord_units column) in Altadena, West Altadena, East Altadena by residential type (e.g., total units in single family homes, total rental units in single family homes) in January 2025 (before the fire)"
+source <- "Source: LA County Assessor Data, January 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
+column_names <- colnames(analysis_units_jan2025) # Get column names
+column_comments <- c(
+  "type of residence",
+  "area",
+  "count of total units",
+  "count of rental units",
+  "percent of total units",
+  "percent of rental units")
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
+dbWriteTable(con, name = "analysis_units_damage", value = analysis_units_damage, overwrite = TRUE)
+schema <- "data"
+table_name <- "analysis_units_damage"
+indicator <- "Data on total units lost, total rental units lost in Altadena, West Altadena, East Altadena by residential type (e.g., total rental units lost in multifamily homes) → count lost as significant damage, but include separately units that sustained some damage"
+source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
+column_names <- colnames(analysis_units_damage) # Get column names
+column_comments <- c(
+  "type of residence",
+  "damage category",
+  "area",
+  "count of total units",
+  "count of rental units",
+  "percent of total units",
+  "percent of rental units"
+)
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
 # dbWriteTable(con, name = "analysis_multifamily_damage", value = analysis_multifamily_damage, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_multifamily_damage"
