@@ -41,11 +41,13 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-Altadena is largely comprise of mostly single-family homes at 91% before the fires in early January 2025. West Altadena has a higher count of single-family homes than East Altadena but they share the same percentage of these homes in their respective areas. Of the differing residential types, condominiums are least likely to be found in the Altadena area.  
+In January 2025 before the fire, Altadena was largely comprised of single-family homes. Approximately, 91% of housing in Altadena were single-family homes. West Altadena had a higher count of single-family homes than East Altadena but they shared the same percentage of these homes in their respective areas. Of the differing residential types, condominiums are least likely to be found in the Altadena area. Multifamily homes comprised just seven percent of housing in all parts of Altadena.
 
 ```{r}
 #### VISUAL ####
-df <- st_read(con, query="Select * from data.analysis_restype_jan2025") %>%
+df_ <- st_read(con, query="Select * from data.analysis_restype_jan2025") 
+
+df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
 pivot_longer(
     cols = -res_type,
@@ -53,7 +55,7 @@ pivot_longer(
     names_pattern = "(altadena|west|east)_(count|prc)" 
   ) %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
-         "Housing Stock"=prc,
+         "Share of Housing Stock"=prc,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -61,16 +63,16 @@ pivot_longer(
 
 
 table<- df %>%
-  select("Area","Residential Type", "Housing Stock", "Count (%)")%>%
+  select("Area","Residential Type", "Share of Housing Stock", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
   # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025."),placement="left") 
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Housing Stock', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Stock', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
-  cols_width(1~px(210),2~px(100),
-             3~px(125))%>%
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
