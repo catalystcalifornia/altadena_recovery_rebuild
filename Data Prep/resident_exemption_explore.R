@@ -126,3 +126,13 @@ table(rel_ain9$rental_flag) # None of them have rentals (as we'd expect)
 # "Delete Real Estate Exemption" means. Online it looks like it just means that property is no longer exempt
 # But the reason why can vary from failure to file, house sale, death etc.
 # The question here then is should these 4433 rows be recoded from 'Other' to 'Homeowner' ?
+
+# Lets also look at their usecodes
+
+table(rel_ain9$res_type) 
+
+# Notes:
+# There is one boarding house that should NOT be recoded as 'Homeowner'
+# But there are 4,260 Single-family res type that might need to be recoded as 'Homeowner' 
+
+# Condos and Multifamily I am not as sure
