@@ -138,25 +138,45 @@ final_workflow_data <- read.csv(workflow_csv_filepath,
 
 
 
-con <- connect_to_db("altadena_recovery_rebuild")
+# con <- connect_to_db("altadena_recovery_rebuild")
+# 
+# dbWriteTable(con, Id(schema="data", table_name=detailed_table_name), final_detailed_data,
+#              overwrite = FALSE, row.names = FALSE)
+# 
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.", detailed_table_name, " IS
+#             'Detailed permit data for Altadena parcels with some or significant damage,
+#             Data imported on ",date_ran, "
+#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
+#             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
+# 
+# dbWriteTable(con, Id(schema="data", table_name=workflow_table_name), final_workflow_data,
+#              overwrite = FALSE, row.names = FALSE)
+# 
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.", workflow_table_name, " IS
+#             'Extended detailed permit data that includes workflow items for Altadena parcels with some or significant damage,
+#             Data imported on ",date_ran, "
+#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
+#             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
+# 
+# dbDisconnect(con)
 
-dbWriteTable(con, Id(schema="data", table_name=detailed_table_name), final_detailed_data,
-             overwrite = FALSE, row.names = FALSE)
 
-dbSendQuery(con, paste0("COMMENT ON TABLE data.", detailed_table_name, " IS
-            'Detailed permit data for Altadena parcels with some or significant damage,
-            Data imported on ",date_ran, "
-            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
-            Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
 
-dbWriteTable(con, Id(schema="data", table_name=workflow_table_name), final_workflow_data,
-             overwrite = FALSE, row.names = FALSE)
-
-dbSendQuery(con, paste0("COMMENT ON TABLE data.", workflow_table_name, " IS
-            'Extended detailed permit data that includes workflow items for Altadena parcels with some or significant damage,
-            Data imported on ",date_ran, "
-            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
-            Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
-
-dbDisconnect(con)
-
+##### Combine and export CSV for MM and DRA #####
+# con <- connect_to_db("altadena_recovery_rebuild")
+# general_permits <- dbGetQuery(con, statement=paste0("SELECT * FROM data.", general_table_name))
+# detailed <- dbGetQuery(con, statement=paste0("SELECT * FROM data.", detailed_table_name)) %>%
+#   mutate(eaton_fire="Y")
+# workflow <- dbGetQuery(con, statement=paste0("SELECT * FROM data.", workflow_table_name))
+# dbDisconnect(con)
+# 
+# combined <- general_permits %>% 
+#   left_join(detailed, by=c("permit_number", "ain"), suffix=c(".general", ".detailed")) %>%
+#   mutate(eaton_fire = replace_na(eaton_fire, "N")) %>%
+#   left_join(workflow, by=c("permit_number", "ain"), suffix=c("", ".workflow")) %>% 
+#   select(ain, record_id, eaton_fire, permit_number, ends_with(".general"), permit_href, expiration_date, ends_with(".detailed"), ends_with(".workflow"), everything())
+# 
+# write.csv(combined, file="W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\ECI to review\\scraped_permit_data.csv",
+#           row.names=FALSE, fileEncoding="UTF-8")
+# 
+# colnames(combined)
