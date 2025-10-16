@@ -1,7 +1,8 @@
 ---
 title: ""
-output: html_document
-css: "W:\\RDA Team\\R\\cc_brandguide.css"
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
 ---
 
 ```{r, include=FALSE}
