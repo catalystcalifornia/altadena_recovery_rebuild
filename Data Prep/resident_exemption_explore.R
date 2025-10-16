@@ -107,14 +107,14 @@ ains_not_in_emg <- as.data.frame(unique(ain9[!ain9 %in% emg_ain])) #41,240 not i
 # Isolate those AINs and look deeper at them, first see how these AINs were recoded in the rel table
 
 rel_ain9<-emg_rel%>%
-  filter(ain %in% ains_in_emg$`unique(ain9[ain9 %in% emg_ain])`)
+  filter(ain %in% ain9)
 
 table(rel_ain9$owner_renter) # only 4433 recoded as 'Other' and 1078 recoded as 'Homeowner/Renter'
 
 # confirm these also don't have landlord_units
 
 rel_ain9<-emg_rel%>%
-  filter(ain %in% ains_in_emg$`unique(ain9[ain9 %in% emg_ain])`)%>%
+  filter(ain %in% ain9)%>%
   filter(owner_renter=="Other")%>%
   mutate(rental_flag=ifelse(landlord_units<1, "No rentals", "Rentals"))
 
