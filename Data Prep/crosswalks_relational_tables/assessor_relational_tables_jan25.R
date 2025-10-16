@@ -60,16 +60,16 @@ parcels_east <- st_join(assessor_parcels, east %>% select(name,label), join=st_w
 # for st_intersects -- 2 assessor parcels overlapping 5862005304 and 5843005901
 
 # check
-mapview(parcels_east) +
-  mapview(east) 
+# mapview(parcels_east) +
+#   mapview(east) 
 # looks good
 
 # parcels within west altadena
 parcels_west <- st_join(assessor_parcels, west %>% select(name,label), join=st_within, left=FALSE)
 
 # check
-mapview(parcels_west) +
-  mapview(west)
+# mapview(parcels_west) +
+#   mapview(west)
 # looks good
 
 # join together
@@ -311,13 +311,13 @@ rel_res_df_final <- rel_res_df %>%
 length(unique(rel_res_df_final$ain))
 nrow(rel_res_df_final) #same count
 
-table_name <- "rel_assessor_residential_jan2025"
-schema <- "data"
-indicator <- "Relational data table with summarized information and flags for residential and mixed use properties in Altadena as of January 2025. Only includes properties in either West or East Altadena proper"
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
-qa_filepath<-"  QA_sheet_relational_tables.docx "
-dbWriteTable(con_alt, Id(schema, table_name), rel_res_df_final,
-             overwrite = FALSE, row.names = FALSE)
+# table_name <- "rel_assessor_residential_jan2025"
+# schema <- "data"
+# indicator <- "Relational data table with summarized information and flags for residential and mixed use properties in Altadena as of January 2025. Only includes properties in either West or East Altadena proper"
+# source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
+# qa_filepath<-"  QA_sheet_relational_tables.docx "
+# dbWriteTable(con_alt, Id(schema, table_name), rel_res_df_final,
+#              overwrite = FALSE, row.names = FALSE)
 
 # Add metadata
 column_names <- colnames(rel_res_df_final) # Get column names
@@ -333,7 +333,7 @@ column_comments <- c('Assessor ID number - use this to match to other relational
                      'Total bedrooms on property',
                      'Original use code for reference')
 
-add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 # STEP 4: TABLE 2: Table to indicate West or East Altadena with geometry ------
 rel_area_geom_df <- parcels_altadena %>%
@@ -351,15 +351,15 @@ rel_area_geom_df <- rel_area_geom_df %>%
 # sum(as.numeric(unique(rel_res_df_final$ain))) # 75678334063382
 
 
-table_name <- "rel_assessor_altadena_parcels_jan2025"
-schema <- "data"
-indicator <- "Relational spatial table with geometries and area flags for residential/mixed use properties in either West or East Altadena proper"
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
-qa_filepath<-"  QA_sheet_relational_tables.docx "
-
-export_shpfile(con=con_alt, df=rel_area_geom_df, schema="data",
-               table_name= "rel_assessor_altadena_parcels_jan2025",
-               geometry_column = "geom")
+# table_name <- "rel_assessor_altadena_parcels_jan2025"
+# schema <- "data"
+# indicator <- "Relational spatial table with geometries and area flags for residential/mixed use properties in either West or East Altadena proper"
+# source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
+# qa_filepath<-"  QA_sheet_relational_tables.docx "
+# 
+# export_shpfile(con=con_alt, df=rel_area_geom_df, schema="data",
+#                table_name= "rel_assessor_altadena_parcels_jan2025",
+#                geometry_column = "geom")
 
 
 # Add metadata
@@ -370,7 +370,7 @@ column_comments <- c('Assessor ID number - use this to match to other relational
                      'West or East Altadena long label',
                      'geometry')
 
-add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
 
@@ -391,9 +391,9 @@ dins_xwalk_res <- dins_xwalk %>%
 length(unique(dins_xwalk_res$ain))
 length(unique(residential_ains$ain))
 # some parcels aren't assessed if they aren't in the fire perimeter
-mapview(dins_xwalk_res) +
-  mapview(eaton_fire,col.regions="red") +
-  mapview(parcels_altadena)
+# mapview(dins_xwalk_res) +
+#   mapview(eaton_fire,col.regions="red") +
+#   mapview(parcels_altadena)
 # looks pretty good, some holes are from commercial, parks, schools, etc.
 
 ## Create binary columns for each damage level -----
@@ -484,29 +484,42 @@ rel_assessor_dins %>%
 ## Clean up and push to postgres----
 rel_assessor_dins_final <- rel_assessor_dins %>%
   rowwise() %>%
-  mutate(damage_type_list=paste(damage_type_list,collapse=', ')) %>% # make list column easier to read
-  select(ain, damage_category,structure_count,mixed_damage,everything()) 
+  mutate(damage_type_list=paste(damage_type_list,collapse=', '), # make list column easier to read
+         source="CalFire DINS") %>% # add a source column so we know that it came from CalFire
+  select(ain, damage_category,source,structure_count,mixed_damage,everything()) 
 
 View(rel_assessor_dins_final)
 nrow(rel_assessor_dins_final)
 length(unique(rel_assessor_dins_final$ain))
 # final check of unique AINs, looks good
 
+# I want to add the unassessed properties too so we can easily loop over this relational table for analysis, so any properties not in the database is labeled as no damage
+residential_ains_no_damage <- residential_ains %>%
+  filter(!ain %in% rel_assessor_dins_final$ain) %>%
+  select(ain) %>%
+  mutate(damage_category="No Damage",
+         source="Assessor Parcel Outside of Fire Area")
+
+rel_assessor_dins_final_final <- bind_rows(rel_assessor_dins_final,residential_ains_no_damage)
+
+
 table_name <- "rel_assessor_damage_level"
 schema <- "data"
-indicator <- "Relational table that contains summarised damage levels for assessor IDS assessed by CalFire post the Eaton Fire, Unlike the damage inspection database, this table is at the unique parcel level rather than building level"
+indicator <- "Relational table that contains summarised damage levels for assessor IDS assessed by CalFire post the Eaton Fire, Unlike the damage inspection database, this table is at the unique parcel level rather than building level
+Table includes all residential parcels in Altadena. If they werent assessed then No Damage is assumed. The source column indicates if the parcel was assessed or we are assuming No Damage because outside of fire area and/or not assessed"
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
 qa_filepath<-"  QA_sheet_relational_tables.docx "
 
-# dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final,
+# dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final_final,
 #              overwrite = FALSE, row.names = FALSE)
 
 
 # Add metadata
-column_names <- colnames(rel_assessor_dins_final) # Get column names
+column_names <- colnames(rel_assessor_dins_final_final) # Get column names
 column_names
 column_comments <- c('Assessor ID number - use this to match to other relational tables',
                      'Overall damage category level -- top coded so highest damage level of a building on the property takes precedent',
+                     'Whether damage category is based on CalFire DINs or assumed because not in the database',
                      'Number of structures assessed by CalFire associated with AIN',
                      'Indicator for whether there was a one type of damage or two or more',
                      'total count for destroyed structures on property',
@@ -518,5 +531,5 @@ column_comments <- c('Assessor ID number - use this to match to other relational
                      'list of unique damage types assigned to property by CalFire',
                      'Total unique types of damage')
 
-add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
