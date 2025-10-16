@@ -41,15 +41,18 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-West Altadena suffers the highest loss of rental units overall by count of homes that are significant damaged or destroyed. West Altadena renters also lost properties at rates higher than those in East Altadena.  
+
+Across Altadena and residential housing types, about one in three rental units were lost in significantly damaged or destroyed properties. West Altadena rental units were hit the hardest. Nearly half of rental units in multifamily properties were significant damaged or destroyed in the fire. And over 40% of rental units in single-family homes in West Altadena were significantly damaged or destroyed. In order to return Altadena at least to the level of rental options existing before the fire, significant investments and strategic solutions to rebuilding rental properties is required.
 
 ```{r}
 #### VISUAL ####
-df <- st_read(con, query="Select res_type, damage_category, area, rent_units, prc_rent from data.analysis_units_damage") %>%
+df_ <- st_read(con, query="Select res_type, damage_category, area, rent_units, prc_rent from data.analysis_units_damage") 
+
+df <- df_ %>%
   filter(res_type != "Boarding house",
          damage_category == "Significant Damage") %>% 
   mutate("Count (%)"=paste0(comma(rent_units)," (",round(prc_rent,0),"%)"),
-         "Rental Units Lost"=prc_rent,
+         "Rental Units Lost in Housing Type"=prc_rent,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -57,16 +60,16 @@ df <- st_read(con, query="Select res_type, damage_category, area, rent_units, pr
 
 
 table<- df %>%
-  select("Area","Residential Type", "Rental Units Lost", "Count (%)")%>%
+  select("Area","Residential Type", "Rental Units Lost in Housing Type", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
   # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Rental Units Lost', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Rental Units Lost in Housing Type', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
-  cols_width(1~px(210),2~px(100),
-             3~px(125))%>%
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
