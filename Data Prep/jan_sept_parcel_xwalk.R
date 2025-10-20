@@ -32,8 +32,8 @@ parcels_sept <- st_read(con_alt, query="SELECT parcels.ain, parcels.geom, stats.
 
 # get assessor data: not sure if we need this though so commenting out for now
 
-# assessor_jan <- st_read(con_alt, query="Select * from data.assessor_data_universe_jan2025")
-# assessor_sept <- st_read(con_alt, query="Select * from data.assessor_data_universe_sept2025")
+ assessor_jan <- st_read(con_alt, query="Select * from data.assessor_data_universe_jan2025")
+ assessor_sept <- st_read(con_alt, query="Select * from data.assessor_data_universe_sept2025")
 
 # double check CRS of both of parcel shapes
 st_crs(parcels_jan)$epsg #3310 good
@@ -162,7 +162,7 @@ match_parcels_wide <- match_parcels %>%
       .default = "undefined status, please review")
   )
 
-# table(match_parcels_wide$status)
+table(match_parcels_wide$status)
 ## diff ain pair, simple xwalk ambiguous matches, needs closer look               run intersect by month              same ains, simple xwalk    uneven matches, needs closer look 
 ## 8                                    4                                  370                                54674                                   18 
 
@@ -173,7 +173,7 @@ same_ain <- match_parcels_wide %>%
   filter(status == "same ains, simple xwalk") 
 #54674
 
-# length(unique(same_ain$dupe_id)) # 44516
+ length(unique(same_ain$dupe_id)) # 44516
 
 same_ain_xwalk <- same_ain %>%
   select(ain, dupe_id) %>%
@@ -187,7 +187,7 @@ same_ain_xwalk <- same_ain %>%
 diff_ain <- match_parcels_wide %>%
   filter(status == "diff ain pair, simple xwalk") 
 
-# length(unique(diff_ain$dupe_id)) # 4
+ length(unique(diff_ain$dupe_id)) # 4
 
 diff_ain_xwalk <- diff_ain %>%
   group_by(dupe_id) %>%
@@ -200,7 +200,7 @@ diff_ain_xwalk <- diff_ain %>%
 ambiguous <- match_parcels_wide %>%
   filter(status == "ambiguous matches, needs closer look") 
 
-# length(unique(ambiguous$dupe_id)) # 2
+ length(unique(ambiguous$dupe_id)) # 2
 
 # note: these are two cases where the jan ain is for a parcel deleted in 2024 and the september ain is the correct parcel ain for that address
 # https://portal.assessor.lacounty.gov/parceldetail/5722013039
@@ -276,13 +276,15 @@ jan_ain_match <-jan_join %>%
   rename(ain_jan=ain,
          ain_sept=ain.1) %>%
   mutate(status="run intersect by month")
-# length(unique(jan_ain_match$ain)) # 151
+
+ length(unique(jan_ain_match$ain_jan)) # 151
 
 jan_leftover <- jan_join %>% 
   st_drop_geometry() %>%
   filter(!(ain %in% jan_ain_match$ain_jan)) %>% 
   filter(pct_jan_overlap>10)
-# length(unique(jan_leftover$ain)) # 42
+
+length(unique(jan_leftover$ain)) # 42
 
 # jan ain is a deleted parcel, should be revised to sept ain
 jan_revise_ain <- jan_leftover %>%
@@ -347,3 +349,40 @@ combined_xwalks <- bind_rows(intersect_jan_xwalk, uneven_xwalk, ambiguous_xwalk,
 # 
 # add_table_comments(con=con_alt, schema=schema,table_name=table_name,indicator = indicator, qa_filepath = qa_filepath,
 #                    source=source,column_names = colnames(combined_xwalks), column_comments = col_comments)
+
+# JZ QA 10/20----------------------------------------------
+
+# AINs in assessor_data_universe_jan2025 but NOT in combined_xwalk
+
+missing_in_xwalk <- assessor_jan %>%
+  anti_join(combined_xwalks, by = c("ain" = "ain_jan"))
+
+setdiff(assessor_jan, combined_xwalks)
+
+# AINs in combined_xwalk but NOT in assessor_data_universe_jan2025
+
+missing_in_assessor <- combined_xwalks %>%
+  anti_join(assessor_jan, by = c("ain_jan" = "ain")) # This produces 48 jan AINs that are in the xwalk but not in the assessor data
+
+# I want to see of those 48 jan AINS from the xwalk if their corresponding sept AIN is in the jan and sept assessor data:
+
+check_missing_sept_ain_in_jan_assessor <- assessor_jan %>%
+  filter(ain %in% missing_in_assessor$ain_sept)
+
+# Of the missing Jan AINs, one of the corresponding Sept AINs is in the Jan Assessor data --this one makes sense because it is the one with the updated jan AIN
+# So really there are only 47 Jan AINs in the xwalk missing in the Jan assessor data
+
+# Check missing ains in the sept assessor data:
+
+check_missing_jan_ain_in_sept_assessor <- assessor_sept %>%
+  filter(ain %in% missing_in_assessor$ain_jan)
+
+# of the 47 missing Jan AINs, 13 of them are NOT missing in the Sept Assessor data
+
+
+check_missing_sept_ain_in_sept_assessor <- assessor_sept %>%
+  filter(ain %in% missing_in_assessor$ain_sept) 
+
+# of the 47 missing Jan AINs, 15 of their corresponding Sept AINs are NOT missing in the Sept Assessor data
+
+
