@@ -1,7 +1,8 @@
 ---
 title: ""
-output: html_document
-css: "W:\\RDA Team\\R\\cc_brandguide.css"
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
 ---
 
 ```{r, include=FALSE}
@@ -68,7 +69,7 @@ table<- df %>%
   cols_width(1~px(210),2~px(100),
              3~px(150))%>%
   opt_align_table_header("left")%>%
-  opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",
     table.font.size = px(12),
@@ -89,7 +90,7 @@ table<- df %>%
   tab_style(style=
             cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
    tab_style(style=
-            cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+            cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
 
 ```
 

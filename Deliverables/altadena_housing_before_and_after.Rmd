@@ -76,7 +76,7 @@ MTK - bullets on findings from literature review
 # Key Findings
 EMG
 
-# Housing Stock Before the Fire -- MTK
+# Housing Stock Before the Fire
 
 ```{r}
 # map of all properties in East/West Altadena with layers for residential housing type, homeowner/renter, unit size, and square footage
@@ -92,17 +92,17 @@ EMG
 ```{r owner-before, child='Embeds/visual_homeowner_before.Rmd', echo=FALSE}
 ```
 
-<!-- ## Residential Unit Types -->
-<!-- Total and types of units prior to the fire in Altadena, East Altadena, West Altadena -->
-<!-- ```{r units-before, child='Embeds/visual_units_before.Rmd', echo=FALSE} -->
-<!-- ``` -->
+## Rental Unit Types
+
+```{r units-before, child='Embeds/visual_units_before.Rmd', echo=FALSE}
+```
 
 ## Square Footage
 
 ```{r sqfeet-before, child='Embeds/visual_sqftg_before.Rmd', echo=FALSE}
 ```
 
-# Characteristics of Properties Significantly Damaged -- MTK
+# Characteristics of Properties Significantly Damaged
 
 ```{r}
 # map of properties significant damaged or destroyed with layers for residential housing type, homeowner/renter, total units, square footage
@@ -119,17 +119,17 @@ EMG
 ```{r owner-after, child='Embeds/visual_homeowner_after.Rmd', echo=FALSE}
 ```
 
-<!-- ## Residential Units Lost -->
-<!-- Total and types of units destroyed or damaged in Altadena, East, West -->
-<!-- ```{r units-after, child='Embeds/visual_units_after.Rmd', echo=FALSE} -->
-<!-- ``` -->
+## Rental Units Lost
+
+```{r units-after, child='Embeds/visual_units_after.Rmd', echo=FALSE}
+```
 
 ## Average Square Footage Lost
 
 ```{r sqftg-after, child='Embeds/visual_sqftg_after.Rmd', echo=FALSE}
 ```
 
-# Changes Since the Fire -- EMG or JZ
+# Changes Since the Fire
 
 ```{r}
 # map of properties being sold or rebuilt
@@ -148,7 +148,7 @@ How many properties that have been damaged or rebuilt are in the rebuilding phas
 ```
 
 
-# Environmental and Zoning Considerations -- EMG
+# Environmental and Zoning Considerations
 
 ```{r}
 # map with damaged/destroyed properties and then lead, zoning, and fire hazard zones

@@ -1,7 +1,7 @@
 ---
 title: ""
-output: html_document
-css: "W:\\RDA Team\\R\\cc_brandguide.css"
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
 
 ---
 
@@ -41,14 +41,17 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-Overall, West Altadena has a higher number of rental units than East Altadena at a count of almost 6,800. 80% of single-family homes have rental units in West Altadena. 77% of single-family homes have rental units in East Altadena. All of Altadena has much more comparable rental units across different property types.  
+
+In January 2025, West Altadena had a higher number of rental units than East Altadena at a count of 2,340. A greater share of rental units in West Altadena were in single-family homes compared to East Altadena (45% compared to 37%). Across Altadena, over half of rental units were in multifamily properties.  
 
 ```{r}
 #### VISUAL ####
-df <- st_read(con, query="Select res_type, area, rent_units, prc_rent from data.analysis_units_jan2025") %>%
+df_ <- st_read(con, query="Select res_type, area, rent_units, prc_rent from data.analysis_units_jan2025") 
+
+df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
   mutate("Count (%)"=paste0(comma(rent_units)," (",round(prc_rent,0),"%)"),
-         "Rental Units"=prc_rent,
+         "Share of Rental Units"=prc_rent,
          "Residential Type" = res_type,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -56,18 +59,18 @@ df <- st_read(con, query="Select res_type, area, rent_units, prc_rent from data.
 
 
 table<- df %>%
-  select("Area","Residential Type", "Rental Units", "Count (%)")%>%
+  select("Area","Residential Type", "Share of Rental Units", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
   # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on LA County Assessor Data, Janaury 2025."),placement="left") 
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Rental Units', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Rental Units', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
-  cols_width(1~px(210),2~px(100),
-             3~px(125))%>%
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
   opt_align_table_header("left")%>%
-  opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",
     table.font.size = px(12),
@@ -88,7 +91,7 @@ table<- df %>%
   tab_style(style=
             cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
    tab_style(style=
-            cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+            cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
 
 
 ```
