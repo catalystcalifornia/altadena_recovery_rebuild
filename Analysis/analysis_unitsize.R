@@ -132,71 +132,143 @@ check <- analysis_units_damage  %>%
   summarise(sum=sum(all_units_prc,na.rm=TRUE),
             sum_=sum(rent_units_prc,na.rm=TRUE)) # looks good zeros are from boarding houses that had 0 counts and totals
 
-#### Step 5: THIRD ANALYSIS- [analysis_multifamily_damage] ####
-analysis_multifamily_damage <- all_df %>% 
-  mutate(damage_category = ifelse(is.na(damage_category), "No Damage", damage_category)) %>%
-  filter(damage_category == "Significant Damage",
-         res_type == "Multifamily") %>% 
-  group_by(total_units) %>%
-  summarise(count_unit = sum(total_units, na.rm = TRUE),
-            avg_unit_size = mean(total_units, na.rm = TRUE),
-            med_unit_size = median(total_units, na.rm = TRUE),
-            .groups = "drop") %>%
-  mutate(prc_unit_size = count_unit/sum(count_unit)*100,
-         total_units = as.character(total_units)) %>%
-  bind_rows( #adding a row for all units
-    summarise(
-      ., 
-      total_units = "all units",
-      count_unit = sum(count_unit),
-      avg_unit_size = sum(count_unit) / nrow(.),  
-      med_unit_size = median(med_unit_size),
-      prc_unit_size = sum(count_unit) / sum(count_unit) * 100  
-    )
+#### Step 5: THIRD ANALYSIS- [analysis_multifamily_jan2025] -- look at size of multifamily properties in january 2025 ####
+# filter for multifamily properties and add a field for the size of them grouping into categories
+all_df_multifamily <- all_df %>% 
+  filter(res_type == "Multifamily") %>% 
+  mutate(
+    multifamily_unit_category=
+      case_when(
+        total_units>0 & total_units<=2 ~ "Two Units",
+        total_units>2 & total_units<5 ~ "Three to Four Units",
+        total_units>=5 ~ "Five or More Units",
+        TRUE ~ NA
+      ))
+
+# check 
+check <- all_df_multifamily %>% group_by(multifamily_unit_category,total_units) %>% summarise(count=n())
+# looks good, one building with 0 units
+
+# run for east and west
+analysis_multifamily_e_w <- all_df_multifamily %>%
+  filter(!is.na(multifamily_unit_category)) %>% # filter out NA
+  group_by(area_name) %>%
+  mutate(property_total=n(), # grabbing a total for just total multifamily unit properties by area
+       unit_size_avg = mean(total_units, na.rm = TRUE), # average unit size for the area
+       unit_size_med = median(total_units, na.rm = TRUE) # median unit size for the area
+       ) %>%
+  ungroup() %>%
+  group_by(area_name,multifamily_unit_category,property_total,unit_size_avg,unit_size_med) %>%
+  summarise(property_count = n(), # properties in that category of multifamily units
+         property_prc=n()/property_total*100) %>% # out of multifamily properties what percent are in this category
+  slice(1)
+
+# check
+check <- all_df_multifamily %>%
+  filter(!is.na(multifamily_unit_category)) %>%
+  filter(area_name=='West') %>%
+  nrow() # checks out with total
+
+check <- all_df_multifamily %>%
+  filter(!is.na(multifamily_unit_category)) %>%
+  filter(area_name=='West') %>%
+  count(multifamily_unit_category) # checks out with the count fields
+
+# run for altadena overall
+analysis_multifamily_alt<- all_df_multifamily %>%
+  filter(!is.na(multifamily_unit_category)) %>%
+  mutate(property_total=n(), # grabbing a total for just total multifamily unit properties by area
+         unit_size_avg = mean(total_units, na.rm = TRUE), # average unit size for the area
+         unit_size_med = median(total_units, na.rm = TRUE) # median unit size for the area
   ) %>%
-  rename(num_of_units = total_units)
+  ungroup() %>%
+  group_by(multifamily_unit_category,property_total,unit_size_avg,unit_size_med) %>%
+  summarise(property_count = n(), # total properties in that category
+            property_prc=n()/property_total*100) %>%
+  slice(1)
 
-# JZ QA alternative code------------
+# check
+median(all_df_multifamily$total_units,na.rm=TRUE)
+mean(all_df_multifamily$total_units,na.rm=TRUE)
+# checks out
 
-# I am unclear if by total units we mean, the sum of the units (already in Maria's original code)
-# OR if it should be the count of n-unit units. i.e) how many 5-unit units or how many 13-unit units are there?
-# I also am interpreting the average/median size of units out of ALL multifamily severly damaged units.
-# I am just going to make an alternative analysis with my different interpretation and if it is completely wrong it can be deleted.
-# I am NOT overwriting Maria's original analysis_multifamily_damage table in postgres
+# bind together and clean up
+analysis_multifamily_jan2025 <- rbind(analysis_multifamily_alt %>%
+                                        mutate(area_name='Altadena'), 
+                                      analysis_multifamily_e_w) %>%
+  select(area_name,multifamily_unit_category, property_count,property_total,property_prc,unit_size_avg, unit_size_med)
 
-analysis_multifamily_damage_jz <- all_df %>% 
-  mutate(damage_category = ifelse(is.na(damage_category), "No Damage", damage_category)) %>%
-  filter(damage_category == "Significant Damage",
-         res_type == "Multifamily") %>% 
-  
-  # this is my interpretation of average/median unit size I assumed it was out of all the multifamily severly damaged units
-  # what is the average unit size and median unit size:
-  
-  mutate(total=n(), # grabbing a total for just total multifamily severely damaged units
-    avg_unit_size = mean(total_units, na.rm = TRUE),
-    med_unit_size = median(total_units, na.rm = TRUE),
-    .groups = "drop") %>%
-  
-  group_by(total_units) %>%
-  
-  # my interpretation of the numerator we nede for prc calcs is to take the count of each n-unit type. i.e.) how many 5-unit multifamily residents are there
-  mutate(count_unit = sum(!is.na(total_units)),
-         total_units=as.numeric(total_units))%>%
-  
-ungroup()%>%
-  mutate(total_5more_units=sum(!is.na(count_unit)[total_units>=5]))%>%
-  group_by(total_units)%>%
-         
-         # calculate prc unit size for units that are less than 5, and then for all units 
-         # greater than 5, make the numerator the sum of all the units greater than 5 and divide that by the total
-       mutate(prc_unit_size = ifelse(total_units<5, count_unit/total*100,
-                                total_5more_units / total * 100)) %>%
-  slice(1)%>%
-  rename(num_of_units=total_units)%>%
-  select(num_of_units, count_unit, avg_unit_size, med_unit_size, prc_unit_size)%>%
-  arrange(num_of_units)%>%
-  mutate(num_of_units=as.character(num_of_units))
- 
+
+
+
+#### Step 6: FOURTH ANALYSIS- [analysis_multifamily_damage] -- what percentage of multifamily properties were destroyed by damage category ----
+
+# run for east and west - percent of each unit type damaged in each area
+analysis_multifamily_e_w_damage <- all_df_multifamily %>%
+  filter(!is.na(multifamily_unit_category)) %>% # filter out NA
+  group_by(area_name,multifamily_unit_category) %>%
+  mutate(property_total=n()) %>% # grabbing a total for multifamily unit properties by area
+  ungroup() %>%
+  group_by(area_name,multifamily_unit_category,damage_category,property_total) %>%
+  summarise(property_damage_count = n(), # properties in that category of multifamily units that were damaged
+            property_damage_prc=n()/property_total*100) %>% # percent of multifamily units in the area in the damage category
+  slice(1) %>%
+  ungroup()
+
+# check
+check <- analysis_multifamily_e_w_damage  %>%
+  group_by(area_name,multifamily_unit_category) %>%
+  summarise(sum=sum(property_damage_prc)) # checks out
+
+# what is the average size of units damaged
+analysis_multifamily_e_w_damage_avg <- all_df_multifamily %>%
+  filter(!is.na(multifamily_unit_category)) %>% # filter out NA
+   group_by(area_name,damage_category) %>%
+   summarise(property_damage_count=n(), # total multifamily properties in damage category
+     unit_size_avg = mean(total_units, na.rm = TRUE), # average unit size for the area and damage category
+                     unit_size_med = median(total_units, na.rm = TRUE)) # median unit size for the area and damage category
+
+
+# run for all of altadena - percent of each unit type damaged 
+analysis_multifamily_alt_damage <- all_df_multifamily %>%
+  filter(!is.na(multifamily_unit_category)) %>% # filter out NA
+  group_by(multifamily_unit_category) %>%
+  mutate(property_total=n()) %>% # grabbing a total for multifamily unit properties
+  ungroup() %>%
+  group_by(multifamily_unit_category,damage_category,property_total) %>%
+  summarise(property_damage_count = n(), # properties in that category of multifamily units that were damaged
+            property_damage_prc=n()/property_total*100) %>% # percent of multifamily units in the damage category
+  slice(1) %>%
+  ungroup()
+
+# check
+check <- analysis_multifamily_alt_damage  %>%
+  group_by(multifamily_unit_category) %>%
+  summarise(sum=sum(property_damage_prc)) # checks out
+
+# what is the average size of units damaged
+analysis_multifamily_alt_damage_avg <- all_df_multifamily %>%
+  filter(!is.na(multifamily_unit_category)) %>% # filter out NA
+  group_by(damage_category) %>%
+  summarise(property_damage_count=n(), # total multifamily properties in damage category
+            unit_size_avg = mean(total_units, na.rm = TRUE), # average unit size for the damage category
+            unit_size_med = median(total_units, na.rm = TRUE)) # median unit size for the damage category
+
+
+# bind together and clean up
+analysis_multifamily_damage <- rbind(analysis_multifamily_alt_damage %>%
+                                        mutate(area_name='Altadena'), 
+                                      analysis_multifamily_e_w_damage) %>%
+  select(area_name,multifamily_unit_category, damage_category, property_damage_count,property_total,property_damage_prc)
+
+# bind together and clean up
+analysis_multifamily_damage_avg <- rbind(analysis_multifamily_alt_damage_avg %>%
+                                       mutate(area_name='Altadena') %>%
+                                       ungroup(), 
+                                     analysis_multifamily_e_w_damage_avg %>%
+                                       ungroup()) %>%
+  select(area_name,damage_category,property_damage_count,unit_size_avg, unit_size_med)
+
 
 
 #### Step 6: Upload tables to postgres and add table/column comments ####
