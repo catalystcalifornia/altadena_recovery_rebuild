@@ -27,13 +27,18 @@ altadena_e_w <- st_read(con, query="SELECT ain, area_name, area_label FROM data.
 housing_jan_e_w <- housing_jan  %>%
   left_join(altadena_e_w, by= "ain")
 # View(head(housing_jan_e_w))
+# sum(is.na(housing_jan_e_w$area_name)) # check
+
 
 ##second combine with housing_damage
 all_df <- housing_jan_e_w  %>%
   left_join(housing_damage, by= "ain")
 # View(head(all_df))
+# sum(is.na(all_df$ain)) # check
+# sum(is.na(all_df$damage_category)) # check
 
-#### Step 3: FIRST ANALYSIS- [analysis_units_jan2025] ####
+
+#### Step 3: FIRST ANALYSIS- [analysis_units_jan2025] - What were the total units and rental units by residential type - single-family, multifamily before the fire ####
 analysis_units_jan2025 <- all_df %>% 
   group_by(res_type) %>% 
   summarise(altadena_tot_units = sum(total_units, na.rm = TRUE),
@@ -45,15 +50,38 @@ analysis_units_jan2025 <- all_df %>%
             .groups = "drop") %>%
   mutate(altadena_prc_tot = altadena_tot_units/sum(altadena_tot_units)*100,
          altadena_prc_rent = altadena_rent_units/sum(altadena_rent_units)*100,
+         altadena_total_all_units = sum(altadena_tot_units, na.rm=TRUE),
+         altadena_total_rent_units = sum(altadena_rent_units, na.rm=TRUE),
          west_prc_tot = west_tot_units/sum(west_tot_units)*100,
          west_prc_rent = west_rent_units/sum(west_rent_units)*100,
+         west_total_all_units = sum(west_tot_units, na.rm=TRUE),
+         west_total_rent_units = sum(west_rent_units, na.rm=TRUE),
          east_prc_tot = east_tot_units/sum(east_tot_units)*100,
-         east_prc_rent = east_rent_units/sum(east_rent_units)*100) %>%
+         east_prc_rent = east_rent_units/sum(east_rent_units)*100,
+         east_total_all_units = sum(east_tot_units, na.rm=TRUE),
+         east_total_rent_units = sum(east_rent_units, na.rm=TRUE),) %>%
   pivot_longer(
     cols = -res_type,
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(tot_units|rent_units|prc_tot|prc_rent)"
+    names_to = c("area_name", ".value"),
+    names_pattern = "(altadena|west|east)_(tot_units|rent_units|prc_tot|prc_rent|total_all_units|total_rent_units)"
   ) 
+
+# clean up table for clarity
+analysis_units_jan2025 <- analysis_units_jan2025 %>%
+  select(area_name, res_type, tot_units, total_all_units, prc_tot, rent_units, total_rent_units, prc_rent) %>%
+  rename(all_units_count=tot_units,
+         all_units_total=total_all_units,
+         all_units_prc=prc_tot,
+         rent_units_count=rent_units,
+         rent_units_total=total_rent_units,
+        rent_units_prc=prc_rent)
+
+# check analysis
+check <- analysis_units_jan2025 %>%
+  group_by(area_name) %>%
+  summarise(sum=sum(all_units_prc),
+            sum_=sum(rent_units_prc)) # looks good
+
 #### Step 4: SECOND ANALYSIS- [analysis_units_damage] ####
 analysis_units_damage <- all_df %>% 
   mutate(damage_category = ifelse(is.na(damage_category), "No Damage", damage_category)) %>%
@@ -147,7 +175,6 @@ ungroup()%>%
 
 
 #### Step 6: Upload tables to postgres and add table/column comments ####
-# 
 dbWriteTable(con, name = "analysis_units_jan2025", value = analysis_units_jan2025, overwrite = FALSE)
 schema <- "data"
 table_name <- "analysis_units_jan2025"
@@ -156,12 +183,14 @@ source <- "Source: LA County Assessor Data, January 2025."
 qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
 column_names <- colnames(analysis_units_jan2025) # Get column names
 column_comments <- c(
-  "type of residence",
   "area",
-  "count of total units",
-  "count of rental units",
-  "percent of total units",
-  "percent of rental units")
+  "type of residence",
+  "count of all units by res type - rental or owner - num",
+  "total units in the area - rental or owner - denom",
+  'percent of all units in each res type for each area',
+  "count of rental units by res type - num",
+  "total rental units in the area - denom",
+  'percent of rental units in each res type for each area')
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 dbWriteTable(con, name = "analysis_units_damage", value = analysis_units_damage, overwrite = FALSE)
