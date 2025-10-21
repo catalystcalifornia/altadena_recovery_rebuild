@@ -1,0 +1,165 @@
+---
+title: ""
+output: rmarkdown::html_vignette
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+## The following document outputs a visual for the altadena_housing_before_and_after.html 
+
+#### Setting Up ####
+
+library(usethis)
+library(dplyr)
+library(tidyverse)
+library(htmltools) 
+library(htmlwidgets)
+library(gtExtras)
+library(gt)
+library(sf)
+library(scales)
+library(leaflet)
+
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+
+## COLORS ##
+orange <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+```
+
+```{r}
+# Eaton Fire damaged properties
+eaton_fire_damage <- st_read(con, query="SELECT * FROM data.eaton_fire_dmg_insp_3310 WHERE 
+                             damage = 'Destroyed (>50%)' OR damage = 'Major (26-50%)'", geom="geom") %>% 
+                              st_transform(4326)
+
+
+# east and west altadena boundaries --
+west <- st_read(con, query="SELECT * FROM data.west_altadena_3310", geom="geom") %>% st_transform(4326)
+
+east <- st_read(con, query="SELECT * FROM data.east_altadena_3310", geom="geom") %>% st_transform(4326)
+
+df_lead <- st_read(con, query="Select * from data.lacdph_lead_results_grid_2025", geom="geom") %>% 
+  filter(lead_geometric_mean > 80) %>%
+  st_transform(4326)
+
+#NOTE: taking time to transform even after filtering
+df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'East San Gabriel Valley' OR plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326)
+
+# df_zoning_pas <- st_read(con, query = "Select * FROM data.cityofpasadena_zoning_3310", geom="geom") %>% st_transform(4326)
+
+df_local_fhsz <- st_read(con, query="Select * from data.eaton_local_fhsz_4326 WHERE fhsz_descr != 'NonWildland'", geom="geom")
+
+df_state_fhsz <- st_read(con, query="Select * from data.eaton_state_fhsz_4326", geom="geom") 
+
+eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom") %>% st_transform(4326)
+
+popup_damage <-  paste0(
+      "Address: ", eaton_fire_damage$site_address_parcel, "</br>",
+      "Structure Type: ",  eaton_fire_damage$structure_type, "</br>",
+      "Average Lead Level Measured in mg/kg: ", df_lead$lead_geometric_mean, "</br>",
+      "State Fire Hazard Zone Level: ", df_state_fhsz$fhsz_descr, "</br>",
+      "Local Fire Hazard Zone Level: ", df_local_fhsz$fhsz_descr, "</br>",
+      "LA County Unincorporated Zoning Description: ", df_zoning_lac$z_desc
+      )
+colorpal_local_fhsz <- colorFactor(palette = "YlOrRd", domain = df_local_fhsz$fhsz_descr)
+colorpal_state_fhsz <- colorFactor(palette = "YlOrRd", domain = df_state_fhsz$fhsz_descr)
+
+```
+
+
+```{r}
+leaflet () %>%
+addProviderTiles(providers$CartoDB.Positron) %>%
+     setView(-118.131127, 34.194432, zoom = 13) %>%
+  #Damaged/Destroyed Properties
+  addCircleMarkers(data=eaton_fire_damage,
+                   radius = 2,
+                   color = "white",
+                   weight = .5,
+                   fillColor = orange,
+                   fillOpacity= 0.6,
+                   popup = ~popup_damage,
+                   group="Eaton Fire Properties Damaged") %>%
+  #Eaton Fire Perimeter
+  addPolygons(data=eaton_fire,
+              fillColor="white",
+              fillOpacity=0,
+              color="black",
+              weight=2.5,
+              opacity=1,
+              options=pathOptions(clickable=FALSE),
+              group="Eaton Fire Perimeter") %>%
+  #East Perimeter
+  addPolygons(data=east,
+              fillColor="white",
+              fillOpacity=0,
+              color=meteorite,
+              weight=2.5,
+              opacity=1,
+              options=pathOptions(clickable=FALSE),
+              group="East Altadena") %>%
+  #West Perimeter
+  addPolygons(data=west,
+              fillColor="white",
+              fillOpacity=0,
+              color=ccblue,
+              weight=2.5,
+              opacity=1,
+              options=pathOptions(clickable=FALSE),
+              group="West Altadena") %>%
+  #Lead Data 
+  addPolygons(data=df_lead,
+              fillColor="white",
+              fillOpacity=0,
+              color= "gray",
+              weight=.6,
+              opacity=1,
+              popup=~popup_damage,
+              group="High Levels of Lead in Soil") %>%
+  #Fire Hazard Zones 
+  addPolygons(data=df_local_fhsz,
+              fillColor=~colorpal_local_fhsz(fhsz_descr),
+              fillOpacity=0.7,
+              color="white",
+              weight=1,
+              popup=~fhsz_descr,
+              group="Local Fire Hazard Zones") %>%
+  addPolygons(data=df_state_fhsz,
+              fillColor=~colorpal_state_fhsz(fhsz_descr),
+              fillOpacity=0.7,
+              color="white",
+              weight=1,
+              popup=~fhsz_descr,
+              group="State Fire Hazard Zones") %>%
+  #Zoning 
+  addPolygons(data=df_zoning_lac,
+              fillColor="white",
+              fillOpacity=0,
+              color=lavender,
+              weight=2.5,
+              opacity=1,
+              popup=~z_desc,
+              group="Zoning") %>% 
+  #Controling Layers
+  addLayersControl(
+          overlayGroups = c("Eaton Fire Properties Damaged", "High Levels of Lead in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning","West Altadena","East Altadena","Eaton Fire Perimeter"),
+        options = layersControlOptions(collapsed = FALSE,autoZIndex = TRUE))  %>%
+  hideGroup(c("Eaton Fire Perimeter","High Levels of Lead in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning"))
+
+```
+
+
