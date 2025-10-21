@@ -282,6 +282,36 @@ sept_ain_universe <- sept_intersect %>% st_drop_geometry() %>% select(ain) %>% p
 #                         " Source: ", source, "'"))
 
 
+##### QA Clean-up #####
+## Address double-encoding error in original data files
+# # jan data tables
+# sql_rename_col <- "ALTER TABLE data.assessor_data_universe_jan2025 RENAME COLUMN exemption_type to exemption_type_original;"
+# dbSendQuery(con, sql_rename_col)
+# 
+# sql_create_new_col <- "ALTER TABLE data.assessor_data_universe_jan2025 ADD COLUMN exemption_type VARCHAR(5);"
+# dbSendQuery(con, sql_create_new_col)
+# 
+# sql_set_values <- "UPDATE data.assessor_data_universe_jan2025 SET exemption_type = exemption_type_original;"
+# dbSendQuery(con, sql_set_values)
+# 
+# sql_recode <- "UPDATE data.assessor_data_universe_jan2025 SET exemption_type = NULL WHERE exemption_type = 'Ã¿';"
+# dbSendQuery(con, sql_recode)
+# 
+# # sept data tables
+# sql_rename_col <- "ALTER TABLE data.assessor_data_universe_sept2025 RENAME COLUMN exemption_type to exemption_type_original;"
+# dbSendQuery(con, sql_rename_col)
+# 
+# sql_create_new_col <- "ALTER TABLE data.assessor_data_universe_sept2025 ADD COLUMN exemption_type VARCHAR(5);"
+# dbSendQuery(con, sql_create_new_col)
+# 
+# sql_set_values <- "UPDATE data.assessor_data_universe_sept2025 SET exemption_type = exemption_type_original;"
+# dbSendQuery(con, sql_set_values)
+# 
+# sql_recode <- "UPDATE data.assessor_data_universe_sept2025 SET exemption_type = NULL WHERE exemption_type = 'Ã¿';"
+# dbSendQuery(con, sql_recode)
+
+
+
 ##### REVIEW: Two kinds of AIN mismatches between CSV and SHP files #####
 # For permit scraping we are primarily interested in mismatches where the associated 
 # use code starts with zero (residential) and does NOT end with V (vacant lot)
