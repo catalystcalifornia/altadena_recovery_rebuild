@@ -59,7 +59,7 @@ analysis_units_jan2025 <- all_df %>%
          east_prc_tot = east_tot_units/sum(east_tot_units)*100,
          east_prc_rent = east_rent_units/sum(east_rent_units)*100,
          east_total_all_units = sum(east_tot_units, na.rm=TRUE),
-         east_total_rent_units = sum(east_rent_units, na.rm=TRUE),) %>%
+         east_total_rent_units = sum(east_rent_units, na.rm=TRUE)) %>%
   pivot_longer(
     cols = -res_type,
     names_to = c("area_name", ".value"),
@@ -74,7 +74,8 @@ analysis_units_jan2025 <- analysis_units_jan2025 %>%
          all_units_prc=prc_tot,
          rent_units_count=rent_units,
          rent_units_total=total_rent_units,
-        rent_units_prc=prc_rent)
+        rent_units_prc=prc_rent) %>%
+  arrange(area_name)
 
 # check analysis
 check <- analysis_units_jan2025 %>%
@@ -82,9 +83,8 @@ check <- analysis_units_jan2025 %>%
   summarise(sum=sum(all_units_prc),
             sum_=sum(rent_units_prc)) # looks good
 
-#### Step 4: SECOND ANALYSIS- [analysis_units_damage] ####
+#### Step 4: SECOND ANALYSIS- [analysis_units_damage] -- What percentage of rental units and all units were destroyed by residential type ####
 analysis_units_damage <- all_df %>% 
-  mutate(damage_category = ifelse(is.na(damage_category), "No Damage", damage_category)) %>%
   group_by(res_type, damage_category) %>% 
   summarise(altadena_tot_units = sum(total_units, na.rm = TRUE),
             altadena_rent_units = sum(landlord_units, na.rm = TRUE),
@@ -96,16 +96,41 @@ analysis_units_damage <- all_df %>%
   group_by(res_type) %>%
   mutate(altadena_prc_tot = altadena_tot_units/sum(altadena_tot_units)*100,
          altadena_prc_rent = altadena_rent_units/sum(altadena_rent_units)*100,
+         altadena_total_all_units = sum(altadena_tot_units, na.rm=TRUE),
+         altadena_total_rent_units = sum(altadena_rent_units, na.rm=TRUE),
          west_prc_tot = west_tot_units/sum(west_tot_units)*100,
          west_prc_rent = west_rent_units/sum(west_rent_units)*100,
+         west_total_all_units = sum(west_tot_units, na.rm=TRUE),
+         west_total_rent_units = sum(west_rent_units, na.rm=TRUE),
          east_prc_tot = east_tot_units/sum(east_tot_units)*100,
-         east_prc_rent = east_rent_units/sum(east_rent_units)*100) %>%
+         east_prc_rent = east_rent_units/sum(east_rent_units)*100,
+         east_total_all_units = sum(east_tot_units, na.rm=TRUE),
+         east_total_rent_units = sum(east_rent_units, na.rm=TRUE)) %>%
   ungroup() %>%
   pivot_longer(
-    cols = c(altadena_tot_units:east_prc_rent),
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(tot_units|rent_units|prc_tot|prc_rent)"
+    cols = c(altadena_tot_units:east_total_rent_units),
+    names_to = c("area_name", ".value"),
+    names_pattern = "(altadena|west|east)_(tot_units|rent_units|prc_tot|prc_rent|total_all_units|total_rent_units)"
   ) 
+
+# clean up table for clarity
+analysis_units_damage  <- analysis_units_damage  %>%
+  select(area_name, res_type, damage_category,tot_units, total_all_units, prc_tot, rent_units, total_rent_units, prc_rent) %>%
+  rename(all_units_count=tot_units,
+         all_units_total=total_all_units,
+         all_units_prc=prc_tot,
+         rent_units_count=rent_units,
+         rent_units_total=total_rent_units,
+         rent_units_prc=prc_rent) %>%
+  arrange(area_name,res_type)
+
+analysis_units_damage[sapply(analysis_units_damage, is.nan)] <- NA
+
+# check analysis
+check <- analysis_units_damage  %>%
+  group_by(area_name, res_type) %>%
+  summarise(sum=sum(all_units_prc,na.rm=TRUE),
+            sum_=sum(rent_units_prc,na.rm=TRUE)) # looks good zeros are from boarding houses that had 0 counts and totals
 
 #### Step 5: THIRD ANALYSIS- [analysis_multifamily_damage] ####
 analysis_multifamily_damage <- all_df %>% 
@@ -175,7 +200,7 @@ ungroup()%>%
 
 
 #### Step 6: Upload tables to postgres and add table/column comments ####
-dbWriteTable(con, name = "analysis_units_jan2025", value = analysis_units_jan2025, overwrite = FALSE)
+# dbWriteTable(con, name = "analysis_units_jan2025", value = analysis_units_jan2025, overwrite = FALSE)
 schema <- "data"
 table_name <- "analysis_units_jan2025"
 indicator <- "Data on total units, total rental units (landlord_units column) in Altadena, West Altadena, East Altadena by residential type (e.g., total units in single family homes, total rental units in single family homes) in January 2025 (before the fire)"
@@ -201,14 +226,15 @@ source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, 
 qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
 column_names <- colnames(analysis_units_damage) # Get column names
 column_comments <- c(
+  "area",
   "type of residence",
   "damage category",
-  "area",
-  "count of total units",
-  "count of rental units",
-  "percent of total units",
-  "percent of rental units"
-)
+  "count of all units by res type and damage category - rental and owner units - num",
+  "total units within each res type in the area - denom",
+  'percent of all units in the res type for that area that sustained each damage level',
+  "count of rental units by res type and damage category - num",
+  "total rental units within each res type  in the area - denom",
+  'percent of rental units in the res type for that area that sustained each damage level')
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 # dbWriteTable(con, name = "analysis_multifamily_damage", value = analysis_multifamily_damage, overwrite = FALSE)

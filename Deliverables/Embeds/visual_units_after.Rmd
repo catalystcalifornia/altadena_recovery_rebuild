@@ -46,17 +46,17 @@ Across Altadena and residential housing types, about one in three rental units w
 
 ```{r}
 #### VISUAL ####
-df_ <- st_read(con, query="Select res_type, damage_category, area, rent_units, prc_rent from data.analysis_units_damage") 
+df_ <- st_read(con, query="Select res_type, damage_category, area_name, rent_units_count, rent_units_prc from data.analysis_units_damage") 
 
 df <- df_ %>%
   filter(res_type != "Boarding house",
          damage_category == "Significant Damage") %>% 
-  mutate("Count (%)"=paste0(comma(rent_units)," (",round(prc_rent,0),"%)"),
-         "Rental Units Lost in Housing Type"=prc_rent,
+  mutate("Count (%)"=paste0(comma(rent_units_count)," (",round(rent_units_prc,0),"%)"),
+         "Rental Units Lost in Housing Type"=rent_units_prc,
          "Residential Type" = res_type,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(rent_units)) 
+  arrange(desc(rent_units_count)) 
 
 
 table<- df %>%
