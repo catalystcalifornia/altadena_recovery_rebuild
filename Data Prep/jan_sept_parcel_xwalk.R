@@ -357,8 +357,6 @@ combined_xwalks <- bind_rows(intersect_jan_xwalk, uneven_xwalk, ambiguous_xwalk,
 missing_in_xwalk <- assessor_jan %>%
   anti_join(combined_xwalks, by = c("ain" = "ain_jan"))
 
-setdiff(assessor_jan, combined_xwalks)
-
 # AINs in combined_xwalk but NOT in assessor_data_universe_jan2025
 
 missing_in_assessor <- combined_xwalks %>%
@@ -379,10 +377,35 @@ check_missing_jan_ain_in_sept_assessor <- assessor_sept %>%
 
 # of the 47 missing Jan AINs, 13 of them are NOT missing in the Sept Assessor data
 
-
 check_missing_sept_ain_in_sept_assessor <- assessor_sept %>%
   filter(ain %in% missing_in_assessor$ain_sept) 
 
 # of the 47 missing Jan AINs, 15 of their corresponding Sept AINs are NOT missing in the Sept Assessor data
 
+# Focus on the missing_in_assessor df and spot check some of those AINs against the assessor portal online
+# ( Except the one with the revised jan AIN) :
 
+## AINS with issues:
+
+# AIN 5725-002-918: This looks like a commercial type, government owned: https://portal.assessor.lacounty.gov/parceldetail/5725002918
+# AIN 5713037904: Looks like a DELETED Parcel status: https://portal.assessor.lacounty.gov/parceldetail/5713037904
+# AIN 5736026047: Parcel status SHELL not sure what that means but seems like can be dropped https://portal.assessor.lacounty.gov/parceldetail/5736026047
+# AIN 5746025908: This looks like a government owned parcel type: https://portal.assessor.lacounty.gov/parceldetail/5746025908
+# AIN 5734025088: Another SHELL Type parcel: https://portal.assessor.lacounty.gov/parceldetail/5734025088 
+# AIN 5728014060: This is a regular type parcel that is active but tax status = DELINQUENT: https://portal.assessor.lacounty.gov/parceldetail/5728014060
+# AIN 5863003900: This is a SHELL parcel status: https://portal.assessor.lacounty.gov/parceldetail/5863003900
+# AIN: 5863003901: This is a government owned type parcel: https://portal.assessor.lacounty.gov/parceldetail/5863003901
+# AIN 5738005099: This is a SHELL parcel status: https://portal.assessor.lacounty.gov/parceldetail/5738005099
+# AIN 5728014061: This is TAX STATUS==DELINQUENT: https://portal.assessor.lacounty.gov/parceldetail/5728014061 
+# AIN 5738013906: This looks like a condominium with active parcel status.  But it does say government owned: https://portal.assessor.lacounty.gov/parceldetail/5738013906
+# AIN 5327002089: This looks like it is an ACTIVE parcel status with a CURRENT tax status. However on the assessor map it says it is a commercial use parcel. Also no site address provided on the portal: https://portal.assessor.lacounty.gov/parceldetail/5327002089 
+# AIN 5327002092: This one has active parcel status but use type == Vacant Land. But on the assessor satellite image it does look like there is a building. No site address provided:  https://portal.assessor.lacounty.gov/parceldetail/5327002092
+# AIN 5327002090: Use type is vacant land also no site address provided on the portal: https://portal.assessor.lacounty.gov/parceldetail/5327002090
+# AIN 5327002091: Use type is Vacant land also no site addressw provided on the protal. But satellite image on portal does look like there is a building? https://portal.assessor.lacounty.gov/parceldetail/5327002091
+
+
+# JZ Notes:
+
+# Feeling like these can be dropped because they all seem to have some sort of issue. 
+# Wondering if we should be filtering out by Parcel Status == SHELL | DELETED in our jan assessor data
+# Could also filter out parcels where type == government owned
