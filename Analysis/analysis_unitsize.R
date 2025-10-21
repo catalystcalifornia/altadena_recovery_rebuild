@@ -256,7 +256,7 @@ analysis_multifamily_alt_damage_avg <- all_df_multifamily %>%
 
 
 # bind together and clean up
-analysis_multifamily_damage <- rbind(analysis_multifamily_alt_damage %>%
+analysis_multifamily_damage_prc <- rbind(analysis_multifamily_alt_damage %>%
                                         mutate(area_name='Altadena'), 
                                       analysis_multifamily_e_w_damage) %>%
   select(area_name,multifamily_unit_category, damage_category, property_damage_count,property_total,property_damage_prc)
@@ -290,7 +290,7 @@ column_comments <- c(
   'percent of rental units in each res type for each area')
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
-dbWriteTable(con, name = "analysis_units_damage", value = analysis_units_damage, overwrite = FALSE)
+# dbWriteTable(con, name = "analysis_units_damage", value = analysis_units_damage, overwrite = FALSE)
 schema <- "data"
 table_name <- "analysis_units_damage"
 indicator <- "Data on total units lost, total rental units lost in Altadena, West Altadena, East Altadena by residential type (e.g., total rental units lost in multifamily homes) → count lost as significant damage, but include separately units that sustained some damage"
@@ -309,37 +309,55 @@ column_comments <- c(
   'percent of rental units in the res type for that area that sustained each damage level')
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
-# dbWriteTable(con, name = "analysis_multifamily_damage", value = analysis_multifamily_damage, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_multifamily_damage"
-# indicator <- "Data on the multifamily units lost (significant damage), what were their sizes? e.g., what was the average unit size, what was the median size, what percentage were 2 units, 3-4 units, or 5 or more units"
-# source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
-# column_names <- colnames(analysis_multifamily_damage) # Get column names
-# column_comments <- c(
-#   "number of units in a building",
-#   "count of units of this many",
-#   "average unit size",
-#   "median unit size",
-#   "percentge unit size") 
+
+# dbWriteTable(con, name = "analysis_multifamily_jan2025", value = analysis_multifamily_jan2025, overwrite = FALSE)
+schema <- "data"
+table_name <- "analysis_multifamily_jan2025"
+indicator <- "Data on the multifamily units by area and multifamily unit size, the average unit size, the median size, and count by select categories. Only includes analysis for properties flagged as multifamily (two or more units on property)"
+source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
+column_names <- colnames(analysis_multifamily_jan2025) # Get column names
+column_comments <- c(
+  "area name",
+  'multifamily unit size category 1-2, 3-4, or 5 or more',
+  "number of multifamily properties in the category",
+  "total multifamily properties in the area",
+  "percent of multifamily properties in the category",
+  "average unit size for the area",
+  "median unit size for the area")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
-dbWriteTable(con, name = "analysis_multifamily_damage_jz", value = analysis_multifamily_damage, overwrite = TRUE)
+# dbWriteTable(con, name = "analysis_multifamily_damage_avg", value = analysis_multifamily_damage_avg, overwrite = FALSE)
 schema <- "data"
-table_name <- "analysis_multifamily_damage_jz"
-indicator <- "Data on the multifamily units lost (significant damage), what were their sizes? e.g., what was the average unit size, what was the median size, what percentage were 2 units, 3-4 units, or 5 or more units"
+table_name <- "analysis_multifamily_damage_avg"
+indicator <- "Data on the multifamily units by area and damage category, Includes the average unit size and the median size for all multifamily properties in the area within each damage category. Only includes analysis for properties flagged as multifamily (two or more units on property)"
 source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
 qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
-column_names <- colnames(analysis_multifamily_damage) # Get column names
+column_names <- colnames(analysis_multifamily_damage_avg) # Get column names
 column_comments <- c(
-  "number of n units",
-  "count of units of this many",
-  "average unit size",
-  "median unit size",
-  "percentge unit size. Unit size greater than 5 is all agggregated and it is the percent of all units that are 5 or greater.")
-add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+  "area name",
+  "damage category",
+  "total multifamily properties in the area and damage category",
+  "average multifamily unit size in the area and damage category",
+  "median unit size in the area and damage category")
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
+dbWriteTable(con, name = "analysis_multifamily_damage_prc", value = analysis_multifamily_damage_prc, overwrite = FALSE)
+schema <- "data"
+table_name <- "analysis_multifamily_damage_prc"
+indicator <- "Data on the multifamily units by area, unit size category, and damage category, count and percentages of multifamily properties in each size category that were or were not damaged"
+source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_units.docx"
+column_names <- colnames(analysis_multifamily_damage_prc) # Get column names
+column_comments <- c(
+  "area name",
+  "multifamily unit size category 1-2, 3-4, 5 or more",
+  "Damage category",
+  "Number of multifamily properties in the area within each size category and damage category combo - numerator",
+  "Total multifamily properties in the area and size category- denominator",
+  "percentage of multifamily properties in the size category that were in each damage level")
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
 #### Step 7: close connection ####
