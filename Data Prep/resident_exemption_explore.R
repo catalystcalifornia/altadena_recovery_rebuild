@@ -60,26 +60,27 @@ exemption_re<-assessor_data%>%
   mutate(exemption_type_re=ifelse(exemption_type %in% "0", "Veteran number on file, no claim",
                                   ifelse(exemption_type %in% "1", "Veteran",
                                          ifelse(exemption_type %in% "2", "Delete veteran exemption",
-                                                       ifelse(exemption_type %in% "3", "Church, wholly exempt",
-                                  ifelse(exemption_type %in% "4", "Welfare, wholly exempt",
-                                         ifelse(exemption_type %in% "5", "Full religious",
-                                                ifelse(exemption_type %in% "6", "Church, partially exempt",
-                                                       ifelse(exemption_type %in% "7", "Welfare, partially exempt",
-                                                              ifelse(exemption_type %in% "8", "Religious, partially exempt",
-                                                                     "Delete real estate exemption"))))))))))%>%
+                                                ifelse(exemption_type %in% "3", "Church, wholly exempt",
+                                                       ifelse(exemption_type %in% "4", "Welfare, wholly exempt",
+                                                              ifelse(exemption_type %in% "5", "Full religious",
+                                                                     ifelse(exemption_type %in% "6", "Church, partially exempt",
+                                                                            ifelse(exemption_type %in% "7", "Welfare, partially exempt",
+                                                                                   ifelse(exemption_type %in% "8", "Religious, partially exempt",
+                                                                                          ifelse(exemption_type %in% "9", "Delete real estate exemption",
+                                                                                                 "Unsure of exemption status")))))))))))%>%
   group_by(exemption_type_re)%>%
   mutate(count=n())%>%
   slice(1)
 
 # Notes:
 # Seems like an encoding issue in the initial import of the assessor data which is why we see Ã¿ as one of the exemption type codes
-# But based on the data dictionary of the assessor data and if we assume Ã¿ should be 9, which means 'Delete real estate exemption'
-# I am wondering if this is a potential source of why there are so many exemptions. Because these are supposed to be 'Delete real estate exemption'
-# Meaning (I think) that the exemption no longer exists. And given how many records have this exemption code. 
+# Based on the data dictionary of the assessor data there is an exemption_type==9 but no 9 values occur in the assessor data. These 9 values are supposed to be 'Delete real estate exemption'
+# I am wondering if this is a potential source of why there are so many exemptions. 
+# However, given 54159 out of 54826 total records have  Ã¿ as the exemption status I also wonder if it means there is no exemption or something else.
 
 # Explore where exemption_type (maybe) == 9 ---------
 
-exemption_re_9<-assessor_data%>%
+exemption_re_unknown<-assessor_data%>%
   mutate(exemption_type_re=ifelse(exemption_type %in% "0", "Veteran number on file, no claim",
                                   ifelse(exemption_type %in% "1", "Veteran",
                                          ifelse(exemption_type %in% "2", "Delete veteran exemption",
@@ -89,42 +90,41 @@ exemption_re_9<-assessor_data%>%
                                                                      ifelse(exemption_type %in% "6", "Church, partially exempt",
                                                                             ifelse(exemption_type %in% "7", "Welfare, partially exempt",
                                                                                    ifelse(exemption_type %in% "8", "Religious, partially exempt",
-                                                                                          "Delete real estate exemption"))))))))))%>%
-  filter(exemption_type_re=="Delete real estate exemption")
+                                                                                          ifelse(exemption_type %in% "9", "Delete real estate exemption",
+                                                                                          "Unsure of exemption status")))))))))))%>%
+  filter(exemption_type_re=="Unsure of exemption status")
 
 
 # pull out ains
-ain9<-exemption_re_9$ain
+ain_unknown<-exemption_re_unknown$ain
 
 # pull out emg xwalk ains
 emg_ain<-emg_rel$ain
 
 # See where there is overlap and not overlap in AINS
 
-ains_in_emg <- as.data.frame(unique(ain9[ain9 %in% emg_ain])) # 12,919 of these made it into the emg rel table
-ains_not_in_emg <- as.data.frame(unique(ain9[!ain9 %in% emg_ain])) #41,240 not in the rel table
+ains_in_emg <- as.data.frame(unique(ain_unknown[ain_unknown %in% emg_ain])) # 12,919 of these made it into the emg rel table
+ains_not_in_emg <- as.data.frame(unique(ain_unknown[!ain_unknown %in% emg_ain])) #41,240 not in the rel table
 
 # Isolate those AINs and look deeper at them, first see how these AINs were recoded in the rel table
 
-rel_ain9<-emg_rel%>%
-  filter(ain %in% ain9)
+rel_ain_unknown<-emg_rel%>%
+  filter(ain %in% ain_unknown)
 
-table(rel_ain9$owner_renter) # only 4433 recoded as 'Other' and 1078 recoded as 'Homeowner/Renter'
+table(rel_ain_unknown$owner_renter) # only 4433 recoded as 'Other' and 1078 recoded as 'Homeowner/Renter'
 
 # confirm these also don't have landlord_units
 
-rel_ain9<-emg_rel%>%
-  filter(ain %in% ain9)%>%
+rel_ain_unknown<-emg_rel%>%
+  filter(ain %in% ain_unknown)%>%
   filter(owner_renter=="Other")%>%
   mutate(rental_flag=ifelse(landlord_units<1, "No rentals", "Rentals"))
 
-# There are 4433 rows recoded as 'Other' that are the AINS where exemption_type=="Delete Real Estate Exemption"
-table(rel_ain9$rental_flag) # None of them have rentals (as we'd expect)
+# There are 4433 rows recoded as 'Other' that are the AINS where exemption_type=="Unsure of exemption status"
+table(rel_ain_unknown$rental_flag) # None of them have rentals (as we'd expect)
 
 # Notes:
-# I am not entirely sure if there is anything here. I think this is mostly dependent on really understanding what 
-# "Delete Real Estate Exemption" means. Online it looks like it just means that property is no longer exempt
-# But the reason why can vary from failure to file, house sale, death etc.
+# I am not entirely sure if there is anything here.
 # The question here then is should these 4433 rows be recoded from 'Other' to 'Homeowner' ?
 
 # Lets also look at their usecodes
