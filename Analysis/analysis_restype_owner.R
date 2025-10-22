@@ -99,7 +99,7 @@ analysis_owner_renter_damage <- all_df %>%
 #   )
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 # 
-# dbWriteTable(con, name = "analysis_restype_damage", value = analysis_restype_damage, overwrite = TRUE)
+# dbWriteTable(con, name = "analysis_restype_damage", value = analysis_restype_damage, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_restype_damage"
 # indicator <- "Data on residential property types (single-family, multifamily, etc.) by damage category for all of Altadena, West Altadena, East Altadena, e.g., what % of single family properties were significantly damaged, etc."
