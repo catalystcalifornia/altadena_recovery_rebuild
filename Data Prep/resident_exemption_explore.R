@@ -38,6 +38,7 @@ assessor_cols<-as.data.frame(colnames(assessor_data))
 # Explore exemption column--------------------------------------------
 
 table(assessor_data$exemption_type)
+sum(is.na(assessor_data$exemption_type)) # 54159 that used to be the weird symbol are now NA
 
 # From assessor data extract pdf: "W:\Project\RDA Team\Altadena Recovery and Rebuild\Data\Assessor Data Extract\FIELD DEF -- SBF.pdf"
 # Exemption Claim Type
@@ -67,13 +68,12 @@ exemption_re<-assessor_data%>%
                                                                             ifelse(exemption_type %in% "7", "Welfare, partially exempt",
                                                                                    ifelse(exemption_type %in% "8", "Religious, partially exempt",
                                                                                           ifelse(exemption_type %in% "9", "Delete real estate exemption",
-                                                                                                 "Unsure of exemption status")))))))))))%>%
+                                                                                                 "No exemption status")))))))))))%>%
   group_by(exemption_type_re)%>%
   mutate(count=n())%>%
   slice(1)
 
 # Notes:
-# Seems like an encoding issue in the initial import of the assessor data which is why we see Ã¿ as one of the exemption type codes
 # Based on the data dictionary of the assessor data there is an exemption_type==9 but no 9 values occur in the assessor data. These 9 values are supposed to be 'Delete real estate exemption'
 # I am wondering if this is a potential source of why there are so many exemptions. 
 # However, given 54159 out of 54826 total records have  Ã¿ as the exemption status I also wonder if it means there is no exemption or something else.
