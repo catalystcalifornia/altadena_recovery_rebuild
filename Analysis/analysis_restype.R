@@ -99,10 +99,10 @@ analysis_owner_renter_damage <- all_df %>%
 #   )
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 # 
-# dbWriteTable(con, name = "analysis_restype_damage", value = analysis_restype_damage, overwrite = FALSE)
+# dbWriteTable(con, name = "analysis_restype_damage", value = analysis_restype_damage, overwrite = TRUE)
 # schema <- "data"
 # table_name <- "analysis_restype_damage"
-# indicator <- "Data on Distribution of residential property types (single-family, multifamily, etc.) by damage category for all of Altadena, West Altadena, East Altadena, e.g., what % of significantly damaged properties were single family, etc."
+# indicator <- "Data on residential property types (single-family, multifamily, etc.) by damage category for all of Altadena, West Altadena, East Altadena, e.g., what % of single family properties were significantly damaged, etc."
 # source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
 # qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_housing.docx"
 # column_names <- colnames(analysis_restype_damage) # Get column names
@@ -139,7 +139,7 @@ analysis_owner_renter_damage <- all_df %>%
 # dbWriteTable(con, name = "analysis_owner_renter_damage", value = analysis_owner_renter_damage, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_owner_renter_damage"
-# indicator <- "Data on distribution of homeownership types (homeowner, renter) by damage category for all of Altadena, West Altadena, East Altadena, e.g., what % of significantly damaged properties were single family, etc."
+# indicator <- "Data on homeownership types (homeowner, renter) by damage category for all of Altadena, West Altadena, East Altadena, e.g., what % of single family properties were significantly damaged, etc."
 # source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
 # qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_housing.docx"
 # column_names <- colnames(analysis_owner_renter_damage) # Get column names
