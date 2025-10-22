@@ -35,10 +35,12 @@ emg_rel<-dbGetQuery(con_alt, "SELECT * FROM rel_assessor_residential_jan2025")
 # get column names
 assessor_cols<-as.data.frame(colnames(assessor_data))
 
-# Explore exemption column--------------------------------------------
+# Explore exemption column in Jan assessor data--------------------------------------------
 
 table(assessor_data$exemption_type)
 sum(is.na(assessor_data$exemption_type)) # 54159 that used to be the weird symbol are now NA
+
+table(emg_rel$owner_renter) # 4461 classified as OTHER
 
 # From assessor data extract pdf: "W:\Project\RDA Team\Altadena Recovery and Rebuild\Data\Assessor Data Extract\FIELD DEF -- SBF.pdf"
 # Exemption Claim Type
@@ -73,66 +75,56 @@ exemption_re<-assessor_data%>%
   mutate(count=n())%>%
   slice(1)
 
-# Notes:
-# Based on the data dictionary of the assessor data there is an exemption_type==9 but no 9 values occur in the assessor data. These 9 values are supposed to be 'Delete real estate exemption'
-# I am wondering if this is a potential source of why there are so many exemptions. 
-# However, given 54159 out of 54826 total records have  Ã¿ as the exemption status I also wonder if it means there is no exemption or something else.
+# Look at the exemption status type for all the AINs in the EMG rel table that are 'Other' (not renter or homwowner)---------
 
-# Explore where exemption_type (maybe) == 9 ---------
+emg_rel_other<-emg_rel%>%
+  filter(owner_renter=="Other")
 
-exemption_re_unknown<-assessor_data%>%
-  mutate(exemption_type_re=ifelse(exemption_type %in% "0", "Veteran number on file, no claim",
-                                  ifelse(exemption_type %in% "1", "Veteran",
-                                         ifelse(exemption_type %in% "2", "Delete veteran exemption",
-                                                ifelse(exemption_type %in% "3", "Church, wholly exempt",
-                                                       ifelse(exemption_type %in% "4", "Welfare, wholly exempt",
-                                                              ifelse(exemption_type %in% "5", "Full religious",
-                                                                     ifelse(exemption_type %in% "6", "Church, partially exempt",
-                                                                            ifelse(exemption_type %in% "7", "Welfare, partially exempt",
-                                                                                   ifelse(exemption_type %in% "8", "Religious, partially exempt",
-                                                                                          ifelse(exemption_type %in% "9", "Delete real estate exemption",
-                                                                                          "Unsure of exemption status")))))))))))%>%
-  filter(exemption_type_re=="Unsure of exemption status")
+emg_rel_other_exemption<-assessor_data%>%
+  filter(ain %in% emg_rel_other$ain)
+
+table(emg_rel_other_exemption$exemption_type) 
+
+# 1 - Veteran: 18 counts
+# 4 - Welfare, wholly exempt: 7 counts
+# 5 - Full religious: 1 count
+# 7 - Welfare, partially exempt: 2 counts
+
+# These look like they are OKAY to be classified as OTHER (Not Homeowner/Renter)? 
+## I am wondering if it is OK to keep Veteran exemption status types but FILTER out all the religious/welfare ones. 
+## I think the veteran ones could be recoded as HOMEOWNER (assuming landlord_unit == 0)
+
+# Check landlord_unit==0 real quick:
+
+emg_rel_other%>%filter(landlord_units>0) # 0 values
+
+# check res_type:
+
+table(emg_rel_other$res_type)
+
+# Lets look at res_type for each exemption status type
+emg_rel_other_exemption%>%
+  mutate(
+    res_type=case_when( # type of residential property
+      # condos first
+      str_detect(use_code, "C$|E$") ~ "Condominium",
+      str_detect(use_code, "^01") ~ "Single-family",
+      str_detect(use_code, "^02|^03|^04|^05") ~ "Multifamily",
+      str_detect(use_code,"^08") ~ "Boarding house",
+      str_detect(use_code,"^12|^17") ~ "Mixed use", 
+      TRUE ~NA))%>%
+  select(exemption_type, res_type)%>%
+  filter(!is.na(exemption_type))%>%
+  count(exemption_type, res_type)
+
+# exemption_type      res_type  n
+# 1                 Single-family 18
+# 4                 Multifamily  1
+# 4                 Single-family  6
+# 5                 Single-family  1
+# 7                 Single-family  2
+
+# We can see all are single or multi-family homes. All of the exemption_type==1 (Veteran exemption) are single-family homes
+# I think these can be coded as HOMEOWNER
 
 
-# pull out ains
-ain_unknown<-exemption_re_unknown$ain
-
-# pull out emg xwalk ains
-emg_ain<-emg_rel$ain
-
-# See where there is overlap and not overlap in AINS
-
-ains_in_emg <- as.data.frame(unique(ain_unknown[ain_unknown %in% emg_ain])) # 12,919 of these made it into the emg rel table
-ains_not_in_emg <- as.data.frame(unique(ain_unknown[!ain_unknown %in% emg_ain])) #41,240 not in the rel table
-
-# Isolate those AINs and look deeper at them, first see how these AINs were recoded in the rel table
-
-rel_ain_unknown<-emg_rel%>%
-  filter(ain %in% ain_unknown)
-
-table(rel_ain_unknown$owner_renter) # only 4433 recoded as 'Other' and 1078 recoded as 'Homeowner/Renter'
-
-# confirm these also don't have landlord_units
-
-rel_ain_unknown<-emg_rel%>%
-  filter(ain %in% ain_unknown)%>%
-  filter(owner_renter=="Other")%>%
-  mutate(rental_flag=ifelse(landlord_units<1, "No rentals", "Rentals"))
-
-# There are 4433 rows recoded as 'Other' that are the AINS where exemption_type=="Unsure of exemption status"
-table(rel_ain_unknown$rental_flag) # None of them have rentals (as we'd expect)
-
-# Notes:
-# I am not entirely sure if there is anything here.
-# The question here then is should these 4433 rows be recoded from 'Other' to 'Homeowner' ?
-
-# Lets also look at their usecodes
-
-table(rel_ain9$res_type) 
-
-# Notes:
-# There is one boarding house that should NOT be recoded as 'Homeowner'
-# But there are 4,260 Single-family res type that might need to be recoded as 'Homeowner' 
-
-# Condos and Multifamily I am not as sure
