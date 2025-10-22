@@ -35,7 +35,7 @@ emg_rel<-dbGetQuery(con_alt, "SELECT * FROM rel_assessor_residential_jan2025")
 # get column names
 assessor_cols<-as.data.frame(colnames(assessor_data))
 
-# Explore exemption column in Jan assessor data--------------------------------------------
+# Step 0: Explore exemption column in Jan assessor data--------------------------------------------
 
 table(assessor_data$exemption_type)
 sum(is.na(assessor_data$exemption_type)) # 54159 that used to be the weird symbol are now NA
@@ -75,7 +75,7 @@ exemption_re<-assessor_data%>%
   mutate(count=n())%>%
   slice(1)
 
-# Look at the exemption status type for all the AINs in the EMG rel table that are 'Other' (not renter or homwowner)---------
+# Step 1: Look at the exemption status type for all the AINs in the EMG rel table that are 'Other' (not renter or homwowner)---------
 
 emg_rel_other<-emg_rel%>%
   filter(owner_renter=="Other")
@@ -90,15 +90,11 @@ table(emg_rel_other_exemption$exemption_type)
 # 5 - Full religious: 1 count
 # 7 - Welfare, partially exempt: 2 counts
 
-# These look like they are OKAY to be classified as OTHER (Not Homeowner/Renter)? 
-## I am wondering if it is OK to keep Veteran exemption status types but FILTER out all the religious/welfare ones. 
-## I think the veteran ones could be recoded as HOMEOWNER (assuming landlord_unit == 0)
-
 # Check landlord_unit==0 real quick:
 
-emg_rel_other%>%filter(landlord_units>0) # 0 values
+emg_rel_other_exemption%>%filter(landlord_units>0) # 0 values
 
-# check res_type:
+# check res_type on emg_rel table:
 
 table(emg_rel_other$res_type)
 
@@ -127,4 +123,79 @@ emg_rel_other_exemption%>%
 # We can see all are single or multi-family homes. All of the exemption_type==1 (Veteran exemption) are single-family homes
 # I think these can be coded as HOMEOWNER
 
+# For now let us recode OTHER where exemption_type==1 as HOMEOWNER-VETERAN
 
+emg_rel_step1<-emg_rel%>%
+  mutate(owner_renter=ifelse(ain %in% emg_rel_other_exemption$ain[emg_rel_other_exemption$exemption_type=="1"], "Homeowner-Veteran", 
+                             owner_renter))
+
+table(emg_rel_step1$owner_renter) # reduces the 'OTHER' category from 4461 to 4443 - what we would expect that reduces it by 18
+
+# Step 2: Lets explore the remaining 4433 values that are coded as OTHER: TRUSTS/LLCs----------------------------------
+
+other_step2<-emg_rel_step1%>%filter(owner_renter=='Other')
+
+other_assessor_step2<-assessor_data%>%filter(ain %in% other_step2$ain)
+
+### Look into how many are TRUST OR LLCs ####
+
+trust_llc <- other_assessor_step2 %>%
+  filter(
+    grepl("TRUST|LLC", first_owner_name, ignore.case = TRUE) |
+      grepl("TRUST|LLC", first_owner_name_overflow, ignore.case = TRUE) |
+      grepl("TRUST|LLC", second_owner_name, ignore.case = TRUE)
+  ) %>%
+  mutate(
+    flag_trust = ifelse(
+      grepl("TRUST", first_owner_name, ignore.case = TRUE) |
+        grepl("TRUST", first_owner_name_overflow, ignore.case = TRUE) |
+        grepl("TRUST", second_owner_name, ignore.case = TRUE),
+      1, 0
+    ),
+    flag_llc = ifelse(
+      grepl("LLC", first_owner_name, ignore.case = TRUE) |
+        grepl("LLC", first_owner_name_overflow, ignore.case = TRUE) |
+        grepl("LLC", second_owner_name, ignore.case = TRUE),
+      1, 0
+    )
+  )
+# summarise results:
+
+# 116 LLCs and #1489 Trusts 
+
+trust_llc%>%
+  summarise(llc_tot=sum(flag_llc),
+            trust_to=sum(flag_trust))
+
+# check if any have rentals
+
+trust_llc%>%filter(landlord_units>0) # none
+
+
+table(trust_llc$exemption_type) # none of these have exemptions
+
+# Lets recode these as LLCs and Trusts
+
+emg_rel_step2<-emg_rel_step1%>%
+  mutate(owner_renter=ifelse(ain %in% trust_llc$ain[trust_llc$flag_llc=="1"], "LLC", 
+                         ifelse(ain %in% trust_llc$ain[trust_llc$flag_trust=="1"], "Trust",
+                             owner_renter)))
+
+table(emg_rel_step2$owner_renter) # Now other is down to 2839
+
+
+
+
+# Step 3: CONTINUE exploring remaining 2839-------------
+
+other_assessor_step3<-other_assessor_step2%>%filter(ain %in% emg_rel_step2$ain[emg_rel_step2$owner_renter=="Other"])
+
+## Lets look at use codes:
+# Data dictionary for use codes: "W:\Project\RDA Team\Altadena Recovery and Rebuild\Data\Assessor Data Extract\Use Code 2023.pdf"
+
+table(other_assessor_step3$use_code)
+
+# 384 rows have usecode ==0101 which I think means it is a POOL ----wondering if these should just be excluded
+# 1 row has usecode == 0102 which is "Estate Guest House"
+      
+      
