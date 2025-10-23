@@ -190,18 +190,6 @@ table(emg_rel_step2$owner_renter) # Now other is down to 2839
 
 other_assessor_step3<-other_assessor_step2%>%filter(ain %in% emg_rel_step2$ain[emg_rel_step2$owner_renter=="Other"])
 
-## Lets look at use codes:
-# Data dictionary for use codes: "W:\Project\RDA Team\Altadena Recovery and Rebuild\Data\Assessor Data Extract\Use Code 2023.pdf"
-
-table(other_assessor_step3$use_code)
-
-# 384 rows have usecode ==0101 which I think means it is a POOL ----wondering if these should just be excluded
-# 1 row has usecode == 0102 which is "Estate Guest House"
-
-# Lets look at the special name legend --nothing here. 29 have C/O which means 'Care of' 
-
-table(other_assessor_step3$special_name_legend)
-
 # Lets look at tax status
 
 table(other_assessor_step3$tax_stat_key)
@@ -317,12 +305,13 @@ dbWriteTable(con_alt, Id(schema, table_name), df,
              overwrite = TRUE, row.names = FALSE)
 
 # Add metadata
-column_names <- colnames(rel_res_df_final) # Get column names
+column_names <- colnames(df) # Get column names
 column_names
 column_comments <- c('Assessor ID number - use this to match to other relational tables',
                      'Flag for whether property is a residential use (e.g., use code starting with 0)',
                      'Flag for whether property is mixed residential-commercial (use code starting with 1 but with a residential combo indicated in 3rd character)',
                      'Residential type -- either single-family, multifamily, mixed use, condominium, boarding house',
+                     'Housing tenure-ownerships recoded-- Includes more categories and recodes all properties that were originally the OTHER category from the owner_renter_original column',
                      'Housing tenure-ownerships -- either homeowner (indicated by homeowner exemption), renter, homeowner-renter combo, or other (no homeowner exemption or rental units indicated',
                      'Total residential units on the property -- use caution when interpreting for mixed use - - can include commercial',
                      'Total rental units on the property -- use caution when interpreting for mixed use - can include commercial',
@@ -330,5 +319,5 @@ column_comments <- c('Assessor ID number - use this to match to other relational
                      'Total bedrooms on property',
                      'Original use code for reference')
 
-# add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+ add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
       
