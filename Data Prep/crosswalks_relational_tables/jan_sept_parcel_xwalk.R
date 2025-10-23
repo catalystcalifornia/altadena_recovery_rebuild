@@ -121,9 +121,10 @@ match_parcels <- rbind(parcels_jan, parcels_sept) %>%
   mutate(dupe_id = ifelse(group_count>1,cur_group_id(), NA)) %>%
   ungroup() 
 # 109748
-# check <- data.frame(table(match_parcels$dupe_id, useNA = "ifany"))
+check <- data.frame(table(match_parcels$dupe_id, useNA = "ifany"))
+check_2 <- data.frame(table(match_parcels$group_count, useNA = "ifany"))
 # number of dupe groups - 44524
-# number of unique shapes - 354
+# number of unique shapes - 354 --> 356?
 # total unique shapes - 44878
 
 # Make wider, clean up values to filter later
@@ -138,7 +139,7 @@ match_parcels_wide <- match_parcels %>%
     # Convert flags to binary (1/0) and handle NAs in one step
     flag_jan = as.integer(!is.na(flag_jan)),
     flag_sept = as.integer(!is.na(flag_sept)),
-    # Flag for same AIN in both months
+    # Flag for same AIN in both months -- would this be same geom?
     same_ain = as.integer(flag_jan == 1 & flag_sept == 1)
   ) %>%
   # Calculate totals by dupe_id
@@ -208,7 +209,8 @@ ambiguous <- match_parcels_wide %>%
 
 # https://portal.assessor.lacounty.gov/parceldetail/5739001072
 # https://portal.assessor.lacounty.gov/parceldetail/5739001900
-
+# looked these up in the assessor_jan and assessor_sept data to make sure they were the same house and unit numbers
+ 
 # xwalk will include a jan_ain_revised
 ambiguous_xwalk <- ambiguous %>%
   group_by(dupe_id) %>%
