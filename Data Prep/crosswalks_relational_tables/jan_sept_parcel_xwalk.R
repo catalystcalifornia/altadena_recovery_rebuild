@@ -155,7 +155,7 @@ match_parcels_wide <- match_parcels %>%
   select(dupe_id, ain, shape_match, same_ain, even_counts, everything()) %>%
   mutate(
     status = case_when(
-      shape_match==0 ~ "run intersect by month",
+      shape_match==0 ~ "run intersect by month", # no shape or ain match
       shape_match==1 & same_ain == 0 & even_counts==1 & group_count==2 ~ "diff ain pair, simple xwalk",
       shape_match==1 & same_ain == 0 & even_counts==1 & group_count>2 ~ "ambiguous matches, needs closer look",
       shape_match==1 & same_ain == 0 & even_counts==0 & group_count>2 ~ "uneven matches, needs closer look",
@@ -219,7 +219,7 @@ ambiguous_xwalk <- ambiguous %>%
     ain_sept = ain[flag_sept == 1]) %>%
   mutate(
     ain_jan_revised = ain_sept,
-    status = "ambiguous matches, needs closer look")
+    status = "jan ain deleted, new sept ain")
 
 
 ### Status: "uneven matches, needs closer look"
@@ -228,20 +228,22 @@ uneven <-  match_parcels_wide %>%
 
 # length(unique(uneven$dupe_id)) # 1
 
-# note: this shape is for a parcel deleted in 12/2024, none of the matching sept shapes
-# have valid assessor portal results
-# also this is a commercial property
+# note: this shape is for a parcel deleted in 12/2024, does not match september data files
+# does have valid assessor portal results, but deleted in 12/2024 the other parcels matched are in the sept shapefile but not in the assessor data
+# ains 5734023084 to 5734023100 - 16 units, could be in development but no information on use codes
+# https://portal.assessor.lacounty.gov/parceldetail/5734023022
+# parcels_sept %>% filter(grepl('573402308',ain)) %>% select(ain,use_code)
+# this was a commercial property
 # address: 139 S OAK KNOLL AVE PASADENA CA 91101-2608
-# Recommend revising to NA
+# Recommend revising so september records keep their ain, but the jan ain is the original 5734023022
 
 uneven_xwalk <- uneven %>%
   group_by(dupe_id) %>%
   summarise(
     ain_jan = ain[flag_jan == 1],
     ain_sept = ain[flag_sept == 1]) %>%
-  mutate(ain_jan_revised="999",
-         ain_sept_revised="999",
-         status="uneven matches, needs closer look")
+  mutate(ain_jan_revised=ain_sept,
+         status="single jan ain, multiple sept ains")
 
 
 ### Status: "run intersect by month"
@@ -264,22 +266,34 @@ jan_join <- st_intersection(jan_parcels_filtered, parcels_sept) %>%
   mutate(count= n()) %>%
   ungroup() %>%
   mutate(address_match = ifelse(address==address.1, 1, 0),
-         sept_na = ifelse(is.na(use_code.1), 1, 0),
+         sept_na = ifelse(is.na(flag.1), 1, 0), # if sept flag is na then not in sept file, use_code can be NA even if in file
          in_sept_shp = ifelse(ain %in% parcels_sept$ain, 1, 0),
          ain_match = ifelse(ain==ain.1, 1 ,0)
          ) %>%
   filter(pct_jan_overlap>0)
 
-# get results where overlapping parcels have same ain
+# explore duplicates
+
+dup_matches <- jan_join[jan_join$ain %in% jan_join$ain[duplicated(jan_join$ain)], ]
+# see https://portal.assessor.lacounty.gov/parceldetail/5327012023
+# neither 5327012023 or 5327012026 are in the september file but online map suggests closest match to 5327012026
+
+# get results where overlapping parcels have same ain -- for condos mostly, keep use code to see
 jan_ain_match <-jan_join %>% 
   filter(ain_match==1) %>%
   st_drop_geometry() %>%
-  select(ain, ain.1) %>%
+  select(ain, ain.1, pct_jan_overlap, pct_sept_overlap, use_code, use_code.1) %>%
   rename(ain_jan=ain,
          ain_sept=ain.1) %>%
-  mutate(status="run intersect by month")
+  mutate(status="spatial intersect, same ain, different shapes")
 
- length(unique(jan_ain_match$ain_jan)) # 151
+View(jan_ain_match)
+
+# matches under a 70% jan overlap seem to be just slight changes to shapes looking at maps online and comparing to postgres
+# https://portal.assessor.lacounty.gov/parceldetail/5832024005
+# SELECT ain, st_transform(geom,4326) FROM data.assessor_parcels_universe_jan2025 where ain='5832024005'
+ 
+length(unique(jan_ain_match$ain_jan)) # 151
 
 jan_leftover <- jan_join %>% 
   st_drop_geometry() %>%
@@ -288,44 +302,82 @@ jan_leftover <- jan_join %>%
 
 length(unique(jan_leftover$ain)) # 42
 
-# jan ain is a deleted parcel, should be revised to sept ain
-jan_revise_ain <- jan_leftover %>%
-  filter(address_match==1 | sept_na==0) %>% # 3
-  select(ain, ain.1) %>%
+# look at duplicates
+dup_matches <- jan_leftover[jan_leftover$ain %in% jan_leftover$ain[duplicated(jan_leftover$ain)], ]
+# very few duplicates
+
+# keep records where there is a 100% overlap with the original january file and there is a september record
+jan_revise_ain_merged <- jan_leftover %>%
+  select(ain, ain.1,pct_jan_overlap,pct_sept_overlap) %>%
+  filter(pct_jan_overlap>=100) %>%
   rename(ain_jan=ain,
          ain_sept=ain.1) %>%
   mutate(ain_jan_revised=ain_sept,
-         status="run intersect by month")
+         status="spatial intersect, jan parcel merged or split")
 
-# these should have revised sept_ains as jan ain
-bad_sept_ains <- jan_leftover %>% 
-  filter(!(ain%in%jan_revise_ain$ain_jan)) %>% 
-  group_by(ain) %>% 
-  slice(which.max(pct_jan_overlap)) %>% # 39
-  select(ain, ain.1) %>%
+View(jan_revise_ain_merged)
+
+# see what's leftover
+jan_leftover_v2 <- jan_leftover %>% 
+  filter(!ain %in% jan_revise_ain_merged$ain_jan) 
+
+
+# keep records where there is greater than a 90% overlap with the original january file and there is a september record
+jan_revise_ain_split <- jan_leftover_v2 %>%
+  filter(sept_na==0) %>%
+  select(ain, ain.1,pct_jan_overlap,pct_sept_overlap) %>%
+  filter(pct_jan_overlap>=90) %>%
   rename(ain_jan=ain,
          ain_sept=ain.1) %>%
-  mutate(ain_sept_revised=ain_jan,
-         status="run intersect by month")
+  mutate(ain_jan_revised=ain_sept,
+         status="spatial intersect, jan parcel merged or split")
 
-intersect_jan_xwalk <- bind_rows(jan_ain_match, jan_revise_ain, bad_sept_ains) %>%
-  mutate(dupe_id=NA)
+View(jan_revise_ain_split)
 
-### notes leftover - can skip to export
+
+# see what's leftover
+jan_leftover_v3 <- jan_leftover_v2 %>% 
+  filter(!ain %in% jan_revise_ain_split$ain_jan) 
+
+# https://portal.assessor.lacounty.gov/parceldetail/5757029054 split parcel
+# https://portal.assessor.lacounty.gov/parceldetail/5709030009 parcel change - 5709030033 is a better match
+# SELECT ain, st_transform(geom,4326) FROM data.assessor_parcels_universe_jan2025 where ain='5709030009'
+
+jan_revise_ain_manual <- jan_leftover_v3 %>%
+  filter(ain.1!='5709030034') %>%
+  select(ain, ain.1,pct_jan_overlap,pct_sept_overlap) %>%
+  rename(ain_jan=ain,
+         ain_sept=ain.1) %>%
+  mutate(ain_jan_revised=ain_sept,
+         status="spatial intersect manual, jan parcel split")
+
+intersect_jan_xwalk <- bind_rows(jan_ain_match, jan_revise_ain_merged, jan_revise_ain_split, jan_revise_ain_manual) %>%
+  rename(use_code_jan=use_code,
+         use_code_sept=use_code.1)
+
+# look at duplicates and make sure they make sense
+dup_matches <- intersect_jan_xwalk[intersect_jan_xwalk$ain_jan %in% intersect_jan_xwalk$ain_jan[duplicated(intersect_jan_xwalk$ain_jan)], ]
+# looks fine, some were looked at manually
+# https://portal.assessor.lacounty.gov/parceldetail/5719022111
+# 5719022101 and 5719022108 are matching to 5719022111 and 5719022114 larger parcels they were merged to
+
 # notes: some are matching to sept ains with no assessor details (e.g., use_codes and address fields are NA)
 # pull below and spot checked and these are not returning valid assessor parcel details 
+# didn't have use codes for january either
 
-jan_nas <- jan_join %>% filter(is.na(use_code.1))
-# sort(unique(jan_nas$ain.1))
-## [1] "5327012026" "5327012027" "5709030033" "5709030034" "5711010080" "5713008086" "5719022111" "5719022114" "5720001013" "5720001014" "5720001015" "5720001016" "5720001017" "5723015082"
-## [15] "5725002918" "5726018095" "5742001038" "5746016092" "5748036037" "5748036038" "5757029055" "5757029056" "5825020910" "5830015029" "5841023022" "5847020027"
-
+sept_data_nas <- intersect_jan_xwalk %>% filter(is.na(use_code_sept))
+# sort(unique(sept_data_nas$ain_jan))
+# length(unique(sept_data_nas$ain_jan)) #43
 # I'm not going to deal with sept parcels at the moment, just putting it as a placeholder here.
 intersect_sept <- match_parcels_wide %>%
   filter(status == "run intersect by month" & flag_sept==1)
 
 ##### combine xwalks and export #####
 combined_xwalks <- bind_rows(intersect_jan_xwalk, uneven_xwalk, ambiguous_xwalk, diff_ain_xwalk, same_ain_xwalk) 
+
+# check dups
+dup_matches <- combined_xwalks[combined_xwalks$ain_jan %in% combined_xwalks$ain_jan[duplicated(combined_xwalks$ain_jan)], ]
+# looks fine, includes one instance of a commercial property being split
 
 # # # Export
 # schema <- "data"
@@ -358,6 +410,7 @@ combined_xwalks <- bind_rows(intersect_jan_xwalk, uneven_xwalk, ambiguous_xwalk,
 
 missing_in_xwalk <- assessor_jan %>%
   anti_join(combined_xwalks, by = c("ain" = "ain_jan"))
+# all ains accounted for
 
 # AINs in combined_xwalk but NOT in assessor_data_universe_jan2025
 
