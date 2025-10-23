@@ -416,13 +416,14 @@ missing_in_xwalk <- assessor_jan %>%
 
 missing_in_assessor <- combined_xwalks %>%
   anti_join(assessor_jan, by = c("ain_jan" = "ain")) # This produces 48 jan AINs that are in the xwalk but not in the assessor data
+# because small selection of parcels have shapes but no data
 
 # I want to see of those 48 jan AINS from the xwalk if their corresponding sept AIN is in the jan and sept assessor data:
 
 check_missing_sept_ain_in_jan_assessor <- assessor_jan %>%
   filter(ain %in% missing_in_assessor$ain_sept)
 
-# Of the missing Jan AINs, one of the corresponding Sept AINs is in the Jan Assessor data --this one makes sense because it is the one with the updated jan AIN
+# Of the missing Jan AINs, one of the corresponding Sept AINs is in the Jan Assessor data --this one makes sense because it is the one with the updated/split jan AIN
 # So really there are only 47 Jan AINs in the xwalk missing in the Jan assessor data
 
 # Check missing ains in the sept assessor data:
