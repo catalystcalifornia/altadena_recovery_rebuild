@@ -22,9 +22,7 @@ library(tidyverse)
 library(janitor)
 library(mapview)
 library(writexl)
-library(lwgeom)  # provides st_oriented_envelope()
-# install.packages("lwgeom", type = "source")
-# ?st_oriented_envelope
+
 
 options(scipen=999)
 
