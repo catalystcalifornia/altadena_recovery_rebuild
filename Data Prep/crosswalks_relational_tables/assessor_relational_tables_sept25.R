@@ -23,7 +23,8 @@ library(janitor)
 library(mapview)
 library(writexl)
 library(lwgeom)  # provides st_oriented_envelope()
-
+# install.packages("lwgeom", type = "source")
+# ?st_oriented_envelope
 
 options(scipen=999)
 
@@ -46,7 +47,8 @@ res <- st_read(con_alt, query="Select * from data.rel_assessor_residential_jan20
 
 damage <- st_read(con_alt, query="Select * from data.rel_assessor_damage_level")
 
-shapes <- st_read(con_alt, query="Select * from data.rel_assessor_altadena_parcels_jan2025", geom="geom")
+shapes <- st_read(con_alt, query="Select * from data.rel_assessor_altadena_parcels_jan2025", geom="geom") %>%
+  rename(ain_jan=ain)
 
 # get custom data from september
 assessor_custom <- st_read(con_alt, query="Select * from data.assessor_customdata_universe_sept2025")
@@ -441,7 +443,7 @@ View(sales_final)
 # STEP 5: TABLE 3: Table with geometry and lot size and indicator for west/east altadena based on january parcels ------
 # select geometries from september in the data we want
 sept_shapes <- assessor_parcels %>% 
-  filter(ain %in% rel_res_df_final$ain_sept)
+  filter(ain %in% jan_sept_xwalk_alt$ain_sept)
 
 nrow(rel_res_df_final)
 nrow(sept_shapes)
@@ -452,7 +454,7 @@ sept_custom_data <- assessor_custom %>%
   filter(ain %in% sept_shapes$ain)
 
 nrow(sept_custom_data)
-# looks good --this data has lot size which we want to test if we can calculate lot size on our own for same results
+# looks good missing data for the same 4 parcels --this data has lot size which we want to test if we can calculate lot size on our own for same results
 
 sept_shapes <- sept_shapes %>%
   left_join(sept_custom_data %>% select(ain,lot_size)) %>%
@@ -475,252 +477,305 @@ sept_shapes <- sept_shapes %>%
                          )) %>%
   select(-c(diff, diff_calculated))
 
-# calculate the width and length of each parcels
-# from ChatGPT
-# Apply bounding box extraction per feature
-bbox_list <- lapply(st_geometry(sept_shapes), st_bbox)
+# add west and east identifier so we don't need to to match to jan every time we run the analysis
+sept_shapes_alt <- sept_shapes %>%
+  left_join(jan_sept_xwalk_alt, by=c("ain"="ain_sept")) %>%
+  left_join(shapes %>% st_drop_geometry(), by=c("ain_jan"="ain_jan")) 
 
-# Convert list of bbox to data frame
-bbox_df <- do.call(rbind, lapply(bbox_list, function(b) {
-  data.frame(
-    xmin = b["xmin"],
-    xmax = b["xmax"],
-    ymin = b["ymin"],
-    ymax = b["ymax"]
-  )
-}))
+# clean up
+sept_shapes_final <- sept_shapes_alt %>%
+  select(ain,area_name,area_label,lot_size, lot_area) %>%
+  rename(ain_sept=ain)
 
-# Compute width and length
-bbox_df$width <- bbox_df$xmax - bbox_df$xmin
-bbox_df$length <- bbox_df$ymax - bbox_df$ymin
+# mapview(sept_shapes_final)
 
-sept_shapes_w_l <- cbind(sept_shapes, bbox_df)
-
-sept_shapes_w_l <- sept_shapes_w_l %>%
-  mutate(width=width*3.28084, #3310 produces in meters convert to feet
-         length=length*3.28084)
-
-View(sept_shapes_w_l)
-## too big, see
-# https://portal.assessor.lacounty.gov/parceldetail/5831009001
-# need the smallest bounding box?
-
-mbrs <- st_oriented_envelope(sept_shapes)
-
-# Function to compute rectangle side lengths
-get_sides <- function(rect) {
-  coords <- st_coordinates(rect)[, 1:2]   # x, y
-  # consecutive points
-  dists <- sqrt(diff(coords[,1])^2 + diff(coords[,2])^2)
-  # rectangle: two unique side lengths (each repeats twice)
-  sort(unique(round(dists, 6)))  # avoid floating precision
-}
-
-# Apply to all polygons
-sides_list <- lapply(mbrs, get_sides)
-
-# Extract shortest and longest sides
-shortest <- sapply(sides_list, min)
-longest  <- sapply(sides_list, max)
-
-polygons$shortest_width <- shortest
-polygons$longest_length <- longest
-
-
-rel_area_geom_df <- parcels_altadena %>%
-  select(ain,name,label) %>%
-  rename(area_name=name,
-         area_label=label)
-
-# select just the residential/mixed uses that we found in the assessor data
-rel_area_geom_df <- rel_area_geom_df %>%
-  filter(ain %in% rel_res_df_final$ain)
-
-# QA quick check---checks out we got the same AINs
-
-# sum(as.numeric(unique(rel_area_geom_df$ain))) # 75678334063382
-# sum(as.numeric(unique(rel_res_df_final$ain))) # 75678334063382
-
-
-# table_name <- "rel_assessor_altadena_parcels_jan2025"
+# # Export to postgres
+# table_name <- "rel_assessor_altadena_parcels_sept2025"
 # schema <- "data"
-# indicator <- "Relational spatial table with geometries and area flags for residential/mixed use properties in either West or East Altadena proper"
-# source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
-# qa_filepath<-"  QA_sheet_relational_tables.docx "
+# indicator <- "Relational spatial table with geometries and area flags for residential/mixed use properties in either West or East Altadena proper as of September 2025"
+# source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_sept25.R "
+# qa_filepath<-"  QA_sheet_relational_tables_sept25.docx "
 # 
-# export_shpfile(con=con_alt, df=rel_area_geom_df, schema="data",
-#                table_name= "rel_assessor_altadena_parcels_jan2025",
+# export_shpfile(con=con_alt, df=sept_shapes_final, schema="data",
+#                table_name="rel_assessor_altadena_parcels_sept2025",
 #                geometry_column = "geom")
-
-
-# Add metadata
-column_names <- colnames(rel_area_geom_df) # Get column names
-column_names
-column_comments <- c('Assessor ID number - use this to match to other relational tables',
-                     'West or East Altadena shortened label',
-                     'West or East Altadena long label',
-                     'geometry')
-
+# 
+# 
+# # Add metadata
+# column_names <- colnames(sept_shapes_final) # Get column names
+# column_names
+# column_comments <- c('Assessor ID number for September - use this to match to other relational tables',
+#                      'West or East Altadena shortened label based on parcel as of January',
+#                      'West or East Altadena long label based on parcel as of January',
+#                      'lot size provided from assessor - doesnt match portal',
+#                      'lot size provided from assessor or calculated by us using st_area when missing from assessor data - doesnt match portal',
+#                      'geometry')
+# 
 # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
+# STEP 6: TABLE 4: Damage categories based on January ------
+# So we don't need to join the damage categories to every September parcel in each script, let's push a relational table based on january categories
+damage_sept <- jan_sept_xwalk_alt %>%
+  left_join(damage %>% select(ain,damage_category),
+            by=c("ain_jan"="ain"))
 
-# STEP 5: TABLE 3: Damage categories ------
-# We need to summarise at assessor ID number the damage categories based on our definitions
-# any parcel with at least one building damaged or majorly destroyed >25% is counted as significant damage
-# any parcel with maximum of an affecting or minor <25% damage is counted as some damage
-# no damage or inaccessible is counted as no damage
+nrow(damage_sept)
+length(unique(damage_sept$ain_sept))
+# one duplicate
 
-# I want the following columns: overall damage category based on groups, binary columns with count of structures in each damage level, list of damage types, count of structures assessed
+# are there different damage assessments with duplicates?
+damage_sept_final <- damage_sept %>%
+  group_by(ain_sept,damage_category) %>%
+  summarise(count=n())
 
-# keep just AINs in our residential or mixed used base
-residential_ains <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_residential_jan2025")
+nrow(damage_sept_final)
+# one damage category for the duplicate, now same rows as unique september ains
+# what's missing?
+missing <- damage_sept_final %>%
+  anti_join(rel_res_df_final)
+# These are the same we don't have data for so fine for now, but we have shapes so keep
 
-dins_xwalk_res <- dins_xwalk %>% 
-  filter(ain %in% residential_ains$ain)
-
-length(unique(dins_xwalk_res$ain))
-length(unique(residential_ains$ain))
-# some parcels aren't assessed if they aren't in the fire perimeter
-# mapview(dins_xwalk_res) +
-#   mapview(eaton_fire,col.regions="red") +
-#   mapview(parcels_altadena)
-# looks pretty good, some holes are from commercial, parks, schools, etc.
-
-## Create binary columns for each damage level -----
-table(dins_xwalk_res$damage)
-
-dins_xwalk_res <- dins_xwalk_res %>%
-  mutate(destroyed_damage=ifelse(damage=="Destroyed (>50%)", 1,0),
-         major_damage=ifelse(damage=="Major (26-50%)", 1,0),
-         minor_damage=ifelse(damage=="Minor (10-25%)",1,0),
-         affected_damage=ifelse(damage=="Affected (1-9%)",1,0),
-         no_damage=ifelse(damage=="No Damage",1,0),
-         inaccessible_damage=ifelse(damage=="Inaccessible",1,0))
-
-# check
-dins_xwalk_res %>%
-  select(damage,ends_with("_damage")) %>%
-  View()
-# looks good
-
-rel_assessor_dins <- dins_xwalk_res %>%
-  st_drop_geometry() %>%
-  group_by(ain) %>%
-  summarise(
-    structure_count=n(),
-    destroyed_damage_count=sum(destroyed_damage),
-    major_damage_count=sum(major_damage),
-    minor_damage_count=sum(minor_damage),
-    affected_damage_count=sum(affected_damage),
-    no_damage_count=sum(no_damage),
-    inaccessible_damage_count=sum(inaccessible_damage),
-    damage_type_list=list(unique(damage))
-  )
-
-# check counts
-nrow(dins_xwalk_res)
-sum(rel_assessor_dins$structure_count)
-# checks out
-
-sum(rel_assessor_dins$destroyed_damage_count)
-# checks out
-
-## Create a single damage category based on highest damage level -----
-rel_assessor_dins <- rel_assessor_dins %>%
-  ungroup() %>%
-  mutate(damage_category = case_when(
-    destroyed_damage_count>=1 ~ "Significant Damage", # top code so destroyed goes first
-    major_damage_count>=1 ~ "Significant Damage", # same coding for highest damage of major
-    minor_damage_count>=1 ~ "Some Damage", # next category
-    affected_damage_count>=1 ~ "Some Damage",
-    no_damage_count>=1 ~ "No Damage",
-    inaccessible_damage_count>=1 ~ "No Damage",
-    TRUE ~ NA))
-
-# check
-rel_assessor_dins %>%
-  select(damage_category,everything()) %>%
-  View()
-# looks good
-
-check <- rel_assessor_dins %>%
-  group_by(damage_category,damage_type_list) %>%
-  count()
-# looks good
-
-# sort list of damage for easier viewing
-rel_assessor_dins$damage_type_list <- lapply(rel_assessor_dins$damage_type_list,sort)
-
-check <- rel_assessor_dins %>%
-  group_by(damage_category,damage_type_list) %>%
-  count()
-
-View(check)
-# looks good
-
-# add a column with the count of unique damage types
-rel_assessor_dins<- rel_assessor_dins %>%
-  group_by(ain) %>%
-  mutate(damage_type_count=length(unique(damage_type_list[[1]]))) %>%
-  ungroup() %>%
-  mutate(mixed_damage=ifelse(damage_type_count<2, "One Damage Type",
-                             "Two or More"))
-
-rel_assessor_dins %>%
-  select(damage_type_count,damage_type_list,mixed_damage) %>%
-  View()
-# looks good
-
-## Clean up and push to postgres----
-rel_assessor_dins_final <- rel_assessor_dins %>%
-  rowwise() %>%
-  mutate(damage_type_list=paste(damage_type_list,collapse=', '), # make list column easier to read
-         source="CalFire DINS") %>% # add a source column so we know that it came from CalFire
-  select(ain, damage_category,source,structure_count,mixed_damage,everything()) 
-
-View(rel_assessor_dins_final)
-nrow(rel_assessor_dins_final)
-length(unique(rel_assessor_dins_final$ain))
-# final check of unique AINs, looks good
-
-# I want to add the unassessed properties too so we can easily loop over this relational table for analysis, so any properties not in the database is labeled as no damage
-residential_ains_no_damage <- residential_ains %>%
-  filter(!ain %in% rel_assessor_dins_final$ain) %>%
-  select(ain) %>%
-  mutate(damage_category="No Damage",
-         source="Assessor Parcel Outside of Fire Area")
-
-rel_assessor_dins_final_final <- bind_rows(rel_assessor_dins_final,residential_ains_no_damage)
-
-
-table_name <- "rel_assessor_damage_level"
-schema <- "data"
-indicator <- "Relational table that contains summarised damage levels for assessor IDS assessed by CalFire post the Eaton Fire, Unlike the damage inspection database, this table is at the unique parcel level rather than building level
-Table includes all residential parcels in Altadena. If they werent assessed then No Damage is assumed. The source column indicates if the parcel was assessed or we are assuming No Damage because outside of fire area and/or not assessed"
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
-qa_filepath<-"  QA_sheet_relational_tables.docx "
-
-# dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final_final,
+# clean up and push to postgres
+damage_sept_final <- damage_sept_final %>%
+  select(-count) %>%
+  ungroup()
+#
+# table_name <- "rel_assessor_damage_level_sept2025"
+# schema <- "data"
+# indicator <- "Relational table that contains summarised damage levels for assessor IDS as of September 2025, based on the assessed damage of their matched January parcels by CalFire post the Eaton Fire, Unlike the damage inspection database, this table is at the unique parcel level rather than building level
+# Table includes all residential parcels in Altadena. If they werent assessed then No Damage is assumed. See the january damage table for further detail on the structures and number of damage categories recorded on each parcel, use the jan sept relational table to join"
+# source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_sept25.R "
+# qa_filepath<-"  QA_sheet_relational_tables_sept25.docx "
+# 
+# dbWriteTable(con_alt, Id(schema, table_name), damage_sept_final,
 #              overwrite = FALSE, row.names = FALSE)
-
-
-# Add metadata
-column_names <- colnames(rel_assessor_dins_final_final) # Get column names
-column_names
-column_comments <- c('Assessor ID number - use this to match to other relational tables',
-                     'Overall damage category level -- top coded so highest damage level of a building on the property takes precedent',
-                     'Whether damage category is based on CalFire DINs or assumed because not in the database',
-                     'Number of structures assessed by CalFire associated with AIN',
-                     'Indicator for whether there was a one type of damage or two or more',
-                     'total count for destroyed structures on property',
-                     'total count for major damage structures on property',
-                     'total count for minor damage structures on property',
-                     'total count for affected damage structures on property',
-                     'total count for no damage structures on property',
-                     'total count for inaccessible structures on property',
-                     'list of unique damage types assigned to property by CalFire',
-                     'Total unique types of damage')
-
+# 
+# # Add metadata
+# column_names <- colnames(damage_sept_final) # Get column names
+# column_names
+# column_comments <- c('Assessor ID number from September- use this to match to other relational tables',
+#                      'Overall damage category level -- top coded so highest damage level of a building on the property takes precedent')
+# 
 # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# 
+
+
+##### IN PROGRESS - Need length and width of each parcel--not working to match assessor portal -------
+# # calculate the width and length of each parcels
+# # from ChatGPT
+# # Apply bounding box extraction per feature
+# bbox_list <- lapply(st_geometry(sept_shapes), st_bbox)
+# 
+# # Convert list of bbox to data frame
+# bbox_df <- do.call(rbind, lapply(bbox_list, function(b) {
+#   data.frame(
+#     xmin = b["xmin"],
+#     xmax = b["xmax"],
+#     ymin = b["ymin"],
+#     ymax = b["ymax"]
+#   )
+# }))
+# 
+# # Compute width and length
+# bbox_df$width <- bbox_df$xmax - bbox_df$xmin
+# bbox_df$length <- bbox_df$ymax - bbox_df$ymin
+# 
+# sept_shapes_w_l <- cbind(sept_shapes, bbox_df)
+# 
+# sept_shapes_w_l <- sept_shapes_w_l %>%
+#   mutate(width=width*3.28084, #3310 produces in meters convert to feet
+#          length=length*3.28084)
+# 
+# View(sept_shapes_w_l)
+# ## too big, see
+# # https://portal.assessor.lacounty.gov/parceldetail/5831009001
+# # need the smallest bounding box?
+# 
+# # Function to compute minimum rotated rectangle (manual version)
+# min_bbox <- function(geom) {
+#   coords <- st_coordinates(st_convex_hull(geom))[, 1:2]
+#   ch <- coords[grDevices::chull(coords), ]
+#   
+#   best_area <- Inf
+#   best_rect <- NULL
+#   
+#   for (i in 1:(nrow(ch)-1)) {
+#     # Compute angle of each edge
+#     dx <- ch[i+1,1] - ch[i,1]
+#     dy <- ch[i+1,2] - ch[i,2]
+#     angle <- atan2(dy, dx)
+#     
+#     # Rotate points
+#     rot <- matrix(c(cos(-angle), -sin(-angle), sin(-angle), cos(-angle)), 2, 2)
+#     rot_pts <- as.matrix(ch) %*% rot
+#     
+#     # Get bounding box
+#     xmin <- min(rot_pts[,1]); xmax <- max(rot_pts[,1])
+#     ymin <- min(rot_pts[,2]); ymax <- max(rot_pts[,2])
+#     
+#     area <- (xmax - xmin) * (ymax - ymin)
+#     
+#     # Keep smallest-area rectangle
+#     if (area < best_area) {
+#       best_area <- area
+#       best_rect <- list(
+#         width  = xmax - xmin,
+#         height = ymax - ymin,
+#         angle  = angle
+#       )
+#     }
+#   }
+#   
+#   return(best_rect)
+# }
+# 
+# # Apply to all polygons
+# dims <- lapply(st_geometry(sept_shapes), min_bbox)
+# sept_shapes$shortest_width <- sapply(dims, function(x) min(x$width, x$height))
+# sept_shapes$longest_length <- sapply(dims, function(x) max(x$width, x$height))
+# sept_shapes$orientation    <- sapply(dims, function(x) x$angle)
+# 
+# sept_shapes <- sept_shapes %>%
+#   mutate(width=shortest_width*3.28084, #3310 produces in meters convert to feet
+#          length=longest_length*3.28084)
+# 
+# 
+# 
+# 
+# #----------------------------------------------------
+# # Function to calculate lot width and depth assuming
+# # the FRONT LOT LINE = LONGEST EDGE
+# #----------------------------------------------------
+# lot_metrics_longest_front <- function(polygon) {
+#   # Return NA if geometry is empty
+#   if (length(polygon) == 0 || st_is_empty(polygon)) {
+#     return(data.frame(lot_depth = NA, lot_width = NA))
+#   }
+#   
+#   # Ensure valid geometry
+#   polygon <- st_make_valid(polygon)
+#   
+#   # Extract boundary (outer + inner rings)
+#   boundary <- st_boundary(polygon)           # MULTILINESTRING
+#   lines <- st_cast(boundary, "LINESTRING")   # individual LINESTRINGs
+#   
+#   # Split each LINESTRING into consecutive edges
+#   edges <- do.call(rbind, lapply(st_geometry(lines), function(ls) {
+#     coords <- st_coordinates(ls)[, 1:2]  # just X,Y
+#     n <- nrow(coords)
+#     if (n < 2) return(NULL)
+#     data.frame(
+#       x1 = coords[1:(n-1),1],
+#       y1 = coords[1:(n-1),2],
+#       x2 = coords[2:n,1],
+#       y2 = coords[2:n,2]
+#     )
+#   }))
+#   
+#   if (is.null(edges) || nrow(edges) == 0) {
+#     return(data.frame(lot_depth = NA, lot_width = NA))
+#   }
+#   
+#   # Edge lengths & midpoints
+#   edges$length <- sqrt((edges$x2 - edges$x1)^2 + (edges$y2 - edges$y1)^2)
+#   edges$mid_x <- (edges$x1 + edges$x2)/2
+#   edges$mid_y <- (edges$y1 + edges$y2)/2
+#   
+#   # 1️⃣ Front = longest edge
+#   front <- edges[which.max(edges$length), ]
+#   front_mid <- c(front$mid_x, front$mid_y)
+#   
+#   # 2️⃣ Rear = farthest edge midpoint
+#   edges$dist <- sqrt((edges$mid_x - front_mid[1])^2 + (edges$mid_y - front_mid[2])^2)
+#   rear <- edges[which.max(edges$dist), ]
+#   rear_mid <- c(rear$mid_x, rear$mid_y)
+#   
+#   # 3️⃣ Lot depth
+#   lot_depth <- sqrt(sum((rear_mid - front_mid)^2))
+#   
+#   # 4️⃣ Midpoint of depth line
+#   mid_depth <- (front_mid + rear_mid)/2
+#   depth_vec <- rear_mid - front_mid
+#   depth_unit <- depth_vec / sqrt(sum(depth_vec^2))
+#   perp_vec <- c(-depth_unit[2], depth_unit[1])
+#   
+#   # 5️⃣ Perpendicular line for width
+#   perp_line <- st_sfc(st_linestring(rbind(
+#     mid_depth + 1000 * perp_vec,
+#     mid_depth - 1000 * perp_vec
+#   )), crs = st_crs(polygon))
+#   
+#   # 6️⃣ Intersection with polygon boundary
+#   poly_line <- st_union(lines)
+#   ints <- st_intersection(perp_line, poly_line)
+#   coords_int <- st_coordinates(ints)[, 1:2]
+#   
+#   # Compute width
+#   if (nrow(coords_int) >= 2) {
+#     lot_width <- sqrt((coords_int[1,1] - coords_int[2,1])^2 +
+#                         (coords_int[1,2] - coords_int[2,2])^2)
+#   } else {
+#     lot_width <- NA
+#   }
+#   
+#   return(data.frame(lot_depth = lot_depth, lot_width = lot_width))
+# }
+# 
+# 
+# #----------------------------------------------------
+# # Example use
+# #----------------------------------------------------
+# # Apply the function to all polygons
+# # Ensure valid geometries and remove empty ones
+# lots <- st_make_valid(sept_shapes)
+# lots <- lots[!st_is_empty(lots), ]
+# 
+# # Compute lot metrics for all polygons
+# results <- lapply(st_geometry(lots), lot_metrics_longest_front)
+# metrics_df <- do.call(rbind, results)
+# 
+# # Add to your sf data frame
+# lots$lot_depth <- metrics_df$lot_depth*3.28084
+# lots$lot_width <- metrics_df$lot_width*3.28084
+# 
+# lot_metrics_pca <- function(polygon) {
+#   if (length(polygon) == 0 || st_is_empty(polygon)) {
+#     return(data.frame(lot_depth = NA, lot_width = NA))
+#   }
+#   
+#   # Ensure valid geometry
+#   polygon <- st_make_valid(polygon)
+#   
+#   # Extract all coordinates
+#   coords <- st_coordinates(st_boundary(polygon))[, 1:2]
+#   
+#   # Center the coordinates
+#   coords_centered <- scale(coords, center = TRUE, scale = FALSE)
+#   
+#   # PCA on coordinates
+#   pca <- prcomp(coords_centered)
+#   
+#   # Rotate coordinates along principal axes
+#   rotated <- coords_centered %*% pca$rotation
+#   
+#   # Compute ranges along first and second principal axes
+#   range_x <- range(rotated[,1])
+#   range_y <- range(rotated[,2])
+#   
+#   lot_depth <- diff(range_y)  # along minor axis
+#   lot_width <- diff(range_x)  # along major axis
+#   
+#   return(data.frame(lot_depth = lot_depth, lot_width = lot_width))
+# }
+# 
+# results <- lapply(st_geometry(sept_shapes), lot_metrics_pca)
+# metrics_df <- do.call(rbind, results)
+# 
+# lots$lot_depth <- metrics_df$lot_depth*3.28084
+# lots$lot_width <- metrics_df$lot_width*3.28084
+# 
+
+
+
 
