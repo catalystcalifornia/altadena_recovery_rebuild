@@ -1,6 +1,7 @@
 # Create the following relational tables for analysis
 # 1: Residential properties from January with September AINs and corresponding info from Sept:
 ## use codes
+## zoning
 ## type of residential property (single family, rental)
 ## homeowner/renter
 
@@ -21,6 +22,8 @@ library(tidyverse)
 library(janitor)
 library(mapview)
 library(writexl)
+library(lwgeom)  # provides st_oriented_envelope()
+
 
 options(scipen=999)
 
@@ -313,11 +316,11 @@ table(rel_res_df$tax_stat_key) # go back and run for january
 
 table(rel_res_df$doc_reason_code) 
 
-table(rel_res_df$land_reason_key) # go back and run for january - why doesn't this have a W value for misfortunate?
+table(rel_res_df$land_reason_key) # go back and run for january - why doesn't this have a W value for misfortunate?, there are numbers in the field though there are no numbers in data dictionary go back and ask assessor
 
-table(rel_res_df$impairment_key) 
+table(rel_res_df$impairment_key) # values not in data dictionary
 
-table(rel_res_df$document_key) 
+table(rel_res_df$document_key) # not in data dictionary
 
 # clean up sales date
 sales <- rel_res_df %>% 
@@ -332,18 +335,198 @@ sales <- rel_res_df %>%
          tax_stat_key,
          impairment_key,
          partial_interest,
-         exemption_type) 
+         exemption_type
+         ) 
 
 sales <- sales %>%
   mutate(last_sale_char=as.character(last_sale_date),
-    last_sale_date_test=as.Date(last_sale_char, format = "%Y%m%d"))
+    last_sale_date=as.Date(last_sale_char, format = "%Y%m%d"),
+    sale_two_char=as.character(sale_two_date),
+    sale_two_date=as.Date(sale_two_char, format = "%Y%m%d"),
+    sale_three_char=as.character(sale_three_date),
+   sale_three_date=as.Date(sale_three_char, format = "%Y%m%d")
+    )
 
-# select just the residential/mixed uses that we found in the assessor data
-rel_area_geom_df <- rel_area_geom_df %>%
-  filter(ain %in% rel_res_df_final$ain)
+View(sales) # looks good
+## extract year and month of most recent sale and flag for if sale took place after Eaton
+# what date to use for flag of being sold after Eaton?
+# first sale occurred in February according to news sources - https://www.cbsnews.com/losangeles/news/first-altadena-property-with-home-destroyed-by-eaton-fire-hits-market-sells-within-days/
+# fire started on January 7th, 2025  https://www.fire.ca.gov/incidents/2025/1/7/eaton-fire
+# LASD allowed all residents to at least visit their properties on 1/21-25 -- use thise date https://www.instagram.com/p/DFGeGEOBbw5/?hl=en
+
+sales <- sales %>%
+  mutate(last_sale_year=format(last_sale_date,"%Y"),
+         last_sale_month=format(last_sale_date,"%m"),
+         sold_after_eaton=ifelse(last_sale_date>"2025-01-21", TRUE, FALSE))
+
+sales %>% 
+  select(ain,last_sale_year,last_sale_month, last_sale_date, sold_after_eaton,land_reason_key) %>% 
+  arrange(desc(last_sale_date)) %>% 
+            View()
+
+# # sold 2/7/25 - had listed prior and then relisted 
+# https://portal.assessor.lacounty.gov/parceldetail/5827004009
+# https://www.redfin.com/CA/Altadena/453-Alberta-St-91001/home/7251344
+# 
+# # sold 2/10/25 unclear when listed
+# https://portal.assessor.lacounty.gov/parceldetail/5841013002
+# http://redfin.com/CA/Altadena/3000-Santa-Anita-Ave-91001/home/7258703
+# 
+# # sold 2025-02-11 listed 1/30/25
+# https://www.redfin.com/CA/Altadena/92-E-Harriet-St-91001/home/7255666
+# https://portal.assessor.lacounty.gov/parceldetail/5835031011
+
+# based on news article and this data, lets use date of 2-8-25 for sale after fire -- escrow takes 30 days to close anyways typically
+
+sales <- sales %>%
+  mutate(sold_after_eaton=ifelse(last_sale_date>="2025-02-08", TRUE, FALSE))
+
+# clean up for postgres
+sales_final <- sales %>%
+  select(ain,
+         sold_after_eaton, last_sale_year, last_sale_month, 
+         first_owner_name, first_owner_name_overflow, second_owner_name,
+         recording_date, 
+         ownership_code, doc_reason_code, land_reason_key, partial_interest,
+         tax_stat_key, year_sold_to_state, impairment_key,
+         last_sale_date, last_sale_verif_key, last_sale_amount,
+         sale_two_date, sale_two_verif_key, sale_two_amount,
+         sale_three_date, sale_three_verif_key, sale_three_amount) %>%
+  rename(ain_sept=ain)
+
+View(sales_final)
+
+# table_name <- "rel_assessor_sales_sept2025"
+# schema <- "data"
+# indicator <- "Relational table with information on sales date and ownership/documentation changes. Includes a flag for sales of properties that were likely listed after the fire"
+# source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_sept25.R
+# See Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.pdf for full data dictionary"
+# qa_filepath<-"  QA_sheet_relational_tables_sept25.docx "
+# 
+# dbWriteTable(con_alt, Id(schema, table_name), sales_final,
+#              overwrite = FALSE, row.names = FALSE)
+
+# # Add metadata
+# column_names <- colnames(sales_final) # Get column names
+# column_names
+# column_comments <- c('ain for september use to match to other tables',
+#         ' true false field for if sale took place after 2-8-25--likely to have been listed after eaton fire', 
+#          'year of last sale', 
+#          'month of last sale in number format', 
+#          'owner name', 
+#          "owner name overflow", 
+#          "second owner name",
+#          " This is the date of last change or correction of ownership", 
+#          "This element contains a code that describes the relationships between the recording and valuation dates", 
+#          "This element contains a one digit code which identifies the specific reason for a reappraisable or  non reappraisable status", 
+#         "Reason key for the last land value change", 
+#          "The percentage of property involved in a transfer of ownership. First two digits are percentage of property being transferred rounded to nearest whole. Third digit indicates the specific interest being transferred",
+#          "A one-digit code that indicates whether or not property taxes are delinquent", 
+#          "If parcel is delinquent, this indicates the four digits of the year in which taxes first became delinquent", 
+#         "A key indicating whether the parcel value has been impaired and describing the impairment",
+#          "This is the last sale date - Present for both verified and unverified sales", 
+#          "Verification key of last sale - only unverified sales appear on the Secured Basic File Abstract", 
+#          "Last unverified sale amount - If the sale is a verified sale (non-numeric character as indicated on the verifications key), the sale amount will not show",
+#         "This is the second to last sale date - Present for both verified and unverified sales", 
+#         "Verification key of second to last sale - Only unverified sales appear on the Secured Basic File Abstract", 
+#         "Second to Last unverified sale amount - If the sale is a verified sale (non-numeric character as indicated on the verifications key), the sale amount will not show",
+#         "This is the third to last sale date - Present for both verified and unverified sales", 
+#         "Verification key of third to last sale - Only unverified sales appear on the Secured Basic File Abstract", 
+#         "Third to last unverified sale amount - If the sale is a verified sale (non-numeric character as indicated on the verifications key), the sale amount will not show")
+# 
+# add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
-# STEP 4: TABLE 2: Table to indicate West or East Altadena with geometry and lot size ------
+
+# STEP 5: TABLE 3: Table with geometry and lot size and indicator for west/east altadena based on january parcels ------
+# select geometries from september in the data we want
+sept_shapes <- assessor_parcels %>% 
+  filter(ain %in% rel_res_df_final$ain_sept)
+
+nrow(rel_res_df_final)
+nrow(sept_shapes)
+# looks good
+
+# get the same parcels from the custom data
+sept_custom_data <- assessor_custom %>%
+  filter(ain %in% sept_shapes$ain)
+
+nrow(sept_custom_data)
+# looks good --this data has lot size which we want to test if we can calculate lot size on our own for same results
+
+sept_shapes <- sept_shapes %>%
+  left_join(sept_custom_data %>% select(ain,lot_size)) %>%
+  mutate(lot_size=as.numeric(lot_size),
+         area_calculated=as.numeric(st_area(geom))*10.7639) # area for 3310 is in square meets so convert to square feet
+
+# calculate difference between shape area and lot size
+sept_shapes <- sept_shapes %>%
+  mutate(diff=lot_size-shape_area,
+         diff_calculated=lot_size-area_calculated)
+
+# event lot size isn't accurate with the assessor portal
+# https://portal.assessor.lacounty.gov/parceldetail/5832024007
+# https://portal.assessor.lacounty.gov/parceldetail/5857034024
+# go with lot size, and if not there, then our calculated area
+
+sept_shapes <- sept_shapes %>%
+  mutate(lot_area=ifelse(is.na(lot_size),area_calculated,
+                         lot_size
+                         )) %>%
+  select(-c(diff, diff_calculated))
+
+# calculate the width and length of each parcels
+# from ChatGPT
+# Apply bounding box extraction per feature
+bbox_list <- lapply(st_geometry(sept_shapes), st_bbox)
+
+# Convert list of bbox to data frame
+bbox_df <- do.call(rbind, lapply(bbox_list, function(b) {
+  data.frame(
+    xmin = b["xmin"],
+    xmax = b["xmax"],
+    ymin = b["ymin"],
+    ymax = b["ymax"]
+  )
+}))
+
+# Compute width and length
+bbox_df$width <- bbox_df$xmax - bbox_df$xmin
+bbox_df$length <- bbox_df$ymax - bbox_df$ymin
+
+sept_shapes_w_l <- cbind(sept_shapes, bbox_df)
+
+sept_shapes_w_l <- sept_shapes_w_l %>%
+  mutate(width=width*3.28084, #3310 produces in meters convert to feet
+         length=length*3.28084)
+
+View(sept_shapes_w_l)
+## too big, see
+# https://portal.assessor.lacounty.gov/parceldetail/5831009001
+# need the smallest bounding box?
+
+mbrs <- st_oriented_envelope(sept_shapes)
+
+# Function to compute rectangle side lengths
+get_sides <- function(rect) {
+  coords <- st_coordinates(rect)[, 1:2]   # x, y
+  # consecutive points
+  dists <- sqrt(diff(coords[,1])^2 + diff(coords[,2])^2)
+  # rectangle: two unique side lengths (each repeats twice)
+  sort(unique(round(dists, 6)))  # avoid floating precision
+}
+
+# Apply to all polygons
+sides_list <- lapply(mbrs, get_sides)
+
+# Extract shortest and longest sides
+shortest <- sapply(sides_list, min)
+longest  <- sapply(sides_list, max)
+
+polygons$shortest_width <- shortest
+polygons$longest_length <- longest
+
+
 rel_area_geom_df <- parcels_altadena %>%
   select(ain,name,label) %>%
   rename(area_name=name,
