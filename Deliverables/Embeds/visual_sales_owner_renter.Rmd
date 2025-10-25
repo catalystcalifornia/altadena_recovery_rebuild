@@ -1,0 +1,103 @@
+---
+title: ""
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+## The following document outputs a visual of the housing stock before in a table format for the altadena_housing_before_and_after.html 
+
+#### Setting Up ####
+
+library(usethis)
+library(dplyr)
+library(tidyverse)
+library(htmltools) 
+library(htmlwidgets)
+library(gtExtras)
+library(gt)
+library(sf)
+library(scales)
+
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+
+## COLORS ##
+orange <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+```
+
+Only a small percentage of properties have been sold in Altadena since the Eaton Fire. In total, 279 properties were sold between February 8th, 2025, and August, 2025 (the latest data received for this project). About 61% of these properties were in West Altadena and 39% in East Altadena. Looking at the rate of sales by damage categories, significantly damaged properties are selling at a faster rate than other damaged properties. However, only three percent of significantly damaged properties have sold in Altadena.
+
+```{r}
+#### VISUAL: Sale rates by damage and area ####
+df_ <- st_read(con, query="Select * from data.analysis_sales_owner_renter_sept2025") 
+
+df <- df_ %>%
+    filter(sold_after_eaton == "Sold") 
+
+df <- df %>%
+  select(-c(sold_after_eaton,owner_renter_total)) %>%
+  mutate("Count (%)"=paste0(comma(sold_count)," (",round(sold_prc,0),"%)"),
+         "Share of Housing Type Sold"=sold_prc,
+         "Owner or Renter Occupied" = owner_renter,
+         "Area" = str_to_title(area_name)) %>%
+  mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
+  arrange(desc(sold_count)) 
+
+
+table<- df %>%
+  select("Area","Owner or Renter Occupied", "Share of Housing Type Sold", "Count (%)")%>%
+  gt(groupname_col = "Area", rowname_col = "Owner or Renter Occupied") %>%
+  # tab_header(title= str_wrap("East Altadena has a few more homeowners but overall the region is made up of majority homeowners", width = 20))%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
+
+ table %>%
+  gt_plt_bar_pct(column= 'Share of Housing Type Sold', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  # if needed modify column widths here 
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
+  opt_align_table_header("left")%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  tab_options(table.background.color=alabaster,
+    column_labels.background.color = "transparent",
+    table.font.size = px(12),
+    column_labels.font.size = px(12),
+    heading.align = "left",
+    table.font.names = "Inter",
+    heading.title.font.size = px(20),
+    heading.border.bottom.color = "transparent",
+    column_labels.border.bottom.width = px(3),
+    column_labels.border.bottom.color = gainsboro,
+    table.border.top.color = "transparent",
+    table.border.bottom.color = "transparent",
+    table.border.bottom.width = px(3),
+    data_row.padding = px(3),
+    footnotes.font.size = px(10),
+    footnotes.border.bottom.color = "transparent",
+    table.align='left')%>%
+  tab_style(style=
+            cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
+   tab_style(style=
+               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+            
+```
+
+```{r, include=FALSE}
+dbDisconnect(con) 
+```
