@@ -17,13 +17,17 @@ options(scipen = 999)
 #### Step 1: Pull in relational datasets ####
 housing_sept <- st_read(con, query="SELECT * FROM data.rel_assessor_residential_sept2025 WHERE residential = 'true'") 
 
+housing_jan <- st_read(con, query="SELECT * FROM data.rel_assessor_residential_jan2025 WHERE residential = 'true'") 
+
+jan_sept_xwalk <- st_read(con, query="SELECT * FROM data.crosswalk_assessor_jan_sept_2025") 
+
 damage <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level_sept2025") 
 
 sales <- st_read(con, query="SELECT * FROM data.rel_assessor_sales_sept2025") 
 
 altadena_e_w <- st_read(con, query="SELECT ain_sept, area_name, area_label FROM data.rel_assessor_altadena_parcels_sept2025") #dropping geom since it's not needed for analysis
 
-#### Step 2: combine all three data frames and clean up ####
+#### Step 2: combine all three septdata frames and clean up ####
 all_df<- housing_sept  %>%
   left_join(altadena_e_w, by= "ain_sept") %>%
   left_join(damage, by="ain_sept") %>%
@@ -168,22 +172,28 @@ analysis_sales_restype <- rbind(e_w,
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 #### Step 6: Fourth ANALYSIS- [analysis_sales_owner_renter_sept2025] ####
-# At what rate are properties selling by owner renter status
-e_w <- all_df %>% 
-  group_by(area_name,owner_renter) %>% 
+# At what rate are properties selling by owner renter status based on owner status in JANUARY-- doing this because current owner status reflects who bought it, we want to know who sold
+all_df_w_jan <- all_df %>%
+  left_join(jan_sept_xwalk,by=c("ain_sept"="ain_sept")) %>%
+  left_join(housing_jan %>% select(ain,owner_renter), by=c("ain_jan"="ain")) %>%
+  rename(owner_renter_jan=owner_renter.y)
+# one duplicated ain that's fine, parcel was split
+
+e_w <- all_df_w_jan %>% 
+  group_by(area_name,owner_renter_jan) %>% 
   mutate(total=n()) %>%
   ungroup() %>%
-  group_by(area_name,owner_renter,sold_after_eaton) %>%
+  group_by(area_name,owner_renter_jan,sold_after_eaton) %>%
   summarise(sold_count=n(),
             sold_prc=n()/min(total)*100,
             owner_renter_total=min(total))
 
-alt<- all_df %>% 
+alt<- all_df_w_jan %>% 
   mutate(area_name="Altadena") %>%
-  group_by(area_name,owner_renter) %>% 
+  group_by(area_name,owner_renter_jan) %>% 
   mutate(total=n()) %>%
   ungroup() %>%
-  group_by(area_name,owner_renter,sold_after_eaton) %>%
+  group_by(area_name,owner_renter_jan,sold_after_eaton) %>%
   summarise(sold_count=n(),
             sold_prc=n()/min(total)*100,
             owner_renter_total=min(total))
@@ -192,18 +202,18 @@ analysis_sales_owner_renter <- rbind(e_w,
                                 alt) 
 
 # Upload tables to postgres and add table/column comments
-# dbWriteTable(con, name = "analysis_sales_owner_renter_sept2025", value = analysis_sales_owner_renter, overwrite = FALSE)
+# dbWriteTable(con, name = "analysis_sales_owner_renter_sept2025", value = analysis_sales_owner_renter, overwrite = TRUE)
 # schema <- "data"
 # table_name <- "analysis_sales_owner_renter_sept2025"
-# indicator <- "Rate of properties being sold by owner type and area --what percent of owner-occupied properties in West Altadena have been sold?"
+# indicator <- "Rate of properties being sold by owner type and area --what percent of owner-occupied properties in West Altadena have been sold? ownership data is based on ownership in January 2025--who originally was in the property? Sales are based on September data"
 # source <- "Source: LA County Assessor Data, September 2025."
 # qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_sales.docx"
 # column_names <- colnames(analysis_sales_owner_renter) # Get column names
 # column_names
 # column_comments <- c(
 #   "area name",
-#   "owner renter type",
-#   "whether analysis is for properties sold or not sold",
+#   "owner renter type as of January 2025",
+#   "whether analysis is for properties sold or not sold as of September",
 #   "count of sold or not sold properties in owner type and area",
 #   "percent of properties sold or not sold in owner type and area",
 #   "total properties in each owner type for each area")
