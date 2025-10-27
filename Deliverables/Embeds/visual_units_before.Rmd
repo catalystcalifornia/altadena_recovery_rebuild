@@ -46,16 +46,16 @@ In January 2025, West Altadena had a higher number of rental units than East Alt
 
 ```{r}
 #### VISUAL ####
-df_ <- st_read(con, query="Select res_type, area, rent_units, prc_rent from data.analysis_units_jan2025") 
+df_ <- st_read(con, query="Select res_type, area_name, rent_units_count, rent_units_prc from data.analysis_units_jan2025") 
 
 df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
-  mutate("Count (%)"=paste0(comma(rent_units)," (",round(prc_rent,0),"%)"),
-         "Share of Rental Units"=prc_rent,
+  mutate("Count (%)"=paste0(comma(rent_units_count)," (",round(rent_units_prc,0),"%)"),
+         "Share of Rental Units"=rent_units_prc,
          "Residential Type" = res_type,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(rent_units)) 
+  arrange(desc(rent_units_count)) 
 
 
 table<- df %>%

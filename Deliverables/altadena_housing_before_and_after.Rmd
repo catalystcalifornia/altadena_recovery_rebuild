@@ -102,19 +102,19 @@ EMG
 ```{r sqfeet-before, child='Embeds/visual_sqftg_before.Rmd', echo=FALSE}
 ```
 
-# Characteristics of Properties Significantly Damaged
+# Housing Stock Damaged
 
 ```{r}
 # map of properties significant damaged or destroyed with layers for residential housing type, homeowner/renter, total units, square footage
 
 ```
 
-## Types of Residential Housing Types Lost
+## Housing Types Lost
 
 ```{r restype-after, child='Embeds/visual_housing_after.Rmd', echo=FALSE}
 ```
 
-## Homeowner and Rental Properties Lost
+## Ownership of Properties Lost
 
 ```{r owner-after, child='Embeds/visual_homeowner_after.Rmd', echo=FALSE}
 ```
@@ -136,10 +136,14 @@ EMG
 
 ```
 
+## Properties Sold by Damage
 
-## Properties Sold
-How many properties have sold in Altadena, East, and West.--what are the characteristics of those sold
-```{r}
+```{r sold-damage, child='Embeds/visual_sales_damage.Rmd', echo=FALSE}
+```
+
+## Properties Sold by Ownership
+
+```{r sold-owner, child='Embeds/visual_sales_owner_renter.Rmd', echo=FALSE}
 ```
 
 ## Properties Being Rebuilt
@@ -148,7 +152,7 @@ How many properties that have been damaged or rebuilt are in the rebuilding phas
 ```
 
 
-# Environmental and Zoning Considerations
+# Environmental Hazards & Zoning
 
 ```{r}
 # map with damaged/destroyed properties and then lead, zoning, and fire hazard zones
@@ -169,6 +173,21 @@ What are the zoning uses of properties in Altadena, East, and West
 How many properties are in high fire zones
 ```{r}
 ```
+
+# Altadena Maps {.tabset}
+
+## Before
+```{r map-before, child='Embeds/map_before_eaton.Rmd', echo=FALSE}
+```
+
+## After
+```{r map-after, child='Embeds/map_after_eaton.Rmd', echo=FALSE}
+```
+
+## Future
+```{r planning-map, child='Embeds/map_damage.Rmd', echo=FALSE}
+```
+
 
 # Recommendations
 
