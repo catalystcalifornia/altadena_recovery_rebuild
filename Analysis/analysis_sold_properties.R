@@ -176,7 +176,8 @@ analysis_sales_restype <- rbind(e_w,
 all_df_w_jan <- all_df %>%
   left_join(jan_sept_xwalk,by=c("ain_sept"="ain_sept")) %>%
   left_join(housing_jan %>% select(ain,owner_renter), by=c("ain_jan"="ain")) %>%
-  rename(owner_renter_jan=owner_renter.y)
+  rename(owner_renter_jan=owner_renter.y,
+         owner_renter_sept=owner_renter.x)
 # one duplicated ain that's fine, parcel was split
 
 e_w <- all_df_w_jan %>% 
@@ -200,6 +201,18 @@ alt<- all_df_w_jan %>%
 
 analysis_sales_owner_renter <- rbind(e_w,
                                 alt) 
+
+# who was it sold to?
+sales_ownership_characteristics <- all_df_w_jan %>%
+  filter(sold_after_eaton=="Sold") %>%
+  group_by(owner_renter_jan) %>%
+  mutate(total=n()) %>%
+  ungroup() %>%
+  group_by(owner_renter_jan,owner_renter_sept) %>%
+  summarise(count=n(),
+            prc=n()/min(total)*100,
+            sold_total=min(total))
+# no evidence of homeownership after sale though
 
 # Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_sales_owner_renter_sept2025", value = analysis_sales_owner_renter, overwrite = TRUE)
