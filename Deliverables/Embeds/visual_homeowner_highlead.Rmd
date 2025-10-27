@@ -9,7 +9,7 @@ output: rmarkdown::html_vignette
 knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
 )
 
-## The following document outputs a visual of the housing stock before in a table format for the altadena_housing_before_and_after.html 
+## The following document outputs a visual in a table format for the altadena_housing_before_and_after.html 
 
 #### Setting Up ####
 

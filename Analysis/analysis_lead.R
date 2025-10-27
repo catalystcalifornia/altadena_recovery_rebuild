@@ -20,6 +20,9 @@ parcels <- st_read(con, query="SELECT * FROM data.rel_assessor_altadena_parcels_
 hi_lead <- st_read(con, query="SELECT * FROM data.lacdph_lead_results_grid_2025", geom = "geom") %>% 
   filter(lead_geometric_mean > 80) 
 
+lead <- st_read(con, query="SELECT * FROM data.lacdph_lead_results_grid_2025", geom = "geom") %>% 
+  mutate(hi_lead_flag = ifelse(lead_geometric_mean > 80, TRUE, FALSE)) 
+
 #### Step 2: intersect and compute which grid has the majority of the parcel in it, assign to that one ####
 
 ain_hi_lead <- st_intersection(parcels %>%
@@ -37,10 +40,24 @@ ain_hi_lead <- st_intersection(parcels %>%
                           st_drop_geometry() %>%
                           select(-c(gid, gid.1))
 
+ain_lead <- st_intersection(parcels %>%
+                                 mutate(ain_id = row_number()),
+                            lead %>% 
+                                 mutate(grid_id = row_number())) %>% 
+                            #calculate overlap
+                            mutate(overlap_area = st_area(.)) %>%
+                            #only keep more of the parcel in the lead level grid 
+                            group_by(ain_id) %>%
+                            slice_max(overlap_area, n = 1, with_ties = FALSE) %>%
+                            ungroup() %>%
+                            #deleting columns that are not needed
+                            st_drop_geometry() %>%
+                            select(-c(gid, gid.1))
+
 #### Step 3: combine with damage and residential type database ####
 damage_df <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level")
   
-restype_df <- st_read(con, query="SELECT * FROM rel_assessor_residential_jan2025")
+restype_df <- st_read(con, query="SELECT * FROM data.rel_assessor_residential_jan2025_recode")
 
 lead_damage_df <- ain_hi_lead %>%
   left_join(damage_df, by = "ain")
@@ -48,7 +65,15 @@ lead_damage_df <- ain_hi_lead %>%
 lead_damage_restype_df <- lead_damage_df %>%
   left_join(restype_df, by = "ain")
 
+lead_damage_df_all <- ain_lead %>%
+  left_join(damage_df, by = "ain")
+
+lead_damage_restype_df_all <- lead_damage_df_all %>%
+  left_join(restype_df, by = "ain")
+
 #### Step 4: calculate by Altadena, West, East for res_type and for owner_renter ####
+#calculate # of total 
+
 final_restype_df <- lead_damage_restype_df %>% 
   group_by(res_type, damage_category) %>% 
   summarise(altadena_count = n(),
@@ -65,17 +90,17 @@ final_restype_df <- lead_damage_restype_df %>%
     names_pattern = "(altadena|west|east)_(count|prc)" 
   )
 
-final_homeowner_df <- lead_damage_restype_df %>% 
-  group_by(owner_renter, damage_category) %>% 
-  summarise(altadena_count = n(),
-            west_count = sum(area_name == "West", na.rm = TRUE),
-            east_count = sum(area_name == "East", na.rm = TRUE)) %>% 
+final_homeowner_df <- lead_damage_restype_df_all %>% 
+  group_by(owner_renter_re, damage_category) %>% 
+  summarise(altadena_count = sum(hi_lead_flag == TRUE, na.rm = TRUE),
+            west_count = sum(area_name == "West" & hi_lead_flag == TRUE, na.rm = TRUE),
+            east_count = sum(area_name == "East" & hi_lead_flag == TRUE, na.rm = TRUE)) %>% 
   mutate(altadena_prc = altadena_count/sum(altadena_count)*100,
          west_prc = west_count/sum(west_count)*100,
          east_prc = east_count/sum(east_count)*100) %>%
   #cleaning 
   pivot_longer(
-    cols = -c(damage_category, owner_renter),
+    cols = -c(damage_category, owner_renter_re),
     names_to = c("area", ".value"),
     names_pattern = "(altadena|west|east)_(count|prc)" 
   )
