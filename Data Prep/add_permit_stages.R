@@ -2,16 +2,16 @@
 
 ##### Typology Outline #####
 ### 1. Fire Debris Removal (Is the site cleaned up?)
-## Phase 1: EPA (Required by All)
-# Yes (Clean up done by EPA, parcel progressed to phase 2)
+## Phase 1 Result:
+# Yes (EPA clean up, parcel progressed to phase 2)
 # No (Not completed)
-# Deferred (EPA deferred to Army Corps, parcel progressed to phase 2)
-## Phase 2A: Army Corps of Engineers (can Opt out)
+# Deferred (Clean up deferred to Army Corps, parcel progressed to phase 2)
+## Phase 2 Result:
 # Yes (Army Corps completed cleanup)
+# Yes (Private contractor completed clean up - Assumed if parcel has "^FDR" permit with a "Finaled" status)
 # No (Not completed)
-# Opt-out (Army Corps did not clean up, to be completed via private contractor)
-## Phase 2B: Own cleanup (Private Contractor)
-# Yes (has "^FDR" permit with a "Finaled" status)
+## Overall Yes if Phase 2 Result is Yes, For now assume yes also if parcel qualifies for Bucket 2 (below)  
+## Overall No otherwise (could specify at what stage but will not implement now)
 
 ### 2. Applied for Rebuild Permits (Have folks asked for permits to rebuild?)
 ## Yes
