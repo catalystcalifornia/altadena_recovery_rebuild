@@ -138,12 +138,12 @@ EMG
 
 ## Properties Sold by Damage
 
-```{r sold-damage, child='Embeds/visual_sales_damage.Rmd', echo=FALSE}}
+```{r sold-damage, child='Embeds/visual_sales_damage.Rmd', echo=FALSE}
 ```
 
 ## Properties Sold by Ownership
 
-```{r sold-owner, child='Embeds/visual_sales_owner_renter.Rmd', echo=FALSE}}
+```{r sold-owner, child='Embeds/visual_sales_owner_renter.Rmd', echo=FALSE}
 ```
 
 ## Properties Being Rebuilt
@@ -177,15 +177,15 @@ How many properties are in high fire zones
 # Altadena Maps {.tabset}
 
 ## Before
-```{r map-before, child='Embeds/map_before_eaton.Rmd', echo=FALSE}}
+```{r map-before, child='Embeds/map_before_eaton.Rmd', echo=FALSE}
 ```
 
 ## After
-```{r map-after, child='Embeds/map_after_eaton.Rmd', echo=FALSE}}
+```{r map-after, child='Embeds/map_after_eaton.Rmd', echo=FALSE}
 ```
 
 ## Future
-```{r planning-map, child='Embeds/map_damage.Rmd', echo=FALSE}}
+```{r planning-map, child='Embeds/map_damage.Rmd', echo=FALSE}
 ```
 
 
