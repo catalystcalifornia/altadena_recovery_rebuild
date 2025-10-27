@@ -7,7 +7,7 @@ output:
 <!-- link to Google Font -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-```{r setup, include=FALSE}
+```{r, include=FALSE}
 knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
 )
 
@@ -125,7 +125,7 @@ owner_pal <- colorFactor(palette = c("#FFCC00","#FF9E0D","#733256","#9B9A9A"), d
 
 
 ```
-## Altadena Before
+
 ```{r}
 leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
