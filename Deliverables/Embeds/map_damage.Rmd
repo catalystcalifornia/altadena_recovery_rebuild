@@ -22,6 +22,7 @@ library(gt)
 library(sf)
 library(scales)
 library(leaflet)
+library(rmapshaper)
 
 options(scipen=999)
 
@@ -43,19 +44,22 @@ gainsboro <- "#DEDEDE"
 
 ```{r}
 # Eaton Fire damaged properties
-eaton_fire_damage <- st_read(con, query="SELECT * FROM data.eaton_fire_dmg_insp_3310 WHERE 
-                             damage = 'Destroyed (>50%)' OR damage = 'Major (26-50%)'", geom="geom") %>% 
-                              st_transform(4326)
-
+# residential parcel shapes
+parcels <- st_read(con, query="SELECT * FROM data.rel_assessor_altadena_parcels_jan2025", geom="geom") %>% st_transform(4326)
+res_data <- st_read(con, query="SELECT * FROM data.rel_assessor_residential_jan2025")
+damage <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level")
+# join parcel shapes to residential data
+parcels <- parcels %>% left_join(res_data, by="ain") %>% left_join(damage, by="ain")
+# make one layer for all residential - use this to visualize all properties
+parcels_res_damaged <- parcels %>% filter(residential==TRUE & total_units>0 & damage_category=="Significant Damage") 
 
 # east and west altadena boundaries --
-west <- st_read(con, query="SELECT * FROM data.west_altadena_3310", geom="geom") %>% st_transform(4326)
-
-east <- st_read(con, query="SELECT * FROM data.east_altadena_3310", geom="geom") %>% st_transform(4326)
+west <- st_read(con, query="SELECT * FROM data.west_altadena_3310", geom="geom") %>% st_transform(4326) %>% ms_simplify()
+east <- st_read(con, query="SELECT * FROM data.east_altadena_3310", geom="geom") %>% st_transform(4326) %>%  ms_simplify()
 
 df_lead <- st_read(con, query="Select * from data.lacdph_lead_results_grid_2025", geom="geom") %>% 
-  filter(lead_geometric_mean > 80) %>%
-  st_transform(4326)
+  st_transform(4326) %>%
+  mutate(hi_lead_flag = ifelse(lead_geometric_mean > 80, TRUE, FALSE))
 
 #NOTE: taking time to transform even after filtering
 df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'East San Gabriel Valley' OR plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326)
@@ -66,11 +70,11 @@ df_local_fhsz <- st_read(con, query="Select * from data.eaton_local_fhsz_4326 WH
 
 df_state_fhsz <- st_read(con, query="Select * from data.eaton_state_fhsz_4326", geom="geom") 
 
-eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom") %>% st_transform(4326)
+eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom") %>% st_transform(4326) %>%  ms_simplify()
 
 popup_damage <-  paste0(
-      "Address: ", eaton_fire_damage$site_address_parcel, "</br>",
-      "Structure Type: ",  eaton_fire_damage$structure_type, "</br>",
+      "AIN: ", parcels_res_damaged$ain, "</br>",
+      "Residential Type: ",  parcels_res_damaged$res_type, "</br>",
       "Average Lead Level Measured in mg/kg: ", df_lead$lead_geometric_mean, "</br>",
       "State Fire Hazard Zone Level: ", df_state_fhsz$fhsz_descr, "</br>",
       "Local Fire Hazard Zone Level: ", df_local_fhsz$fhsz_descr, "</br>",
@@ -87,14 +91,14 @@ leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
      setView(-118.131127, 34.194432, zoom = 13) %>%
   #Damaged/Destroyed Properties
-  addCircleMarkers(data=eaton_fire_damage,
+  addCircleMarkers(data=parcels_res_damaged,
                    radius = 2,
                    color = "white",
                    weight = .5,
                    fillColor = orange,
                    fillOpacity= 0.6,
                    popup = ~popup_damage,
-                   group="Eaton Fire Properties Damaged") %>%
+                   group="Significantly Damaged Parcels after Eaton Fire") %>%
   #Eaton Fire Perimeter
   addPolygons(data=eaton_fire,
               fillColor="white",
@@ -124,13 +128,20 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               group="West Altadena") %>%
   #Lead Data 
   addPolygons(data=df_lead,
-              fillColor="white",
+              fillColor = ~ifelse(hi_lead_flag, "red", "white"),
               fillOpacity=0,
               color= "gray",
               weight=.6,
               opacity=1,
               popup=~popup_damage,
-              group="High Levels of Lead in Soil") %>%
+              group="High Levels of Lead in Soil") %>% 
+                addLegend(
+                  position = "bottomleft",
+                  colors = c("red", "white"),
+                  labels = c("High Lead Level", "Normal Lead Level"),
+                  group="High Levels of Lead in Soil",
+                  title = "Lead Levels"
+                ) %>%
   #Fire Hazard Zones 
   addPolygons(data=df_local_fhsz,
               fillColor=~colorpal_local_fhsz(fhsz_descr),
@@ -139,6 +150,12 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               weight=1,
               popup=~fhsz_descr,
               group="Local Fire Hazard Zones") %>%
+                addLegend(
+                position = "bottomleft",
+                pal = colorpal_local_fhsz,
+                values =  df_local_fhsz$fhsz_descr,
+                group="Local Fire Hazard Zones",
+                title = "Hazard Level") %>%
   addPolygons(data=df_state_fhsz,
               fillColor=~colorpal_state_fhsz(fhsz_descr),
               fillOpacity=0.7,
@@ -157,7 +174,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               group="Zoning") %>% 
   #Controling Layers
   addLayersControl(
-          overlayGroups = c("Eaton Fire Properties Damaged", "High Levels of Lead in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning","West Altadena","East Altadena","Eaton Fire Perimeter"),
+          overlayGroups = c("Significantly Damaged Parcels after Eaton Fire", "High Levels of Lead in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning","West Altadena","East Altadena","Eaton Fire Perimeter"),
         options = layersControlOptions(collapsed = FALSE,autoZIndex = TRUE))  %>%
   hideGroup(c("Eaton Fire Perimeter","High Levels of Lead in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning"))
 
