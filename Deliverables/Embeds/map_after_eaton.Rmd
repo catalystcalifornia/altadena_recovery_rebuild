@@ -7,7 +7,7 @@ output:
 <!-- link to Google Font -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-```{r setup, include=FALSE}
+```{r, include=FALSE}
 knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
 )
 
@@ -94,7 +94,6 @@ popup_res <-  paste0(
 
 ```
 
-## Altadena After
 ```{r}
 leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
