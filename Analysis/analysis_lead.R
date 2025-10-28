@@ -122,16 +122,23 @@ lead_damage_restype_df_all <- lead_damage_df_all %>%
 
 # check
 nrow(restype_df)
+nrow(lead_damage_restype_df_all)
+length(unique(lead_damage_restype_df_all$ain_sept))
+# looks good
 
 #### Step 4: calculate by Altadena, West, East for res_type and for owner_renter ####
 #calculate # of total 
 
 final_restype_df <- lead_damage_restype_df %>% 
-  group_by(res_type, damage_category) %>% 
-  summarise(altadena_count = n(),
-            west_count = sum(area_name == "West", na.rm = TRUE),
-            east_count = sum(area_name == "East", na.rm = TRUE)) %>% 
-  mutate(altadena_prc = altadena_count/sum(altadena_count)*100,
+  group_by(area_name,res_type, damage_category) %>% 
+  mutate(total=n()) %>%
+  ungroup() %>%
+  group_by(area_name,res_type, damage_category, hi_lead_label)
+  summarise(count=n(),
+            prc=count/min(total),
+            total=min(total))
+            
+            (altadena_prc = altadena_count/sum(altadena_count)*100,
          west_prc = west_count/sum(west_count)*100,
          east_prc = east_count/sum(east_count)*100) %>%
   #cleaning 
