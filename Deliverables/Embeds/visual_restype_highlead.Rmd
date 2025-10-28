@@ -9,7 +9,6 @@ output: rmarkdown::html_vignette
 knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
 )
 
-## The following document outputs a visual of the housing stock before in a table format for the altadena_housing_before_and_after.html 
 
 #### Setting Up ####
 
@@ -42,29 +41,37 @@ gainsboro <- "#DEDEDE"
 
 ```
 
+As property owners rebuild, they must also contend with chemical hazards resulting from the fire. Between February and March 2025, L.A. County Department of Public Health contracted Roux Associates, Inc. to conduct surface soil testing at residential properties near and within the Eaton fire. [Their results](http://publichealth.lacounty.gov/media/wildfire/docs/Roux_Community_Soil_Sampling_and_Human_Health_Screening_Report_Eaton_and_Palisades_Fire_Regions.pdf) confirmed lead as a chemical of potential concern from the wildfire. Lead was the only chemical they found was above soil screening levels considered protective over a lifetime of exposure, geographically consistent throughout the area, and above background concentrations/ambient levels. Additionally, they found that while chemical levels significantly reduced after soil/debris removal, parcels still showed areas with lead concentrations exceeding residential screening levels. Their report recommends that properties with lead concentrations at or above 80 mg/kg pursue additional [precautions and mitigation measures](http://publichealth.lacounty.gov/media/wildfire/docs/Reducing_the_Risk_from_Soil_Contaminated_After_Wildfires.pdf) to reduce risk for lead contamination. For properties with children or pregnant people living at the property, they recommend receiving a professional assessment of appropriate mitigation measures. Lastly, for properties with any destroyed structures, they recommend soil impact assessments and management as any part of rebuilding.
+
+Based on these recommendations, we examined the percentage of significantly damaged properties in testing grids with average lead levels above residential screening levels. Significantly damaged condominimums were most likely to be in high lead grids for both West and East Altadena. In East Altadena, 79% of significantly damaged multifamily properties were in high lead grids. In West Altadena, nearly half (48%) of significantly damaged single-family properties were in high lead grids. 
+
+Further analysis also demonstrates the need to consider mitigation measures in properties that sustained no or some damage in the fire. In Altadena, 83.5% of multifamily properties, 58.3% of single-family properties, and 97.8% of condominiums that sustained no damage are in high lead grids. Support should be provided to property owners that sustained the most damage, but also to those with intact properties with high lead concentrations.
+
 ```{r}
 #### VISUAL ####
-df_raw <- st_read(con, query="Select * from data.analysis_restype_lead_damage") %>%
-  #NOTE: line below is an attemp to reorder damage categories on the table but its NOT doing what I want it to.
-  mutate(damage_category = factor(damage_category, c("Significant Damage", "Some Damage", "No Damage")))
+df_raw <- st_read(con, query="Select * from data.analysis_restype_damage_lead_sept2025") 
+
+high_lead <- df_raw %>%
+  filter(hi_lead_label=="High Lead Grid")
 
 df<- df_raw %>%
+  filter(damage_category=="Significant Damage" & hi_lead_label=="High Lead Grid") %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),        
-         "Damage in areas with lead levels higher than safety threshold"=prc,
+         "Properties in Areas with High Lead Levels"=prc,
          "Residential Type" = res_type,
-         "Damage Level" = damage_category,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>% 
   arrange(desc(count))
 
 
 table<- df %>%
-  select("Area","Residential Type", "Damage Level", "Damage in areas with lead levels higher than safety threshold", "Count (%)")%>%
-  gt(groupname_col = c("Area", "Damage Level"), rowname_col = "Residential Type") %>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
+  select("Area","Residential Type", "Properties in Areas with High Lead Levels", "Count (%)")%>%
+  gt(groupname_col = c("Area"), rowname_col = "Residential Type") %>%
+    tab_header(title= "Significantly Damaged Properties in Areas with Average Lead Levels Above Protective Screening Levels (>=80 mg/kg by Residential Type)")%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and L.A. County Department of Public Health Soil Testing Program, March 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Damage in areas with lead levels higher than safety threshold', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Properties in Areas with High Lead Levels', scaled=TRUE, fill=meteorite, background="transparent")%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c("Inter", default_fonts())) %>% 
   tab_options(table.background.color=alabaster,
