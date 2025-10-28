@@ -72,16 +72,8 @@ df_state_fhsz <- st_read(con, query="Select * from data.eaton_state_fhsz_4326", 
 
 eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom") %>% st_transform(4326) %>%  ms_simplify()
 
-popup_damage <-  paste0(
-      "AIN: ", parcels_res_damaged$ain, "</br>",
-      "Residential Type: ",  parcels_res_damaged$res_type, "</br>",
-      "Average Lead Level Measured in mg/kg: ", df_lead$lead_geometric_mean, "</br>",
-      "State Fire Hazard Zone Level: ", df_state_fhsz$fhsz_descr, "</br>",
-      "Local Fire Hazard Zone Level: ", df_local_fhsz$fhsz_descr, "</br>",
-      "LA County Unincorporated Zoning Description: ", df_zoning_lac$z_desc
-      )
+
 colorpal_local_fhsz <- colorFactor(palette = "YlOrRd", domain = df_local_fhsz$fhsz_descr)
-colorpal_state_fhsz <- colorFactor(palette = "YlOrRd", domain = df_state_fhsz$fhsz_descr)
 
 ```
 
@@ -91,13 +83,16 @@ leaflet () %>%
 addProviderTiles(providers$CartoDB.Positron) %>%
      setView(-118.131127, 34.194432, zoom = 13) %>%
   #Damaged/Destroyed Properties
-  addCircleMarkers(data=parcels_res_damaged,
-                   radius = 2,
-                   color = "white",
-                   weight = .5,
-                   fillColor = orange,
-                   fillOpacity= 0.6,
-                   popup = ~popup_damage,
+  addPolygons(data=parcels_res_damaged,
+                   fillColor="orange",
+                   color = "orange",
+                   fillOpacity=0.3,
+                   weight=.6,
+                   opacity=1,
+                   popup = ~paste0(
+      "AIN: ", parcels_res_damaged$ain, "</br>",
+      "Residential Type: ",  parcels_res_damaged$res_type, "</br>",
+      "Home Ownership Status: ",  parcels_res_damaged$owner_renter),
                    group="Significantly Damaged Parcels after Eaton Fire") %>%
   #Eaton Fire Perimeter
   addPolygons(data=eaton_fire,
@@ -128,16 +123,17 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               group="West Altadena") %>%
   #Lead Data 
   addPolygons(data=df_lead,
-              fillColor = ~ifelse(hi_lead_flag, "red", "white"),
+              color = ~ifelse(hi_lead_flag == TRUE, "red", "gray"),
+              fillColor = "gray",
               fillOpacity=0,
-              color= "gray",
               weight=.6,
               opacity=1,
-              popup=~popup_damage,
+              popup=~paste0("Average Lead Level Measured in mg/kg: ", df_lead$lead_geometric_mean, "</br>",
+                            "Higher than Safe Levels of Lead: ", df_lead$hi_lead_flag),
               group="High Levels of Lead in Soil") %>% 
                 addLegend(
                   position = "bottomleft",
-                  colors = c("red", "white"),
+                  colors = c("red", "gray"),
                   labels = c("High Lead Level", "Normal Lead Level"),
                   group="High Levels of Lead in Soil",
                   title = "Lead Levels"
@@ -157,7 +153,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
                 group="Local Fire Hazard Zones",
                 title = "Hazard Level") %>%
   addPolygons(data=df_state_fhsz,
-              fillColor=~colorpal_state_fhsz(fhsz_descr),
+              fillColor="red",
               fillOpacity=0.7,
               color="white",
               weight=1,
@@ -170,7 +166,7 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               color=lavender,
               weight=1,
               opacity=1,
-              popup=~z_desc,
+              popup=~paste0("LA County Unincorporated Zoning Description: ", df_zoning_lac$z_desc),
               group="Zoning") %>% 
   #Controling Layers
   addLayersControl(
