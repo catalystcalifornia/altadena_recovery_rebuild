@@ -70,6 +70,10 @@ ON gen.ain = det.ain AND gen.permit_number = det.permit_number
 LEFT JOIN data.scraped_workflow_permit_data_2025_10 wf
 ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;") 
 
+# get debris removal data
+debris_status <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_pkg_received, fso_pkg_approved FROM data.usace_debris_removal_parcels_2025;")
+
+
 final_types <- parcels # 12959
 
 ##### Prep data #####
@@ -113,6 +117,7 @@ final_types <- final_types %>%
   
 combined_permits <- parcels %>%
   left_join(permits_filtered, by="ain") %>% # 16468
+  left_join(debris_status, by="ain") %>%
   # add bucket 1 helper columns
   mutate(has_fdr=ifelse(grepl("^FDR", permit_number), 1, 0),
          has_fdr_finaled = ifelse((grepl("^FDR", permit_number) & status=="Finaled"), 1, 0)) %>%
