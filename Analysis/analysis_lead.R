@@ -126,76 +126,100 @@ nrow(lead_damage_restype_df_all)
 length(unique(lead_damage_restype_df_all$ain_sept))
 # looks good
 
-#### Step 4: calculate by Altadena, West, East for res_type and for owner_renter ####
-#calculate # of total 
+table(lead_damage_restype_df_all$hi_lead_label,useNA='always')
 
-final_restype_df <- lead_damage_restype_df %>% 
+#### Step 4: calculate by Altadena, West, East for res_type and for owner_renter ####
+## Properties with high lead levels by residential type and damage level first
+final_restype_df_e_w <- lead_damage_restype_df_all %>% 
+  group_by(area_name,res_type, damage_category) %>% 
+  mutate(total=n()) %>% # calculate total for denominator of analysis--e.g., single family homes in West Altadena that were significantly damaged
+  ungroup() %>%
+  group_by(area_name,res_type, damage_category, hi_lead_label) %>%
+  summarise(count=n(), # calculate numerator
+            prc=count/min(total)*100, # calculate %
+            total=min(total)) # carry through the total
+            
+final_restype_df_alt<- lead_damage_restype_df_all %>% 
+  mutate(area_name="Altadena") %>% # dummy for all of altadena to repeat for all of altadena
   group_by(area_name,res_type, damage_category) %>% 
   mutate(total=n()) %>%
   ungroup() %>%
-  group_by(area_name,res_type, damage_category, hi_lead_label)
+  group_by(area_name,res_type, damage_category, hi_lead_label) %>%
   summarise(count=n(),
-            prc=count/min(total),
+            prc=count/min(total)*100,
             total=min(total))
-            
-            (altadena_prc = altadena_count/sum(altadena_count)*100,
-         west_prc = west_count/sum(west_count)*100,
-         east_prc = east_count/sum(east_count)*100) %>%
-  #cleaning 
-  filter(res_type != 'Boarding house') %>%
-  pivot_longer(
-    cols = -c(damage_category, res_type),
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(count|prc)" 
-  )
 
-final_homeowner_df <- lead_damage_restype_df_all %>% 
-  group_by(owner_renter_re, damage_category) %>% 
-  summarise(altadena_count = sum(hi_lead_flag == TRUE, na.rm = TRUE),
-            west_count = sum(area_name == "West" & hi_lead_flag == TRUE, na.rm = TRUE),
-            east_count = sum(area_name == "East" & hi_lead_flag == TRUE, na.rm = TRUE)) %>% 
-  mutate(altadena_prc = altadena_count/sum(altadena_count)*100,
-         west_prc = west_count/sum(west_count)*100,
-         east_prc = east_count/sum(east_count)*100) %>%
-  #cleaning 
-  pivot_longer(
-    cols = -c(damage_category, owner_renter_re),
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(count|prc)" 
-  )
+final_restype_df <- rbind(final_restype_df_e_w, final_restype_df_alt)
+# check
+check <- final_restype_df %>%
+  group_by(area_name,res_type, damage_category) %>%
+  summarise(sum=sum(prc))
+# looks good adds to 100%
 
-#### Step 5: upload table to postgres ####
-dbWriteTable(con, name = "analysis_restype_lead_damage", value = final_restype_df, overwrite = FALSE)
-schema <- "data"
-table_name <- "analysis_restype_lead_damage"
-indicator <- "Data on distribution of residential property types (single-family, multifamily, etc.) for all of Altadena, West Altadena, East Altadena by damage type that are in areas at or above the lead safety threshold of >=80mg/kg by damage level."
-source <- "Multiple Data Sources"
-qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_lead.docx"
-column_names <- colnames(final_restype_df) # Get column names
-column_comments <- c(
-  "type of residence",
-  "type of damage",
-  "Altadena, East/West of Lake Avenue",
-  "count",
-  "percent"
-  )
-add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+## Properties with high lead levels by owner type and damage level first
+final_owner_df_e_w <- lead_damage_restype_df_all %>% 
+  group_by(area_name,owner_renter, damage_category) %>% 
+  mutate(total=n()) %>% # calculate total for denominator of analysis--e.g., owner-occupied homes in West Altadena that were significantly damaged
+  ungroup() %>%
+  group_by(area_name,owner_renter, damage_category, hi_lead_label) %>%
+  summarise(count=n(), # calculate numerator
+            prc=count/min(total)*100, # calculate %
+            total=min(total)) # carry through the total
 
-dbWriteTable(con, name = "analysis_owner_renter_lead_damage", value = final_homeowner_df, overwrite = FALSE)
-schema <- "data"
-table_name <- "analysis_owner_renter_lead_damage"
-indicator <- "Data on distribution of residential ownership (homeowner, renter, etc.) for all of Altadena, West Altadena, East Altadena by damage type that are in areas at or above the lead safety threshold of >=80mg/kg by damage level."
-source <- "Multiple Data Sources"
-qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_lead.docx"
-column_names <- colnames(final_homeowner_df) # Get column names
-column_comments <- c(
-  "home owner or renter",
-  "type of damage",
-  "Altadena, East/West of Lake Avenue",
-  "count",
-  "percent"
-)
-add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+final_owner_df_alt<- lead_damage_restype_df_all %>% 
+  mutate(area_name="Altadena") %>% # dummy for all of altadena to repeat for all of altadena
+  group_by(area_name,owner_renter, damage_category) %>% 
+  mutate(total=n()) %>%
+  ungroup() %>%
+  group_by(area_name,owner_renter, damage_category, hi_lead_label) %>%
+  summarise(count=n(),
+            prc=count/min(total)*100,
+            total=min(total))
+
+final_owner_df <- rbind(final_owner_df_e_w, final_owner_df_alt)
+# check
+check <- final_owner_df %>%
+  group_by(area_name,owner_renter, damage_category) %>%
+  summarise(sum=sum(prc))
+# looks good adds to 100%
+
+#### Step 5: upload tables to postgres ####
+# dbWriteTable(con, name = "analysis_restype_damage_lead_sept2025", value = final_restype_df, overwrite = FALSE)
+# schema <- "data"
+# table_name <- "analysis_restype_damage_lead_sept2025"
+# indicator <- "Data on residential property types (single-family, multifamily, etc.) for all of Altadena, West Altadena, East Altadena by damage type and high lead levels (e.g., in areas at or above the lead safety threshold of >=80mg/kg by damage level) - what % of significantly damaged residential properties are in high lead level areas in West Altadena."
+# source <- "Multiple Data Sources"
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_lead.docx"
+# column_names <- colnames(final_restype_df) # Get column names
+# column_names
+# column_comments <- c(
+#   "area name -  Altadena, East/West of Lake Avenue",
+#   "type of residence",
+#   "type of damage",
+#   "high lead level >=80 or not, could be in an area not tested - numerator",
+#   "percent of properties in that res type and damage level in a high lead area or not for that area of Altadena",
+#   "total properties in that res type and damage level combo for that area of Altadena-- denominator"
+#   )
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
+# owner renter table next
+# dbWriteTable(con, name = "analysis_owner_renter_damage_lead_sept2025", value = final_owner_df, overwrite = FALSE)
+# schema <- "data"
+# table_name <- "analysis_owner_renter_damage_lead_sept2025"
+# indicator <- "Data on ownership types for all of Altadena, West Altadena, East Altadena by damage type and high lead levels (e.g., in areas at or above the lead safety threshold of >=80mg/kg by damage level) - what % of significantly damaged owner-occupied properties are in high lead level areas in West Altadena."
+# source <- "Multiple Data Sources"
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_lead.docx"
+# column_names <- colnames(final_owner_df) # Get column names
+# column_names
+# column_comments <- c(
+#   "area name -  Altadena, East/West of Lake Avenue",
+#   "ownership type",
+#   "type of damage",
+#   "high lead level >=80 or not, could be in an area not tested - numerator",
+#   "percent of properties in that res type and damage level in a high lead area or not for that area of Altadena",
+#   "total properties in that res type and damage level combo for that area of Altadena-- denominator"
+#   )
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
 #### Step 6: close database connection ####
