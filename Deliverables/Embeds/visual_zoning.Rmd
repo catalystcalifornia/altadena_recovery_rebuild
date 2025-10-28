@@ -1,0 +1,154 @@
+---
+title: ""
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+## The following document outputs a visual of the housing stock before in a table format for the altadena_housing_before_and_after.html 
+
+#### Setting Up ####
+
+library(usethis)
+library(dplyr)
+library(tidyverse)
+library(htmltools) 
+library(htmlwidgets)
+library(gtExtras)
+library(gt)
+library(sf)
+library(scales)
+
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+
+## COLORS ##
+orange <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+```
+
+Over 90% of properties that were significantly damaged in Altadena are zoned for single-family residences, at the lowest density (R-1). Comparatively, fewer residential properties that were significantly damaged in West Altadena are limited to R-1 zoning (93%) compared to East Altadena (97%). Likewise, more properties in West Altadena have allowable zones for two-family or multifamily family residences (three and two percent respectively), but this is still a low percentage of all properties. While the low-density nature of Altadena zones will help serve to protect the character of Altadena, it also raises the importance of preserving the multifamily units that were lost. [SB-9](https://www.hcd.ca.gov/sites/default/files/docs/planning-and-community/sb-9-fact-sheet.pdf) makes it possible for single-family residences to add units by adding up to four units on a single-family zone. While this makes it possible to add needed residential units while owners rebuild, it also risks losing the character of Altadena's single-family homes. As of September 2025, 26 permit applications in Altadena were submitted to increase density on single-family lots, but none have asked to split their lots or add up to the maximum of four units.
+
+```{r}
+#### VISUAL: Sale rates by damage and area ####
+df_ <- st_read(con, query="Select * from data.analysis_zone_categories_sept2025") 
+
+df <- df_ %>%
+    filter(zone_count>=10) # filter out zones that are super low in count, like residential agricultural, open space, neighborhood business
+
+df <- df %>%
+  mutate("Count (%)"=paste0(comma(zone_count)," (",round(zone_prc,0),"%)"),
+         "Share of Damaged Properties"=zone_prc,
+         "Zones" = paste0(z_category_label," (", z_category,")"),
+         "Area" = str_to_title(area_name)) %>%
+  mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
+  arrange(desc(zone_count)) 
+
+
+table<- df %>%
+  select("Area","Zones", "Share of Damaged Properties", "Count (%)")%>%
+  gt(groupname_col = "Area", rowname_col = "Zones") %>%
+  tab_header(title= "Allowable Zones for Significantly Damaged Residential Properties")%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025; CAL FIRE Damage Data, September 2025; and L.A. County Department of Regional Planning, Zoning, 2025."),placement="left") 
+
+ table %>%
+  gt_plt_bar_pct(column= 'Share of Damaged Properties', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  # if needed modify column widths here 
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
+  opt_align_table_header("left")%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  tab_options(table.background.color=alabaster,
+    column_labels.background.color = "transparent",
+    table.font.size = px(12),
+    column_labels.font.size = px(12),
+    heading.align = "left",
+    table.font.names = "Inter",
+    heading.title.font.size = px(20),
+    heading.border.bottom.color = "transparent",
+    column_labels.border.bottom.width = px(3),
+    column_labels.border.bottom.color = gainsboro,
+    table.border.top.color = "transparent",
+    table.border.bottom.color = "transparent",
+    table.border.bottom.width = px(3),
+    data_row.padding = px(3),
+    footnotes.font.size = px(10),
+    footnotes.border.bottom.color = "transparent",
+    table.align='left')%>%
+  tab_style(style=
+            cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
+   tab_style(style=
+               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+            
+```
+
+Given the large number of single-family zoned properties (R-1), we also examined the minimum lot sizes attached to R-1 properties. Significantly damaged, R-1 properties in West Altadena have lower lot size requirements compared to East Altadena. About 23% of East Altadena's single-family zoned properties have a 20,000 square foot minimum lot size requirement compared to just one percent of West Altadena's properties. As property owners rebuild, the specific R-1 zones of properties utilizing SB-9 can be tracked to determine how changes may differentially affect different types of R-1 properties in West and East Altadena. This can help determine if particular categories of single-family lots are being lost in development.
+
+```{r}
+#### VISUAL: Sale rates by damage and area ####
+df_ <- st_read(con, query="Select * from data.analysis_zone_r1_sept2025") 
+
+df <- df_ %>%
+  mutate("Count (%)"=paste0(comma(zone_count)," (",round(zone_prc,0),"%)"),
+         "Share of R-1 Damaged Properties"=zone_prc,
+         "Zones" = zone,
+         "Area" = str_to_title(area_name)) %>%
+  mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
+  arrange(desc(zone_count)) 
+
+
+table<- df %>%
+  select("Area","Zones", "Share of R-1 Damaged Properties", "Count (%)")%>%
+  gt(groupname_col = "Area", rowname_col = "Zones") %>%
+  tab_header(title= "Lot Size Requirements for Significantly Damaged Single-Family Zone Properties")%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025; CAL FIRE Damage Data, September 2025; and L.A. County Department of Regional Planning, Zoning, 2025."),placement="left") 
+
+ table %>%
+  gt_plt_bar_pct(column= 'Share of R-1 Damaged Properties', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  # if needed modify column widths here 
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
+  opt_align_table_header("left")%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  tab_options(table.background.color=alabaster,
+    column_labels.background.color = "transparent",
+    table.font.size = px(12),
+    column_labels.font.size = px(12),
+    heading.align = "left",
+    table.font.names = "Inter",
+    heading.title.font.size = px(20),
+    heading.border.bottom.color = "transparent",
+    column_labels.border.bottom.width = px(3),
+    column_labels.border.bottom.color = gainsboro,
+    table.border.top.color = "transparent",
+    table.border.bottom.color = "transparent",
+    table.border.bottom.width = px(3),
+    data_row.padding = px(3),
+    footnotes.font.size = px(10),
+    footnotes.border.bottom.color = "transparent",
+    table.align='left')%>%
+  tab_style(style=
+            cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
+   tab_style(style=
+               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+            
+```
+
+```{r, include=FALSE}
+dbDisconnect(con) 
+```
