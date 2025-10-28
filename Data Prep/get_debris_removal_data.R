@@ -240,14 +240,27 @@ table(parcels_filtered$damage_category, parcels_filtered$hhm_removal_status, use
 table(parcels_filtered$damage_category, parcels_filtered$roe_status, useNA = "ifany")
 table(parcels_filtered$epa_status, parcels_filtered$hhm_removal_status, useNA = "ifany")
 table(parcels_filtered$roe_status, parcels_filtered$hhm_removal_status, useNA = "ifany")
-# epa_status - "Phase 1 Complete" or "Deferred to Phase 2"
+# [KEEP for permit stages] epa_status - "Phase 1 Complete" or "Deferred to Phase 2" - bring into permit stages
 # hhm_removal_status - in map pop-up seems equiv to "USACE Phase 1 Status"
-# roe_status - tracks if roe returned_complete or not_received/opt_out or returned_ineligible/returned_withdrawn
+# [KEEP for permit stages] roe_status - tracks if roe returned_complete or not_received/opt_out or returned_ineligible/returned_withdrawn - keep
 # roe_received - seems to have some ID if relevant else NA
 # roe_approved - same as above
 # roe_submitted - same as above
 # roe_details
-# hsa_report_received/has_report_approved - probably historical site assessment report  (prelim eval of site history to assess potential for contamination, radiological material, etc.)
-# pcr_received/pcr_approved - possibly a cultural/historical assessment
+# hsa_report_received/has_report_approved - "Hazardous Site Assessment" see below, code if valid else NA
+# [KEEP for permit stages] fso_pkg_received/fso_pkg_approved - same as others, ID if relevant else NA - keep
+# pcr_received/pcr_approved - Parcel Completion Report"
 
-
+# From map sidebar: https://jecop-public.usace.army.mil/portal/apps/experiencebuilder/experience/?id=efbee5617ffa4d17b572d5f312004806
+# Terms used in this dashboard
+# ROE Status:
+## "ROE Received" ROEs transmitted from LA County to Corps of Engineers for review and acceptance excluding any ineligible or withdrawn instances.
+## "ROE Accepted" are those that the Corps of Engineers has received and accepted from LA County. Once EPA has classified the parcel (Phase 1 Complete or Deferred), Corps of Engineers transfers ROE to Prime Contractor for Property Debris Removal (PPDR). 
+## "In Progress with Contractor" identifies accepted ROEs that the Corps of Engineers transferred to the Prime Contractor for PPDR.
+# Final Sign Off
+## "Final Sign Off" identifies parcels that have had all debris removed, erosion control applied, final inspection and Final Sign Off by Corps of Engineers and Contractor.
+# ROE: Right of Entry
+# HSA: Hazardous Site Assessment
+# FSO: Final Sign Off
+# PCR: Parcel Completion Report
+# APN: Assessor's Parcel Number
