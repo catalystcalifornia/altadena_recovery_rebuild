@@ -10,6 +10,7 @@ library(sf)
 
 source("W:\\RDA Team\\R\\credentials_source.R")
 con <- connect_to_db("altadena_recovery_rebuild")
+options(scipen = 999)
 
 # Base configuration
 BASE_URL <- "https://jecop-public.usace.army.mil/arcgis/rest/services/USACE_Debris_Parcels_Southern_California_Public/MapServer/0/query"
@@ -200,10 +201,53 @@ date_ran <- as.character(Sys.Date())
 dbWriteTable(con, Id(schema="data", table_name=table_name), eaton_df,
              overwrite = FALSE, row.names = FALSE)
 
-dbSendQuery(con, paste0("COMMENT ON TABLE data.", table_name, " IS
-            'Debris removal data for parcels impacted by the Eaton Fire,
-            Data imported on ",date_ran, "
-            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_permit_typology.docx
-            Source: US Army Corps of Engineers'"))
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.", table_name, " IS
+#             'Debris removal data for parcels impacted by the Eaton Fire,
+#             Data imported on ",date_ran, "
+#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_permit_typology.docx
+#             Source: US Army Corps of Engineers'"))
 
 dbDisconnect(con)
+
+
+##### Read in from postgres and do quick review #####
+
+con <- connect_to_db("altadena_recovery_rebuild") 
+debris <- dbGetQuery(con, "SELECT * FROM data.usace_debris_removal_parcels_2025;")
+
+jan_parcels <- dbGetQuery(con, "SELECT * FROM data.rel_assessor_residential_jan2025;")
+sept_parcels <- dbGetQuery(con, "SELECT * FROM data.rel_assessor_residential_sept2025;") %>% 
+  rename(ain=ain_sept) %>%
+  select(-zoning_code)
+sept_damage <- dbGetQuery(con, "SELECT * FROM data.rel_assessor_damage_level_sept2025;")
+dbDisconnect(con)
+
+ains <- rbind(select(jan_parcels,ain), select(sept_parcels,ain)) %>% unique() %>%
+  left_join(jan_parcels, by="ain", suffix=c("", "_jan"))
+ains <- ains %>% left_join(sept_parcels, by="ain", suffix=c("", "_sept")) %>%
+  left_join(sept_damage, by=c("ain"="ain_sept"))
+
+parcels <- ains %>% 
+  select(ain, damage_category, use_code, use_code_sept) %>% 
+  left_join(debris, by="ain")
+
+# remove parcels that didn't match
+parcels_filtered <- parcels %>% #6331
+  filter(!is.na(OBJECTID))
+
+table(parcels_filtered$damage_category, parcels_filtered$epa_status, useNA = "ifany")
+table(parcels_filtered$damage_category, parcels_filtered$hhm_removal_status, useNA = "ifany")
+table(parcels_filtered$damage_category, parcels_filtered$roe_status, useNA = "ifany")
+table(parcels_filtered$epa_status, parcels_filtered$hhm_removal_status, useNA = "ifany")
+table(parcels_filtered$roe_status, parcels_filtered$hhm_removal_status, useNA = "ifany")
+# epa_status - "Phase 1 Complete" or "Deferred to Phase 2"
+# hhm_removal_status - in map pop-up seems equiv to "USACE Phase 1 Status"
+# roe_status - tracks if roe returned_complete or not_received/opt_out or returned_ineligible/returned_withdrawn
+# roe_received - seems to have some ID if relevant else NA
+# roe_approved - same as above
+# roe_submitted - same as above
+# roe_details
+# hsa_report_received/has_report_approved - probably historical site assessment report  (prelim eval of site history to assess potential for contamination, radiological material, etc.)
+# pcr_received/pcr_approved - possibly a cultural/historical assessment
+
+
