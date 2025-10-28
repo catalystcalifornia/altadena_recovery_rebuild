@@ -137,7 +137,7 @@ parcels_fhsz_final <- rbind(parcels_fhsz_none,parcels_fhsz)
 # table_name <- "rel_assessor_fhsz_sept2025"
 # indicator <- "Relational table of september residential parcels that include the local and state responsibility fire hazard zones. If the parcels is not in a fire hazard zone then the category None is used"
 # source <- "Source: LA County Assessor Data, September 2025 & Local & state fire hazard zones from Cal office of fire marshall"
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zones.docx"
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zoning_fire_zones.docx"
 # column_names <- colnames(parcels_fhsz_final) # Get column names
 # column_names
 # column_comments <- c(
@@ -194,7 +194,7 @@ schema <- "data"
 table_name <- "analysis_damage_fhsz_sept2025"
 indicator <- "Analysis of the percentage of properties in West and East Altadena in fire hazard areas by damage category, e.g., the % of significantly damaged properties in very high fire hazard areas in West Altadena"
 source <- "Source: LA County Assessor Data, September 2025 & California Office of Fire Marshall state and local responsibility areas"
-qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zones.docx"
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zoning_fire_zones.docx"
 column_names <- colnames(analysis_fhsz) # Get column names
 column_names
 column_comments <- c(
