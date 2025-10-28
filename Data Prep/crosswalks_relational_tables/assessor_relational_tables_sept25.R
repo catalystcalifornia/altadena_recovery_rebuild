@@ -554,6 +554,10 @@ sales %>%
 sales <- sales %>%
   mutate(sold_after_eaton=ifelse(last_sale_date>="2025-02-08", TRUE, FALSE))
 
+# quick check
+
+sales%>%select(last_sale_date, sold_after_eaton)%>%View() # Looks good
+
 # clean up for postgres
 sales_final <- sales %>%
   select(ain,
