@@ -153,7 +153,7 @@ analysis_z_category_final <- analysis_z_category %>%
 # table_name <- "analysis_zone_categories_sept2025"
 # indicator <- "Allowable zone categories for significantly damaged properties in each area, e.g., % of significantly damaged properties in West Altadena with a R-1 (single family residence) allowable use"
 # source <- "Source: LA County Assessor Data, September 2025 & LA County plannning data"
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zones.docx"
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zoning_fire_zones.docx"
 # column_names <- colnames(analysis_z_category_final) # Get column names
 # column_names
 # column_comments <- c(
@@ -213,7 +213,7 @@ analysis_zone_final <- analysis_zone %>%
 # table_name <- "analysis_zone_r1_sept2025"
 # indicator <- "Allowable zone categories and lot sizes for significantly damaged properties in R1 (single family) zones for each area, e.g., % of significantly damaged R-1 properties in West Altadena with a R-1 minimum 7500 lot size use"
 # source <- "Source: LA County Assessor Data, September 2025 & LA County plannning data"
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zones.docx"
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zoning_fire_zones.docx"
 # column_names <- colnames(analysis_zone_final) # Get column names
 # column_names
 # column_comments <- c(
@@ -224,5 +224,41 @@ analysis_zone_final <- analysis_zone %>%
 #   "total properties in the zone")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
-#### Step 8: close connection ####
+### Step 6: Push relational table to postgres #####
+# Run for all residential parcels
+# join parcels to zones based on centroid
+parcels_zoning_all <- st_join(st_centroid(parcels_sept), zoning_lac, left=TRUE)
+
+# check join
+nrow(parcels_zoning_all)
+length(unique(parcels_zoning_all$ain_sept))
+# no duplicates
+
+table(parcels_zoning_all$z_category, useNA='always')
+# no NAs
+
+# recode
+rel_zoning <- parcels_zoning_all %>% st_drop_geometry () %>%
+  select(ain_sept, z_desc, z_category, z_name, zone, plng_area) %>%
+  st_drop_geometry()
+
+# Upload tables to postgres and add table/column comments
+# dbWriteTable(con, name = "rel_assessor_zoning_sept2025", value = rel_zoning, overwrite = FALSE)
+# schema <- "data"
+# table_name <- "rel_assessor_zoning_sept2025"
+# indicator <- "Relational table of residential parcels from September 2025 matched to zoning code - allowable uses, based on centroid join"
+# source <- "Source: LA County Assessor Data, September 2025 & LA County plannning data"
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_zoning_fire_zones.docx"
+# column_names <- colnames(rel_zoning) # Get column names
+# column_names
+# column_comments <- c(
+#   "september ain",
+#   "zoning description or label of z_category",
+#   "zone category (alphanumeric version of z_desc)",
+#   "zone category in a different format",
+#   "specific zone with lot size requirements for R-1 specified",
+#   "Planning area")
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
+#### Step 7: close connection ####
 dbDisconnect(con)
