@@ -67,6 +67,7 @@ parcels_res <- parcels %>% filter(residential==TRUE & total_units>0)
 
 parcels_damaged <- parcels_res %>% filter(damage_category=="Significant Damage")
 
+
 ```
 
 ```{r, include=FALSE}
@@ -84,13 +85,46 @@ damage_pal <- colorFactor(palette = c("#FFCC00","#FF9E0D","#F25922"), domain = p
 
 popup_res <-  paste0(
       "AIN: ", parcels_res$ain, "</br>",
-      "Residential Type: ",  parcels_res$res_type, "</br>",
       "Damage Category: ",  parcels_res$damage_category, "</br>",
-      "Housing Tenure: ",  parcels_res$owner_renter, "</br>",
+      "Residential Type: ",  parcels_res$res_type, "</br>",
+      "Ownership Type: ",  parcels_res$owner_renter, "</br>",
       "Total/Rental Units: ",  parcels_res$total_units, "/", parcels_res$landlord_units, "</br>",
-      "Total Square Feet: ", parcels_res$total_square_feet)
+      "Total Square Feet: ", parcels_res$total_square_feet, "</br>",
+      "Use Code: ",  parcels_res$use_code)
 
 
+# make layer for rental units lost ------
+rental_units <- parcels_res %>% filter(owner_renter=="Renter occupied") %>% filter(damage_category=="Significant Damage")
+popup_rent <-  paste0(
+      "AIN: ", rental_units$ain, "</br>",
+      "Damage Category: ",  rental_units$damage_category, "</br>",
+      "Residential Type: ",  rental_units$res_type, "</br>",
+      "Ownership Type: ",  rental_units$owner_renter, "</br>",
+      "Total/Rental Units: ",  rental_units$total_units, "/", rental_units$landlord_units, "</br>",
+      "Total Square Feet: ", rental_units$total_square_feet, "</br>",
+      "Use Code: ",  rental_units$use_code)
+
+# make layer for single family units lost ------
+single_family <- parcels_res %>% filter(res_type=="Single-family") %>% filter(damage_category=="Significant Damage")
+popup_single <-  paste0(
+      "AIN: ", single_family$ain, "</br>",
+      "Damage Category: ",  single_family$damage_category, "</br>",
+      "Residential Type: ",  single_family$res_type, "</br>",
+      "Ownership Type: ",  single_family$owner_renter, "</br>",
+      "Total/Rental Units: ",  single_family$total_units, "/", single_family$landlord_units, "</br>",
+      "Total Square Feet: ", single_family$total_square_feet, "</br>",
+      "Use Code: ",  single_family$use_code)
+
+# make layer for multifamily units lost ------
+multifamily <- parcels_res %>% filter(res_type=="Multifamily") %>% filter(damage_category=="Significant Damage")
+popup_multi <-  paste0(
+      "AIN: ", multifamily$ain, "</br>",
+      "Damage Category: ",  multifamily$damage_category, "</br>",
+      "Residential Type: ",  multifamily$res_type, "</br>",
+      "Ownership Type: ",  multifamily$owner_renter, "</br>",
+      "Total/Rental Units: ",  multifamily$total_units, "/", multifamily$landlord_units, "</br>",
+      "Total Square Feet: ", multifamily$total_square_feet, "</br>",
+      "Use Code: ",  multifamily$use_code)
 
 ```
 
@@ -117,16 +151,16 @@ addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(data=west,
               fillColor="white",
               fillOpacity=0,
-              color="#2BC433",
+              color=ccblue,
               weight=2.5,
               opacity=1,
               popup=~"West Altadena",
               group="West Altadena") %>%
     addPolygons(data=parcels_res,
-              fillColor="white",
-              fillOpacity=0,
-              color=~damage_pal(damage_factor),
-              weight=.6,
+              fillColor=~damage_pal(damage_factor),
+              fillOpacity=1,
+              color="white",
+              weight=.4,
               opacity=1,
               popup=~popup_res,
               group="Residential Properties Damage Levels") %>%
@@ -137,53 +171,38 @@ addProviderTiles(providers$CartoDB.Positron) %>%
         group="Residential Properties Damage Levels",
         title = "Damage Level"
       ) %>%
-      # addPolygons(data=parcels_res,
-      #         fillColor="white",
-      #         fillOpacity=0,
-      #         color=~unit_pal(unit_category_factor),
-      #         weight=.6,
-      #         opacity=1,
-      #         popup=~popup_res,
-      #         group="Residential Unit Sizes") %>%
-      #   addLegend(
-      #   position = "bottomleft",
-      #   pal = unit_pal,
-      #   values =  parcels_res$unit_category_factor,
-      #   group="Residential Unit Sizes",
-      #   title = "Number of Residential Units"
-      # ) %>%
-      #   addPolygons(data=parcels_res,
-      #         fillColor="white",
-      #         fillOpacity=0,
-      #         color=~owner_pal(owner_renter_factor),
-      #         weight=.6,
-      #         opacity=1,
-      #         popup=~popup_res,
-      #         group="Owner or Renter Occupied") %>%
-      #   addLegend(
-      #   position = "bottomleft",
-      #   pal = owner_pal,
-      #   values =  parcels_res$owner_renter_factor,
-      #   group="Owner or Renter Occupied",
-      #   title = "Owner or Renter Occupied"
-      # ) %>%
-      # addPolygons(data=parcels_mixed,
-      #         fillColor="white",
-      #         fillOpacity=0,
-      #         color="#F25922",
-      #         weight=.7,
-      #         opacity=1,
-      #         popup=~res_type,
-      #         group="Mixed Use Properties") %>%
+  addPolygons(data=rental_units,
+                   fillColor="black",
+                   color = "white",
+                   fillOpacity=0.9,
+                   weight=.3,
+                   opacity=1,
+                            popup=~popup_rent,
+                   group="Rental Properties Lost") %>%
+  addPolygons(data=single_family,
+                   fillColor="black",
+                   color = "white",
+                   fillOpacity=0.9,
+                   weight=.3,
+                   opacity=1,
+                            popup=~popup_single,
+                   group="Single-family Properties Lost") %>%
+  addPolygons(data=multifamily,
+                   fillColor="black",
+                   color = "white",
+                   fillOpacity=0.9,
+                   weight=.3,
+                   opacity=1,
+                            popup=~popup_multi,
+                   group="Multifamily Properties Lost") %>%
   addLayersControl(
           overlayGroups = c("Residential Properties Damage Levels",
-                            # "Residential Unit Sizes","Owner or Renter Occupied","Mixed Use Properties",
+                            "Rental Properties Lost", "Single-family Properties Lost", "Multifamily Properties Lost",
                             "West Altadena","East Altadena","Eaton Fire Perimeter"),
         options = layersControlOptions(collapsed = FALSE
                                        # ,  autoZIndex = TRUE)
         ))  %>%
-  hideGroup(c("Eaton Fire Perimeter"
-              # ,"Residential Unit Sizes","Owner or Renter Occupied","Mixed Use Properties"
+  hideGroup(c("Eaton Fire Perimeter", "Rental Properties Lost", "Single-family Properties Lost", "Multifamily Properties Lost"
               ))
 
 
