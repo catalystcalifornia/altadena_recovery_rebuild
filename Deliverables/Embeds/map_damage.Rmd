@@ -59,10 +59,13 @@ east <- st_read(con, query="SELECT * FROM data.east_altadena_3310", geom="geom")
 
 df_lead <- st_read(con, query="Select * from data.lacdph_lead_results_grid_2025", geom="geom") %>% 
   st_transform(4326) %>%
-  mutate(hi_lead_flag = ifelse(lead_geometric_mean > 80, TRUE, FALSE))
+  mutate(hi_lead_flag = case_when(is.na(lead_geometric_mean) ~ "Not Tested",
+                               lead_geometric_mean >= 80 ~ "Above Threshold",
+                               lead_geometric_mean <80 ~ "Below Threshold",
+                               TRUE ~ NA))
 
 #NOTE: taking time to transform even after filtering
-df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'East San Gabriel Valley' OR plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326)
+df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326)
 
 df_local_fhsz <- st_read(con, query="Select * from data.eaton_local_fhsz_4326 WHERE fhsz_descr != 'NonWildland'", geom="geom")
 
@@ -72,21 +75,71 @@ eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geo
 
 #Pulling in data for POP UP 
 sept_zoning <- st_read(con, query="SELECT * FROM data.rel_assessor_zoning_sept2025")
-sept_fhsz <- st_read(con, query="SELECT * FROM data.rel_assessor_fhsz_sept2025") 
+sept_fhsz <- st_read(con, query="SELECT * FROM data.rel_assessor_fhsz_sept2025") %>% select(-area_name)
+sept_lead <- st_read(con, query="SELECT * FROM data.rel_assessor_lead_sept2025")
 
-all_df <- parcels_res_damaged %>% left_join(sept_zoning, by = "ain_sept") %>% left_join(sept_fhsz, by = "ain_sept")
+all_df <- parcels_res_damaged %>% left_join(sept_zoning, by = "ain_sept") %>% left_join(sept_fhsz, by = "ain_sept") %>% left_join(sept_lead, by="ain_sept")
 
-# pop up 
+### parcel pop up ----
 popup_parcel <- paste0(
       "AIN: ", all_df$ain_sept, "</br>",
       "Residential Type: ",  all_df$res_type, "</br>",
-      "Home Ownership Status: ",  all_df$owner_renter, "</br>",
+      "Ownership Type: ",  all_df$owner_renter, "</br>",
       "Total Square Footage: ", all_df$total_square_feet, "</br>",
-      "LA County Unincorporated Zoning Description: ",  all_df$z_desc, "</br>",
-      "Local Fire Hazard Zone: ", all_df$local_fhsz
+      "Total Units: ", all_df$total_units, "</br>",
+      "L.A. County Zoning: ",  all_df$z_desc, "</br>",
+      "Fire Hazard Zone: ", all_df$combined_fhsz, "</br>",
+      "Lead Level: ", all_df$hi_lead_label
       )
 
-colorpal_local_fhsz <- colorFactor(palette = "YlOrRd", domain = df_local_fhsz$fhsz_descr)
+### factors and paletes for other polygons ----
+# high lead grid colors
+df_lead$hi_lead_flag <- factor(
+      df_lead$hi_lead_flag,
+      levels = c("Not Tested","Below Threshold","Above Threshold"))
+
+# Create a color palette based on the factor
+lead_pal <- colorFactor(palette = c("gray","#ffcccc","red"), domain = df_lead$hi_lead_flag)
+
+# fire zone colors
+df_local_fhsz$fhsz_descr <- factor(
+      df_local_fhsz$fhsz_descr,
+      levels = c("Moderate","High","Very High"))
+
+# Create a color palette based on the factor
+colorpal_local_fhsz  <- colorFactor(palette = c("#ffffb2","#fd8d3c","#f03b20"), domain = df_local_fhsz$fhsz_descr)
+
+
+# zone colors
+# reference https://planning.lacounty.gov/wp-content/uploads/2022/04/map_z_02_Altadena.pdf
+# table(df_zoning_lac$z_desc,useNA='always')
+zoning_codes <- as.data.frame(table(df_zoning_lac$z_category,useNA='always'))
+df_zoning_lac <- df_zoning_lac %>%
+  mutate(zone_label=
+           case_when(
+             str_detect(z_category, "^C") ~ "Commercial",
+             str_detect(z_category, "^A") ~ "Agricultural",
+             str_detect(z_category, "^R-1") ~ "Single-Family Residence",
+             str_detect(z_category, "^R-2") ~ "Two-Family Residence",
+             str_detect(z_category, "^R-3") ~ "Multiple Residence",
+             str_detect(z_category, "^R-4") ~ "Multiple Residence",
+             str_detect(z_category, "^R-5") ~ "Multiple Residence",
+             str_detect(z_category, "^R") ~ "Other Residential",
+             str_detect(z_category, "^MXD") ~ "Mixed Use Development",
+             str_detect(z_category, "^M-") ~ "Manufacturing",
+             str_detect(z_category, "^O-") ~ "Open Space/Water Shed",
+             str_detect(z_category, "^W-") ~ "Open Space/Water Shed",
+             TRUE ~ "Other"))
+# check
+check <- df_zoning_lac %>% st_drop_geometry() %>% group_by(zone_label, z_category) %>% summarise(count=n())
+             
+df_zoning_lac$zone_label<- factor(
+      df_zoning_lac$zone_label,
+      levels = c("Single-Family Residence","Two-Family Residence","Multiple Residence","Other Residential","Mixed Use Development","Commercial","Manufacturing","Agricultural","Open Space/Water Shed","Other"))
+
+# Create a color palette based on the factor
+zoning_pal <- colorFactor(palette = c("#feffe2","#f2d84b","#d09a36","#dfd3b6","#b3605d","#E34234","#b7c4db","#c5fb5d","#8ffa4f","#bfbfbf"), domain = df_zoning_lac$zone_label)
+
 
 ```
 
@@ -133,25 +186,25 @@ addProviderTiles(providers$CartoDB.Positron) %>%
               group="West Altadena") %>%
   #Lead Data 
   addPolygons(data=df_lead,
-              color = ~ifelse(hi_lead_flag == TRUE, "red", "gray"),
-              fillColor = "gray",
-              fillOpacity=0,
-              weight=.6,
+              fillColor = ~lead_pal(hi_lead_flag),
+              fillOpacity=0.4,
+              color="white",
+              weight=.5,
               opacity=1,
               popup=~paste0("Average Lead Level Measured in mg/kg: ", df_lead$lead_geometric_mean, "</br>",
-                            "Higher than Safe Levels of Lead: ", df_lead$hi_lead_flag),
-              group="High Levels of Lead in Soil") %>% 
+                            "Higher than 80 mg/kg Safety Threshold: ", df_lead$hi_lead_flag),
+              group="Lead Levels in Soil") %>% 
                 addLegend(
                   position = "bottomleft",
-                  colors = c("red", "gray"),
-                  labels = c("High Lead Level", "Normal Lead Level"),
-                  group="High Levels of Lead in Soil",
+                  pal = lead_pal,
+                  values =  df_lead$hi_lead_flag,
+                  group="Lead Levels in Soil",
                   title = "Lead Levels"
                 ) %>%
   #Fire Hazard Zones 
   addPolygons(data=df_local_fhsz,
               fillColor=~colorpal_local_fhsz(fhsz_descr),
-              fillOpacity=0.7,
+              fillOpacity=0.5,
               color="white",
               weight=1,
               popup=~fhsz_descr,
@@ -161,28 +214,34 @@ addProviderTiles(providers$CartoDB.Positron) %>%
                 pal = colorpal_local_fhsz,
                 values =  df_local_fhsz$fhsz_descr,
                 group="Local Fire Hazard Zones",
-                title = "Hazard Level") %>%
+                title = "Fire Hazard Level") %>%
   addPolygons(data=df_state_fhsz,
               fillColor="red",
-              fillOpacity=0.7,
+              fillOpacity=0.5,
               color="white",
               weight=1,
               popup=~fhsz_descr,
               group="State Fire Hazard Zones") %>%
   #Zoning 
   addPolygons(data=df_zoning_lac,
-              fillColor="white",
-              fillOpacity=0,
-              color=lavender,
+              fillColor=~zoning_pal(zone_label),
+              fillOpacity=0.5,
+              color="white",
               weight=1,
               opacity=1,
-              popup=~paste0("LA County Unincorporated Zoning Description: ", df_zoning_lac$z_desc),
-              group="Zoning") %>% 
+              popup=~paste0("Zoning Description: ", df_zoning_lac$z_desc),
+              group="Zoning") %>%
+                addLegend(
+                position = "bottomleft",
+                pal = zoning_pal,
+                values =  df_zoning_lac$zone_label,
+                group="Zoning",
+                title = "Allowable Uses") %>% 
   #Controling Layers
   addLayersControl(
-          overlayGroups = c("Significantly Damaged Parcels after Eaton Fire", "High Levels of Lead in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning","West Altadena","East Altadena","Eaton Fire Perimeter"),
+          overlayGroups = c("Significantly Damaged Parcels after Eaton Fire", "Lead Levels in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning","West Altadena","East Altadena","Eaton Fire Perimeter"),
         options = layersControlOptions(collapsed = FALSE,autoZIndex = TRUE))  %>%
-  hideGroup(c("Eaton Fire Perimeter","High Levels of Lead in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning"))
+  hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning"))
 
 ```
 
