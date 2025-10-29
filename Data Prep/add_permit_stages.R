@@ -119,8 +119,12 @@ combined_permits <- parcels %>%
   left_join(permits_filtered, by="ain") %>% # 16468
   left_join(debris_status, by="ain") %>%
   # add bucket 1 helper columns
-  mutate(has_fdr=ifelse(grepl("^FDR", permit_number), 1, 0),
+  mutate(has_ace_fso = ifelse(!is.na(fso_pkg_approved), 1, 0),
+         has_fdr=ifelse(grepl("^FDR", permit_number), 1, 0),
          has_fdr_finaled = ifelse((grepl("^FDR", permit_number) & status=="Finaled"), 1, 0)) %>%
+  mutate(phase_2_result = case_when((has_ace_fso==1)|(has_fdr==1 & has_fdr_finaled==1) ~ "Debris Removal Completed",
+                                    (has_ace_fso==0 & damage_category == "No Damage") ~ "Debris Removal Not Applicable",
+                                    .default = "Debris Removal Incomplete")) %>%
   # add bucket 2 helper columns
   mutate(has_rebuild_app = ifelse(grepl("^(CREB|UNC-)", permit_number), 1, 0)) %>%
   mutate(
@@ -184,24 +188,22 @@ combined_permits <- parcels %>%
   
 
 ##### Bucket 1: Debris Removal Completed ##### 
-### check if there's an fdr permit (indicates private contractor used for Phase 2 clean up)
-check_fdr <- combined_permits %>%
-  select(ain, has_fdr, has_fdr_finaled) %>% 
-  unique() %>%
-  # creating here but should recreate later (after bucket 2 to get assumed Debris Removal Completed)
-  mutate(phase_2_result = case_when(has_fdr==1 & has_fdr_finaled==1 ~ "Debris Removal Completed",
-                                    has_fdr==1 & has_fdr_finaled==0 ~ "Debris Removal In Progress",
-                                    .default = "Need more info"))
+### check if there's an fdr permit or army corps full sign off "fso" to indicate debris removal complete (phase_2_result)
+### may need to refine further
+check_debris <- combined_permits %>%
+  select(ain, epa_status, roe_status, fso_pkg_received, fso_pkg_approved,
+         has_ace_fso, has_fdr, has_fdr_finaled, phase_2_result) %>% 
+  unique() 
 
-### Will need to get Army Corps (and possibly EPA) data to finish this section
-# <TBD>
 
-### Add what we have to final_types 
+### Add what we have to final_types and create bucket_1_status
 final_types <- final_types %>% 
-  left_join(check_fdr, by="ain") 
+  left_join(check_debris, by="ain") %>%
+  # add bucket 1 with assumption (note assumption is for any permit status)
+  mutate(bucket_1_status = phase_2_result)
   
 # check
-table(final_types$phase_2_result, useNA="ifany")
+table(final_types$bucket_1_status, useNA="ifany")
 
 ##### Bucket 2: Applied for Rebuild Permits #####
 ### Yes 
@@ -220,13 +222,11 @@ check_rebuild <- combined_permits %>%
 ### Add to final_types
 final_types <- final_types %>%
   left_join(check_rebuild, by="ain") %>%
-  # add bucket 1 with assumption (note assumption is for any permit status)
-  mutate(bucket_1_status = case_when(
-    # may need to update to have permit app and app status is finaled or issued
-    has_rebuild_app==1 ~ "Debris Removal Completed",
-    .default = phase_2_result)) %>%
-  mutate(bucket_2_status = case_when((bucket_1_status=="Debris Removal Completed" & has_rebuild_app==1) ~ "Applied for rebuild permits", 
-                                     (bucket_1_status=="Debris Removal Completed" & has_rebuild_app==0) ~ "Awaiting permit application",
+  # using an assumption that is the parcel has a rebuild app, it is probably finished with debris removal
+  mutate(bucket_1_status = case_when(has_rebuild_app==1 ~ "Debris Removal Completed",
+                                     .default=bucket_1_status)) %>%
+  mutate(bucket_2_status = case_when((bucket_1_status=="Debris Removal Completed" & has_rebuild_app==1 & (damage_category=="Some Damage"|damage_category=="Significant Damage")) ~ "Applied for rebuild permits", 
+                                     (bucket_1_status=="Debris Removal Completed" & has_rebuild_app==0 & (damage_category=="Some Damage"|damage_category=="Significant Damage")) ~ "Awaiting permit application",
                                      .default=bucket_1_status))
 
 # check
@@ -235,7 +235,6 @@ table(final_types$bucket_1_status, useNA = "ifany")
 table(final_types$bucket_2_status, useNA = "ifany")
 table(final_types$damage_category, final_types$bucket_1_status, useNA = "ifany")
 table(final_types$damage_category, final_types$bucket_2_status, useNA = "ifany")
-
 
 ##### Bucket 3: Rebuild/Construction in progress #####
 ## Yes
@@ -260,7 +259,7 @@ final_types <- final_types %>%
                                      .default=bucket_2_status))
   
 
-
+table(final_types$damage_category, final_types$bucket_3_status, useNA = "ifany")
 ##### Bucket 4: Construction Complete #####
 ## Yes: Qualifies for bucket 3 AND
 # Sub-bucket 4.1: Permanent Housing Complete - Bucket 2.1 == Yes AND permit_number starts with “CREB”, “UNC-BLDR”, or “UNC-BLDF” and with status.detailed = “Finaled” 
@@ -294,21 +293,21 @@ final_types <- final_types %>%
 
 # Check rebuild status
 check <- as.data.frame(table(final_types$damage_category, final_types$rebuild_status))
-# QA to  check: has_finaled had NAs - should have only 0/1 now; check other helper columns
-
 
 
 ##### Export to postgres #####
+con <- connect_to_db("altadena_recovery_rebuild")
 table_name <- "rel_parcel_rebuild_status_2025_10"
 date_ran <- as.character(Sys.Date())
   
-dbWriteTable(con, Id(schema="data", table_name=table_name), final_types,
+# Now write the table
+dbWriteTable(con, Id(schema="data", table=table_name), final_types,
              overwrite = FALSE, row.names = FALSE)
 
-dbSendQuery(con, paste0("COMMENT ON TABLE data.", table_name, " IS
-            'Rebuild status for Altadena parcels based on scraped permit data from _2025_10 tables,
-            Data imported on ",date_ran, "
-            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_permit_typology.docx
-            Source: Multiple sources - see QA doc'"))
+# dbSendQuery(con, paste0("COMMENT ON TABLE data.", table_name, " IS
+#             'Rebuild status for Altadena parcels based on scraped permit data from _2025_10 tables,
+#             Data imported on ",date_ran, "
+#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_permit_typology.docx
+#             Source: Multiple sources - see QA doc'"))
 
 dbDisconnect(con)
