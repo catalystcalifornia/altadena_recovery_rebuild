@@ -42,7 +42,7 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Across Altadena and residential housing types, about one in three rental units were lost in significantly damaged or destroyed properties. West Altadena rental units were hit the hardest. Nearly half of rental units in multifamily properties were significant damaged or destroyed in the fire. And over 40% of rental units in single-family homes in West Altadena were significantly damaged or destroyed. In order to return Altadena at least to the level of rental options existing before the fire, significant investments and strategic solutions to rebuilding rental properties is required.
+Across Altadena and multifamily unit types, almost half (47%) of multifamily properties that had five or more units were significantly damaged or destroyed. A count of over 200 multifamily homes with two units were lost due to the Eaton Fire in Altadena. Multifamily homes in West Altadena suffered property loss and damage at much higher rates than East Altadena.    
 
 ```{r}
 #### VISUAL ####
