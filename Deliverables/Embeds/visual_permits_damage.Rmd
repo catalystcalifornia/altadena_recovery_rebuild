@@ -1,0 +1,119 @@
+---
+title: ""
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+#### Setting Up ####
+
+library(usethis)
+library(dplyr)
+library(tidyverse)
+library(htmltools) 
+library(htmlwidgets)
+library(gtExtras)
+library(gt)
+library(sf)
+library(scales)
+
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+
+## COLORS ##
+orange <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+```
+
+Based on permit data we scraped and cleaned, only one in three significantly damaged properties in Altadena have at least applied for a permit or started construction. We classified properties according to five rebuild categories:
+
+* No Evidence of Progress: There is no data that clean-up or debris removal has occurred on the property.
+* Debris Removal Incomplete: Debris removal has not been finaled.
+* Awaiting Permit Application: Debris removal has been completed, but there has been no permit application received.
+* Awaiting Construction Start: A permit has been approved, but there is no indication on the permit that construction has started.
+* Move-In Available: For rebuild permits related to temporary or permanent housing, at least one of the permits has been finaled.
+
+West and East Altadena significantly damaged properties are similar in their rebuild status. About 70% of properties in each area have completed debris removal, but have not applied for a permit to rebuild--67% in West Altadena and 70% in East Altadena. This suggests that many property owners have not made progress toward rebuilding and returning to the community--which likely shows the difficult journey property owners are facing toward being able to finance and manage construction.
+
+```{r}
+#### VISUAL: Permit statuses by area for significantly damaged properties  ####
+df_ <- st_read(con, query="Select * from data.analysis_permits_damage_jan2025") 
+
+df <- df_ %>%
+    filter(damage_category == "Significant Damage") 
+
+# add factor level and clean up labels
+df <- df %>%
+  mutate('Rebuild Status'=
+           case_when(rebuild_status=="Need more info" ~ "No Evidence of Progress",
+                     TRUE ~ str_to_title(rebuild_status)))
+
+df$`Rebuild Status`<- factor(df$`Rebuild Status`, levels = c("No Evidence of Progress",
+                                                             "Debris Removal Incomplete",
+                                                             "Awaiting Permit Application",
+                                                             "Awaiting Construction Start",
+                                                             "Move-In Available"))
+
+df <- df %>%
+  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
+         "Share of Damaged Properties in Rebuild Status"=prc,
+         "Area" = str_to_title(area_name)) %>%
+  mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
+  arrange(Area,`Rebuild Status`)
+
+
+table<- df %>%
+  select("Area","Rebuild Status", "Share of Damaged Properties in Rebuild Status", "Count (%)")%>%
+  gt(groupname_col = "Area", rowname_col = "Rebuild Status") %>%
+  tab_header(title= "Rebuild Status of Significantly Damaged Properties by Area as of October 2025")%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and L.A. County Public Works, October 2025."),placement="left") 
+
+ table %>%
+  gt_plt_bar_pct(column= 'Share of Damaged Properties in Rebuild Status', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  # if needed modify column widths here 
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
+  opt_align_table_header("left")%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  tab_options(table.background.color=alabaster,
+    column_labels.background.color = "transparent",
+    table.font.size = px(12),
+    column_labels.font.size = px(12),
+    heading.align = "left",
+    table.font.names = "Inter",
+    heading.title.font.size = px(20),
+    heading.border.bottom.color = "transparent",
+    column_labels.border.bottom.width = px(3),
+    column_labels.border.bottom.color = gainsboro,
+    table.border.top.color = "transparent",
+    table.border.bottom.color = "transparent",
+    table.border.bottom.width = px(3),
+    data_row.padding = px(3),
+    footnotes.font.size = px(10),
+    footnotes.border.bottom.color = "transparent",
+    table.align='left')%>%
+  tab_style(style=
+            cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
+   tab_style(style=
+               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+            
+```
+
+```{r, include=FALSE}
+dbDisconnect(con) 
+```

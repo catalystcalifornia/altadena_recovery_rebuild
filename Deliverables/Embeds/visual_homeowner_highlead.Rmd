@@ -9,7 +9,6 @@ output: rmarkdown::html_vignette
 knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
 )
 
-## The following document outputs a visual in a table format for the altadena_housing_before_and_after.html 
 
 #### Setting Up ####
 
@@ -42,29 +41,37 @@ gainsboro <- "#DEDEDE"
 
 ```
 
+Different strategies may be needed to support varying ownership types in safely rebuilding their properties. We examined the percentage of significantly damaged properties in high lead grids by ownership type. Across owner types, over one in three significantly damaged properties are in high lead grids. Significantly damaged properties that are owned as rentals (renter-occupied) have the highest share of properties in high lead grids. In West Altadena, 57% of renter-occupied, significantly damaged properties are in high lead areas and in East Altadena, 55% are. West Altadena has a higher share of significantly damanaged, owner-occupied properties in high lead areas. Nearly half (48%) of significantly damaged, owner-occupied properties in West Altadena are in high lead areas compared to 38% in East Altadena. Homeowners with significantly damaged properties or that are in high lead areas may require support in safely rebuilding their homes and mitigating hazards on their property. The high rate of renter-occupied properties in high lead grids also necessitates an approach to ensuring landlords are taking measures to make rental properties safe for tenants. This includes renter-occupied properties that were left intact after the fire. In Altadena, 69.4% of renter-occupied properties that sustained no damage are in high lead grids. Additional soil testing at this properties and then professional assessments for mitigation can help ensure properties are safe for homeowner and tenants to return to.
+
 ```{r}
 #### VISUAL ####
-df_raw <- st_read(con, query="Select * from data.analysis_owner_renter_lead_damage") %>%
-  #NOTE: line below is an attemp to reorder damage categories on the table but its NOT doing what I want it to.
-  mutate(damage_category = factor(damage_category, c("Significant Damage", "Some Damage", "No Damage")))
+df_raw <- st_read(con, query="Select * from data.analysis_owner_renter_damage_lead_sept2025") 
+
+high_lead <- df_raw %>%
+  filter(hi_lead_label=="High Lead Grid")
+
+# take out 	
+# Church/Welfare exemption and SBE or Government owned for simplicity
 
 df<- df_raw %>%
+  filter(damage_category=="Significant Damage" & hi_lead_label=="High Lead Grid") %>%
+  filter(!owner_renter %in% c("Church/Welfare exemption","SBE or Government owned")) %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),        
-         "Damage in areas with lead levels higher than safety threshold"=prc,
-         "Owner/Renter" = owner_renter,
-         "Damage Level" = damage_category,
-         "Area" = str_to_title(area)) %>%
+         "Properties in Areas with High Lead Levels"=prc,         
+         "Ownership Type" = owner_renter,
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>% 
   arrange(desc(count))
 
 
 table<- df %>%
-  select("Area","Owner/Renter", "Damage Level", "Damage in areas with lead levels higher than safety threshold", "Count (%)")%>%
-  gt(groupname_col = c("Area", "Damage Level"), rowname_col = "Owner/Renter") %>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
+  select("Area","Ownership Type", "Properties in Areas with High Lead Levels", "Count (%)")%>%
+  gt(groupname_col = c("Area"), rowname_col = "Ownership Type") %>%
+    tab_header(title= "Significantly Damaged Properties in Areas with Average Lead Levels Above Protective Screening Levels (>=80 mg/kg) by Ownership Type")%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and L.A. County Department of Public Health Soil Testing Program, March 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Damage in areas with lead levels higher than safety threshold', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= "Properties in Areas with High Lead Levels", scaled=TRUE, fill=meteorite, background="transparent")%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c("Inter", default_fonts())) %>% 
   tab_options(table.background.color=alabaster,
