@@ -289,15 +289,21 @@ check_complete <- combined_permits %>%
   mutate(bucket_4_perm_comp = ifelse((bucket_2_perm != "" & finaled_perm_count>0), 1, 0),
          bucket_4_temp_comp = ifelse((bucket_2_temp != "" & finaled_temp_count>0), 1, 0),
          bucket_4_misc_comp = ifelse((bucket_2_misc != "" & finaled_misc_count==misc_count), 1, 0),) %>%
-  select(ain, bucket_4_perm_comp, bucket_4_temp_comp, bucket_4_misc_comp) %>%
+  mutate(is_housing = ifelse(sum(perm_count, temp_count, na.rm=TRUE)>0, 1, 0),
+         is_misc = ifelse(misc_count>0, 1, 0)) %>%
+  select(ain, bucket_4_perm_comp, bucket_4_temp_comp, bucket_4_misc_comp, is_housing, is_misc) %>%
   unique()
            
 # join to final_types, create bucket_4_status
 final_types <- final_types %>%
   left_join(check_complete, by="ain") %>%
-  mutate(bucket_4_status = case_when((bucket_3_status == "Construction in progress" & sum(bucket_4_perm_comp, bucket_4_temp_comp, na.rm=TRUE)>=1) ~ "Move-in available", 
-                                     (bucket_3_status == "Construction in progress" & sum(perm_count, temp_count, na.rm=TRUE)==0 & misc_count>0 & misc_count==bucket_4_misc_comp)~ "Rebuild Complete",
-                                     .default=bucket_3_status)) %>%
+  rowwise() %>%
+  mutate(bucket_4_status = case_when(
+    # (bucket_3_status == "Construction in progress" & sum(bucket_4_perm_comp, bucket_4_temp_comp, na.rm=TRUE)>=1) ~ "Move-in available", # removing for now
+    (bucket_3_status == "Construction in progress" & is_housing==1 & sum(perm_count, temp_count, na.rm=TRUE)==sum(bucket_4_perm_comp, bucket_4_temp_comp, na.rm=TRUE))~ "Rebuild Complete",
+    (bucket_3_status == "Construction in progress" & is_housing==0 & is_misc==1 & misc_count==bucket_4_misc_comp)~ "Rebuild Complete",
+    .default=bucket_3_status)) %>%
+  ungroup() %>%
   mutate(rebuild_status = bucket_4_status)
 
 # Check rebuild status
