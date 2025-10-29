@@ -52,6 +52,7 @@ length(unique(all_df$ain))
 
 missing_permit <- all_df %>%
   filter(is.na(rebuild_status))
+# sent these AINs to HK for investigation
 
 all_df <- all_df %>%
   mutate(rebuild_status=ifelse(is.na(rebuild_status),"Need more info", rebuild_status))
@@ -121,7 +122,7 @@ analysis_damage_final<- rbind(analysis_damage_e_w,
                                analysis_damage_alt)
 
 
-# Upload tables to postgres and add table/column comments
+# # Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_permits_damage_jan2025", value = analysis_damage_final, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_permits_damage_jan2025"
@@ -166,7 +167,7 @@ analysis_permits_restype <- rbind(e_w,
                                 alt) 
 
 # Upload tables to postgres and add table/column comments
-# # dbWriteTable(con, name = "analysis_permits_restype_jan2025", value = analysis_permits_restype, overwrite = FALSE)
+# dbWriteTable(con, name = "analysis_permits_restype_jan2025", value = analysis_permits_restype, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_permits_restype_jan2025"
 # indicator <- "Distribution of permitting stages by residential type and area in Altadena for significantly damaged residential properties only, e.g., what % of significantly damaged single-family properties in West Altadena are awaiting construction"
@@ -207,7 +208,7 @@ alt<- all_df_damaged %>%
 analysis_permits_owner <- rbind(e_w,
                                   alt) 
 
-# # Upload tables to postgres and add table/column comments
+# Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_permits_owner_renter_jan2025", value = analysis_permits_owner, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_permits_owner_renter_jan2025"
@@ -224,7 +225,7 @@ analysis_permits_owner <- rbind(e_w,
 #   "percent of properties ",
 #   "total residential properties in the area that were significantly damaged")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-
+# 
 
 #### Step 8: close connection ####
 dbDisconnect(con)
