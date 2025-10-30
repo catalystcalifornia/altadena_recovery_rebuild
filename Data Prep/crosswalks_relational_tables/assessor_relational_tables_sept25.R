@@ -317,7 +317,7 @@ rel_res_df<-rel_res_df%>%
   )
 
 # check
-table(rel_res_df$owner_renter) # checks out. We got 10 more in 'Owner occupied' from the 10 veteran exemptions, and 14 church/welfare exemption . Interesting this went up from 10 in the Jan data
+table(rel_res_df$owner_renter) # checks out. We got 20 more in 'Owner occupied' from the 10 veteran exemptions, and 14 church/welfare exemption . Interesting this went up from 10 in the Jan data
 
 # move on to trusts and LLCs
 
@@ -378,7 +378,7 @@ test_ain<-test$ain[test$owner_renter=="LLC owned"]
 not_in_test <- setdiff(other_llc_ain, test_ain)
 print(not_in_test) # AIN 5829032026 ---same as the one that came up in the jan relational script. This has 'Trust' and 'LLC" in the name and can be manually recoded as an LLC
 
-# now lets explore the 8 Trusts that are not showing u in my recoding 
+# now lets explore the 10 Trusts that are not showing u in my recoding 
 
 other_trust_ain<-other_trust_llc$ain[other_trust_llc$flag_trust==1]
 
@@ -393,10 +393,9 @@ print(not_in_test) # AIN 5829032026 ---same as the one that came up in the jan r
 trust_check<-rel_res_df%>%
   filter(ain %in% c("5831018017", "5833003027", "5833014014", "5835008002", "5835009015",
                     "5835020029", "5839009012", "5841027012", "5847003019"))%>%
-  select(ain, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, landlord_units, owner_renter)
+  select(ain, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, landlord_units, owner_renter)
 
-# These 9 AINs have TRUST in the name but also have a vetern exemption status. I think for these it is OK to recode as
-# Trust-owned instead of Owner-occupied because it is more accurate.
+# These 9 AINs have TRUST in the name but also have a veteran exemption status. I think for these it is OK to keep as owner, home owners can own in a trust
 
 # So now we  can officially recode our Trusts/LLCs
 
@@ -420,13 +419,13 @@ rel_res_df<-rel_res_df%>%
 table(rel_res_df$owner_renter) # looks good
 
 ## Now lets recode based on tax exemption status:
-
+table(rel_res_df$tax_stat_key)
 
 rel_res_df<-rel_res_df%>%
   mutate(
     owner_renter = case_when(
-      tax_stat_key %in% c("1","2") & owner_renter == "Other" ~ "Sold to state",
-      tax_stat_key %in% "3" & owner_renter == "Other" ~ "SBE or Government owned",
+      tax_stat_key %in% c("1","2") ~ "Sold to state",
+      tax_stat_key %in% "3" ~ "SBE or Government owned",
       TRUE ~ owner_renter  # keeps existing value if none of the above conditions are met
     )
   )
@@ -434,8 +433,15 @@ rel_res_df<-rel_res_df%>%
 # check
 table(rel_res_df$owner_renter) # numbers check out
 
+sold_to_state <- rel_res_df %>% filter(tax_stat_key %in% c("1","2")) %>%
+  select(ain, owner_renter, tax_stat_key, year_sold_to_state, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, landlord_units, owner_renter)
+
 
 # Now lets recode the remaining as  "likely owner-occupied, no exemption'
+# check remaining other
+remaining_other <-rel_res_df %>% filter(owner_renter=="Other") %>%
+  select(ain, owner_renter, tax_stat_key, year_sold_to_state, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, total_units, landlord_units, owner_renter)
+# some with church in title, recode as church
 
 rel_res_df<-rel_res_df%>%
   mutate(
@@ -457,7 +463,7 @@ rel_res_df_final <- rel_res_df %>%
 # check for duplicates
 length(unique(rel_res_df_final$ain_sept))
 nrow(rel_res_df_final) #same count
-# 
+
 # table_name <- "rel_assessor_residential_sept2025"
 # schema <- "data"
 # indicator <- "Relational data table with summarized information and flags for September parcels that were in Altadena in january 2025, selected based on january september crosswalk and keeping only the january 2025 parcels in Altadena. Only includes properties in either West or East Altadena proper"
