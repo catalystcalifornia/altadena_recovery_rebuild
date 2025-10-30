@@ -82,7 +82,8 @@ sept_sales <- dbGetQuery(con, statement = "SELECT ain_sept, sold_after_eaton, fi
   select(ain_sept, sold_after_eaton, owner_names)
 sept_rebuild <- dbGetQuery(con, statement="SELECT ain as ain_jan, ain_sept, address_sept, rebuild_status
 FROM data.rel_parcel_rebuild_status_2025_10
-WHERE damage_category='Significant Damage';")
+WHERE damage_category='Significant Damage';") %>%
+  mutate(rebuild_status = str_to_title(rebuild_status))
 sept_contact <- dbGetQuery(con, "SELECT ain as ain_sept, mail_house_no, m_fraction, m_direction, m_street_name, m_unit, m_city_state, m_zip FROM data.assessor_data_universe_sept2025;") %>%
   # create clean address for contact
   mutate(
@@ -166,8 +167,33 @@ df_zoning_lac$zone_label<- factor(
       levels = c("Single-Family Residence","Two-Family Residence","Multiple Residence","Other Residential","Mixed Use Development","Commercial","Manufacturing","Agricultural","Open Space/Water Shed","Other"))
 
 # Create a color palette based on the factor
-zoning_pal <- colorFactor(palette = c("#feffe2","#f2d84b","#d09a36","#dfd3b6","#b3605d","#E34234","#b7c4db","#c5fb5d","#8ffa4f","#bfbfbf"), domain = df_zoning_lac$zone_label)
+zoning_pal <- colorFactor(
+  palette = c("#feffe2","#f2d84b","#d09a36","#dfd3b6","#b3605d","#E34234","#b7c4db","#c5fb5d","#8ffa4f","#bfbfbf"), 
+  domain = df_zoning_lac$zone_label)
 
+# sold status
+sept_sales_sf <- all_df %>%
+  select(ain_sept, sold_after_eaton, geom) %>%
+  mutate(sold_after_eaton_factor = factor(
+    sold_after_eaton,
+    levels=c("TRUE", "FALSE")))
+
+sales_pal <- colorFactor(
+  palette = c("#E34234", "#f2d84b"),
+  domain = sept_sales_sf$sold_after_eaton_factor
+)
+
+# rebuild status
+sept_rebuild_sf <- all_df %>%
+  select(ain_sept, rebuild_status) %>%
+  mutate(rebuild_status_factor = factor(
+    rebuild_status, 
+    levels=c("Debris Removal Incomplete", "Awaiting Permit Application", "Awaiting Construction Start", "Construction In Progress", "Rebuild Complete")))
+
+rebuild_pal <- colorFactor(
+  palette = c("#E2D9FF", "#BDAFE9", "#8E7ACA", "#362178", "#211447"),
+  domain= sept_rebuild_sf$rebuild_status_factor
+)
 
 ```
 
@@ -265,11 +291,38 @@ addProviderTiles(providers$CartoDB.Positron) %>%
                 values =  df_zoning_lac$zone_label,
                 group="Zoning",
                 title = "Allowable Uses") %>% 
+  # Sold Status
+  addPolygons(data=sept_sales_sf,
+              fillColor=~sales_pal(sold_after_eaton_factor),
+              fillOpacity=1,
+              color="white",
+              weight=0.6,
+              opacity=1,
+              group="Sold Status") %>%
+                addLegend(
+                position = "bottomleft",
+                pal = sales_pal,
+                values =  sept_sales_sf$sold_after_eaton_factor,
+                group="Sold Status") %>% 
+  # Rebuild Status
+  addPolygons(data=sept_rebuild_sf,
+              fillColor=~rebuild_pal(rebuild_status_factor),
+              fillOpacity=1,
+              color="white",
+              weight=0.6,
+              opacity=1,
+              group="Rebuild Status") %>%
+                addLegend(
+                position = "bottomleft",
+                pal = rebuild_pal,
+                values =  sept_rebuild_sf$rebuild_status_factor,
+                group="Rebuild Status") %>% 
+  
   #Controling Layers
   addLayersControl(
-          overlayGroups = c("Significantly Damaged Parcels after Eaton Fire", "Lead Levels in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning","West Altadena","East Altadena","Eaton Fire Perimeter"),
+          overlayGroups = c("Significantly Damaged Parcels after Eaton Fire", "Lead Levels in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning", "Sold Status", "Rebuild Status", "West Altadena","East Altadena","Eaton Fire Perimeter"),
         options = layersControlOptions(collapsed = FALSE,autoZIndex = TRUE))  %>%
-  hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning"))
+  hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones","State Fire Hazard Zones","Zoning", "Sold Status", "Rebuild Status"))
 
 ```
 
