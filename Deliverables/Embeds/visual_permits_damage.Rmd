@@ -40,15 +40,15 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Based on permit data we scraped and cleaned, only one in three significantly damaged properties in Altadena have at least applied for a permit or started construction. We classified properties according to five rebuild categories:
+Based on permit data we scraped and cleaned, only one in three significantly damaged properties in Altadena have at least applied for a permit to begin construction. We classified properties according to five rebuild categories:
 
-* No Evidence of Progress: There is no data that clean-up or debris removal has occurred on the property.
 * Debris Removal Incomplete: Debris removal has not been finaled.
 * Awaiting Permit Application: Debris removal has been completed, but there has been no permit application received.
-* Awaiting Construction Start: A permit has been approved, but there is no indication on the permit that construction has started.
-* Move-In Available: For rebuild permits related to temporary or permanent housing, at least one of the permits has been finaled.
+* Awaiting Construction Start: A permit application has been approved, but there is no indication on the permit that construction has started.
+* Construction In Progress: A permit application has been approved, and inspections related to the permit indicate that construction has started.
+* Rebuild Complete: For rebuild permits related to temporary or permanent housing, all have been finaled.
 
-West and East Altadena significantly damaged properties are similar in their rebuild status. About 70% of properties in each area have completed debris removal, but have not applied for a permit to rebuild--67% in West Altadena and 70% in East Altadena. This suggests that many property owners have not made progress toward rebuilding and returning to the community--which likely shows the difficult journey property owners are facing toward being able to finance and manage construction.
+Significantly damaged properties in West and East Altadena are similar in their rebuild progress. About 70% of properties in each area have completed debris removal, but have not applied for a permit to rebuild--68% in West Altadena and 71% in East Altadena. This suggests that many property owners have not made progress toward rebuilding and returning to the community--which likely shows the difficult journey property owners are facing toward being able to finance and manage construction.
 
 ```{r}
 #### VISUAL: Permit statuses by area for significantly damaged properties  ####
@@ -67,7 +67,8 @@ df$`Rebuild Status`<- factor(df$`Rebuild Status`, levels = c("No Evidence of Pro
                                                              "Debris Removal Incomplete",
                                                              "Awaiting Permit Application",
                                                              "Awaiting Construction Start",
-                                                             "Move-In Available"))
+                                                             "Construction In Progress",
+                                                             "Rebuild Complete"))
 
 df <- df %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
@@ -80,7 +81,8 @@ df <- df %>%
 table<- df %>%
   select("Area","Rebuild Status", "Share of Damaged Properties in Rebuild Status", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Rebuild Status") %>%
-  tab_header(title= "Rebuild Status of Significantly Damaged Properties by Area as of October 2025")%>%
+  tab_header(title= "Rebuild Status of Significantly Damaged Properties",
+             subtitle = "By Area (as of October 2025)")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and L.A. County Public Works, October 2025."),placement="left") 
 
  table %>%
@@ -97,6 +99,7 @@ table<- df %>%
     heading.align = "left",
     table.font.names = "Inter",
     heading.title.font.size = px(20),
+    heading.subtitle.font.size = px(16),
     heading.border.bottom.color = "transparent",
     column_labels.border.bottom.width = px(3),
     column_labels.border.bottom.color = gainsboro,
@@ -110,7 +113,9 @@ table<- df %>%
   tab_style(style=
             cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
    tab_style(style=
-               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title(groups="title")) %>%
+   tab_style(style=
+               cell_text(font=c("Inter", default_fonts()),weight=600),locations=cells_title(groups="subtitle"))
             
 ```
 

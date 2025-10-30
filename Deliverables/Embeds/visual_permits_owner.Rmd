@@ -40,9 +40,9 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Across Altadena, most significantly damaged properties are awaiting permit applications regardless of ownership type. Renter-occupied and LLC-owned properties are most likely to have not completed debris removal though they represent a small percentage of all renter-occupied or LLC-owned properties. In Altadena, about 6% of significantly damaged, renter-occupied properties have not completed debris removal.
+Across Altadena, most significantly damaged properties are awaiting permit applications regardless of ownership type. Renter-occupied and LLC-owned properties are most likely to have not completed debris removal though these represent a small percentage of all renter-occupied or LLC-owned properties. In Altadena, over 5% of significantly damaged, renter-occupied properties have not completed debris removal.
 
-Generally, only five to 10% of significantly damaged properties in Altadena are move-in ready across ownership types. More properties have at least applied for permits and are awaiting construction. In Altadena, 24% of owner-occupied and renter-occupied properties alike are awaiting for construction to start--meaning permits have been approved but construction has not started. A large percentage of all ownership types have not applied for permits. This suggests across the board property owners in Altadena are slowly progressing toward building efforts--requiring further investigation on how to jumpstart recovery.
+Generally, only 1.4% of significantly damaged properties in Altadena are rebuilt across ownership types. More properties have at least applied for permits and are awaiting construction. In Altadena, 21-22% of owner-occupied and renter-occupied properties alike are awaiting the start of construction--meaning permits have been approved but construction has not started. A large percentage of all ownership types have not applied for permits. This suggests across the board property owners in Altadena are slowly progressing toward building efforts--requiring further investigation on how to jumpstart recovery.
 
 ```{r}
 #### VISUAL: Permit statuses by area and owner type for significantly damaged properties  ####
@@ -76,17 +76,19 @@ df <- df %>% #
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   # reorder, dropping no evidence of progress given the small %
  select("Area","Ownership Type", "Total Properties",
-        "Debris Removal Incomplete","Awaiting Permit Application","Awaiting Construction Start", "Move-In Available")%>%
-  arrange(Area)
+        "Debris Removal Incomplete","Awaiting Permit Application","Awaiting Construction Start", "Construction In Progress", "Rebuild Complete")%>%
+  arrange(Area, desc(`Total Properties`))
 
 table<- df %>%
-    gt(groupname_col = "Area", rowname_col = "Ownership Type") %>%
+  gt(groupname_col = "Area", rowname_col = "Ownership Type") %>%
   gt_plt_bar_pct(column= 'Debris Removal Incomplete',  scaled=TRUE, fill=meteorite, background=gainsboro)%>%
-    gt_plt_bar_pct(column= 'Awaiting Permit Application',  scaled=TRUE, fill=meteorite, background=gainsboro)%>%
-     gt_plt_bar_pct(column= 'Awaiting Permit Application', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
+  gt_plt_bar_pct(column= 'Awaiting Permit Application', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   gt_plt_bar_pct(column= 'Awaiting Construction Start', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
-  gt_plt_bar_pct(column= 'Move-In Available', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
-  tab_header(title= "Rebuild Status of Significantly Damaged Properties by Ownership Type as of October 2025")%>%
+  gt_plt_bar_pct(column= 'Construction In Progress', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
+  gt_plt_bar_pct(column= 'Rebuild Complete', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
+  tab_header(title= "Rebuild Status of Significantly Damaged Properties",
+             subtitle = "B y Ownership Type (as of October 2025)")%>%
+  
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and L.A. County Public Works, October 2025."),placement="left")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
@@ -100,6 +102,7 @@ table<- df %>%
     heading.align = "left",
     table.font.names = "Inter",
     heading.title.font.size = px(20),
+    heading.subtitle.font.size = px(16),
     heading.border.bottom.color = "transparent",
     column_labels.border.bottom.width = px(3),
     column_labels.border.bottom.color = gainsboro,
@@ -113,7 +116,9 @@ table<- df %>%
   tab_style(style=
             cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
    tab_style(style=
-               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) %>%
+   tab_style(style=
+               cell_text(font=c("Inter", default_fonts()),weight=600),locations=cells_title(groups="subtitle"))
 
 table
 
