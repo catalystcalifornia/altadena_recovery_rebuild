@@ -199,9 +199,17 @@ rebuild_pal <- colorFactor(
 
 
 ```{r}
-leaflet () %>%
-addProviderTiles(providers$CartoDB.Positron) %>%
-     setView(-118.131127, 34.194432, zoom = 13) %>%
+custom_sidebar <- ""
+
+leaflet(width = "100%",
+        height = "650px",
+        options = leafletOptions(attributionControl=FALSE)) %>%
+  setView(-118.131127, 34.194432, zoom = 13) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  
+  # add custom sidebar
+  addControl(html=custom_sidebar, position = "topleft") %>%
+     
   #Damaged/Destroyed Properties
   addPolygons(data=all_df,
                    fillColor="orange",
