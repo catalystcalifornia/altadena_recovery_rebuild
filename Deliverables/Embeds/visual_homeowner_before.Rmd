@@ -41,7 +41,19 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-In January 2025, many homes in Altadena were occupied by homeowners rather than renters. We identified owner-occupied properties by whether there was record of a homeowner exemption on the property record. Overall, at least 45% of folks in Altadena owned their home, a rate comparable to the county of Los Angeles. Families in East Altadena were more likely to own their home with 50% of properties being owner-occupied compared 42% in West Altadena. In each area of Altadena, only 12% of properties were renter-occupied, or had rental units on the property record, and additional 8% in each area had a homeowner exemption and rental units. Between 30-40% did not have rental units recorded, but also did not have a homeowner exemption recorded. We are investigating these properties further.  
+
+We analyzed the ownership types of residential properties in Altadena before and after the Eaton fire. We classified ownership based on owner information, unit types, and exemption characteristics associated with each property. 
+
+* Owner-occupied: Properties with a homeowner or veteran's exemption on the property tax bill. This includes properties with a homeowner exemption where the homeowner and renters may be living on the property.
+* Likely owner-occupied: These are properties that are owned individually, but have no exemption type listed on the property tax bill. We assume most of these may be homeowners that have not claimed their exemption.
+* Renter-occupied: These are properties solely with renter-occupied units on the property, and no exemption type listed.
+* Trust-owned: Properties with no rental units or property tax exemptions and that are owned in a trust.
+* Sold to state: Properties that are tax delinquent and recorded as being sold to the state. These may include owner- or renter-occupied units.
+* LLC-owned:  Properties with no rental units or property tax exemptions and that are owned in a LLC.
+* SBE or Government-owned: Properties that have are government-owned and have no rental units.
+* Church/Welfare exemption: Properties that have a church, religious, or welfare exemption on the property and that have no rental units.
+
+In January 2025, most homes in Altadena were occupied by homeowners rather than renters. Overall, at least 53% of properties were owner-occupied in Altadena. Properties in East Altadena were more likely to be owner-occupied -- 58% of properties were owner-occupied compared 50% in West Altadena. In each area of Altadena, only 12% of properties were renter-occupied. About 11% of properties across Altadena are owned in a trust, but have no exemptions or rental units. These could be owner-occupied properties that have no claimed an exemption, family homes or inheritances, or rentals that are not recorded accurately. Tracking these ownership characteristics can help evaluate how the Altadena changes over time in recovery, including if the number of rentals or owner-occupied units decrease.
 
 ```{r}
 #### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
@@ -55,20 +67,20 @@ pivot_longer(
   ) %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
          "Share of Housing Stock"=prc,
-         "Owner/Renter" = owner_renter,
+         "Ownership Type" = owner_renter,
          "Area" = str_to_title(area)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   arrange(desc(count)) 
 
 
 table<- df %>%
-  select("Area","Owner/Renter", "Share of Housing Stock", "Count (%)")%>%
-  gt(groupname_col = "Area", rowname_col = "Owner/Renter") %>%
-  # tab_header(title= str_wrap("East Altadena has a few more homeowners but overall the region is made up of majority homeowners", width = 20))%>%
+  select("Area","Ownership Type", "Share of Housing Stock", "Count (%)")%>%
+  gt(groupname_col = "Area", rowname_col = "Ownership Type") %>%
+  tab_header(title= "Ownership Types of Residential Properties Before the Fire") %>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Share of Housing Stock', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Stock', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
