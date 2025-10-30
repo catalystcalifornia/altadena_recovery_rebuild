@@ -77,19 +77,47 @@ eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geo
 sept_zoning <- st_read(con, query="SELECT * FROM data.rel_assessor_zoning_sept2025")
 sept_fhsz <- st_read(con, query="SELECT * FROM data.rel_assessor_fhsz_sept2025") %>% select(-area_name)
 sept_lead <- st_read(con, query="SELECT * FROM data.rel_assessor_lead_sept2025")
+sept_sales <- dbGetQuery(con, statement = "SELECT ain_sept, sold_after_eaton, first_owner_name, first_owner_name_overflow, second_owner_name FROM data.rel_assessor_sales_sept2025;") %>%
+  mutate(owner_names = str_squish(paste(first_owner_name, first_owner_name_overflow, second_owner_name))) %>%
+  select(ain_sept, sold_after_eaton, owner_names)
+sept_rebuild <- dbGetQuery(con, statement="SELECT ain as ain_jan, ain_sept, address_sept, rebuild_status
+FROM data.rel_parcel_rebuild_status_2025_10
+WHERE damage_category='Significant Damage';")
+sept_contact <- dbGetQuery(con, "SELECT ain as ain_sept, mail_house_no, m_fraction, m_direction, m_street_name, m_unit, m_city_state, m_zip FROM data.assessor_data_universe_sept2025;") %>%
+  # create clean address for contact
+  mutate(
+    street_part = trimws(paste(mail_house_no, m_fraction, m_direction, m_street_name)),
+    # Add unit if present
+    unit_part = ifelse(!is.na(m_unit) & trimws(m_unit) != "", paste0(", ", trimws(m_unit)), ""),
+    city_zip_part = paste0(m_city_state, " ", substr(m_zip, 1, 5)),
+    # Combine everything
+    contact_address = str_squish(paste0(street_part, unit_part, ", ", city_zip_part))) %>%
+  select(ain_sept, contact_address) %>% 
+  filter(ain_sept %in% parcels_res_damaged$ain_sept)
 
-all_df <- parcels_res_damaged %>% left_join(sept_zoning, by = "ain_sept") %>% left_join(sept_fhsz, by = "ain_sept") %>% left_join(sept_lead, by="ain_sept")
+all_df <- parcels_res_damaged %>% 
+  left_join(sept_zoning, by = "ain_sept") %>% 
+  left_join(sept_fhsz, by = "ain_sept") %>% 
+  left_join(sept_lead, by="ain_sept") %>%
+  left_join(sept_sales, by="ain_sept") %>%
+  left_join(sept_contact, by = "ain_sept") %>%
+  left_join(sept_rebuild, by="ain_sept")
 
 ### parcel pop up ----
 popup_parcel <- paste0(
       "AIN: ", all_df$ain_sept, "</br>",
+      "Parcel Address: ", all_df$address_sept, "</br>",
       "Residential Type: ",  all_df$res_type, "</br>",
       "Ownership Type: ",  all_df$owner_renter, "</br>",
+      "Owner Name(s): ", all_df$owner_names, "</br>",
+      "Owner Contact: ", all_df$contact_address, "</br>",
       "Total Square Footage: ", all_df$total_square_feet, "</br>",
       "Total Units: ", all_df$total_units, "</br>",
       "L.A. County Zoning: ",  all_df$z_desc, "</br>",
       "Fire Hazard Zone: ", all_df$combined_fhsz, "</br>",
-      "Lead Level: ", all_df$hi_lead_label
+      "Lead Level: ", all_df$hi_lead_label, "</br>",
+      "Rebuild Status: ", all_df$rebuild_status, "</br>",
+      "Sold After Eaton: ", all_df$sold_after_eaton
       )
 
 ### factors and paletes for other polygons ----
