@@ -179,6 +179,8 @@ all_df_w_jan <- all_df %>%
   rename(owner_renter_jan=owner_renter.y,
          owner_renter_sept=owner_renter.x)
 # one duplicated ain that's fine, parcel was split
+na_owner <- all_df_w_jan %>% filter(is.na(owner_renter_jan))
+# two NA--these weren't residential parcels in January
 
 e_w <- all_df_w_jan %>% 
   group_by(area_name,owner_renter_jan) %>% 
@@ -215,7 +217,7 @@ sales_ownership_characteristics <- all_df_w_jan %>%
 # no evidence of homeownership after sale though
 
 # Upload tables to postgres and add table/column comments
-# dbWriteTable(con, name = "analysis_sales_owner_renter_sept2025", value = analysis_sales_owner_renter, overwrite = TRUE)
+# dbWriteTable(con, name = "analysis_sales_owner_renter_sept2025", value = analysis_sales_owner_renter, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_sales_owner_renter_sept2025"
 # indicator <- "Rate of properties being sold by owner type and area --what percent of owner-occupied properties in West Altadena have been sold? ownership data is based on ownership in January 2025--who originally was in the property? Sales are based on September data"
