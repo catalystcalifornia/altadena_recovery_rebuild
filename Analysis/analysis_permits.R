@@ -19,7 +19,7 @@ housing_jan <- st_read(con, query="SELECT * FROM data.rel_assessor_residential_j
 
 damage <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level") 
 
-permits <- st_read(con, query="SELECT * FROM data.rel_parcel_rebuild_status_2025_10")
+permits <- st_read(con, query="SELECT ain, rebuild_status FROM data.rel_parcel_rebuild_status_2025_10")
 
 altadena_e_w <- st_read(con, query="SELECT ain, area_name, area_label FROM data.rel_assessor_altadena_parcels_jan2025") #dropping geom since it's not needed for analysis
 
@@ -39,27 +39,31 @@ table(permits_res$rebuild_status,useNA='always')
 
 # join data together
 all_df <- housing_jan %>% # want the parcels from january
-  left_join(altadena_e_w) %>%
-  left_join(damage) %>%
-  left_join(permits_res)
+  left_join(altadena_e_w, by="ain") %>%
+  left_join(damage, by="ain") %>%
+  left_join(permits_res, by="ain")
 
 # check
 table(all_df$damage_category,useNA='always')
 table(all_df$res_type,useNA='always')
-table(all_df$rebuild_status,useNA='always') # going to assume NA is need more info? also wondering why these AINs aren't captured
+table(all_df$rebuild_status,useNA='always') # no longer NAs
 nrow(all_df)
 length(unique(all_df$ain))
 
 missing_permit <- all_df %>%
   filter(is.na(rebuild_status))
-# sent these AINs to HK for investigation
+# sent these AINs to HK for investigation - HK: no longer NA, updated permit type methods 
 
 all_df <- all_df %>%
-  mutate(rebuild_status=ifelse(is.na(rebuild_status),"Need more info", rebuild_status))
+  mutate(rebuild_status=case_when(
+    is.na(rebuild_status) ~ "Need more info",
+    rebuild_status=="Debris Removal Completed"  ~ NA,
+    rebuild_status== "Debris Removal Not Applicable" ~ NA,
+    .default=rebuild_status))
          
 #### Step 3: First ANALYSIS- [analysis_permits_area_sept2025] ####
 ## What percentage of residential properties have started permits by area
-analysis_permits_area_e_w <- all_df %>% 
+analysis_permits_area_e_w <- all_df %>%
   group_by(area_name) %>%
   mutate(total=n()) %>%
   ungroup() %>%
@@ -67,6 +71,11 @@ analysis_permits_area_e_w <- all_df %>%
   summarise(count=n(),
             prc=n()/min(total)*100,
             total=min(total))
+
+# HK: Note for above - All "Debris Removal Complete" (n=38) are parcels with no damage
+# With the majority occurring in West Altadena for "Assessor Parcel Outside of Fire Area"
+# should filter this status out? Additionally "Debris Removal Not Applicable" is 
+# only applied to No Damage parcels, may want to exclude as well?
 
 analysis_permits_area_alt <- all_df %>% 
   mutate(area_name="Altadena") %>%
@@ -80,7 +89,7 @@ analysis_permits_area_alt <- all_df %>%
 
 analysis_permits_final <- rbind(analysis_permits_area_e_w, analysis_permits_area_alt)
 
-# Upload tables to postgres and add table/column comments
+# # Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_permits_area_jan2025", value = analysis_permits_final, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_permits_area_jan2025"
@@ -166,7 +175,7 @@ alt<- all_df_damaged %>%
 analysis_permits_restype <- rbind(e_w,
                                 alt) 
 
-# Upload tables to postgres and add table/column comments
+# # Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_permits_restype_jan2025", value = analysis_permits_restype, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_permits_restype_jan2025"
@@ -208,7 +217,7 @@ alt<- all_df_damaged %>%
 analysis_permits_owner <- rbind(e_w,
                                   alt) 
 
-# Upload tables to postgres and add table/column comments
+# # Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_permits_owner_renter_jan2025", value = analysis_permits_owner, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_permits_owner_renter_jan2025"
@@ -225,7 +234,7 @@ analysis_permits_owner <- rbind(e_w,
 #   "percent of properties ",
 #   "total residential properties in the area that were significantly damaged")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-# 
+
 
 #### Step 8: close connection ####
 dbDisconnect(con)
