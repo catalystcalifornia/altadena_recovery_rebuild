@@ -76,48 +76,47 @@ MTK - bullets on findings from literature review
 # Key Findings
 EMG
 
+# Methods
+EMG
+
+
 # Altadena Before
+
+## Map
 
 ```{r map-before, child='Embeds/map_before_eaton.Rmd', echo=FALSE}
 ```
 
-## Housing Stock Before the Fire
 
-### Residential Housing Types
+## Residential Housing Types
 
 ```{r restype-before, child='Embeds/visual_housing_before.Rmd',echo=FALSE}
 ```
 
-### Rental Units
+## Rental Units
 
 ```{r units-before, child='Embeds/visual_units_before.Rmd', echo=FALSE}
 ```
 
-### Ownership Types
+## Ownership Types
 
 ```{r owner-before, child='Embeds/visual_homeowner_before.Rmd', echo=FALSE}
 ```
 
 
-### Average Square Footage
+## Average Square Footage
 
 ```{r sqfeet-before, child='Embeds/visual_sqftg_before.Rmd', echo=FALSE}
 ```
 
 # Altadena After
 
+## Map
 ```{r map-after, child='Embeds/map_after_eaton.Rmd', echo=FALSE}
 ```
 
 
-## Housing Stock Damaged
-
-```{r}
-# map of properties significant damaged or destroyed with layers for residential housing type, homeowner/renter, total units, square footage
-
-```
-
-### Residential Housing Types Lost
+## Residential Types Lost
 
 ```{r restype-after, child='Embeds/visual_housing_after.Rmd', echo=FALSE}
 ```
@@ -125,58 +124,47 @@ EMG
 ```{r multi-after, child='Embeds/visual_multifamily_after.Rmd', echo=FALSE}
 ```
 
-### Rental Units Lost
+## Rental Units Lost
 
 ```{r units-after, child='Embeds/visual_units_after.Rmd', echo=FALSE}
 ```
 
-### Ownership Types Lost
+## Ownership Types Lost
 
 ```{r owner-after, child='Embeds/visual_homeowner_after.Rmd', echo=FALSE}
 ```
 
-
-### Average Square Footage Lost
+## Average Square Footage Lost
 
 ```{r sqftg-after, child='Embeds/visual_sqftg_after.Rmd', echo=FALSE}
 ```
 
 # Altadena Rebuilding
+
+## Map
 ```{r planning-map, child='Embeds/map_damage.Rmd', echo=FALSE}
 ```
 
-## Housing Sold
-
-### Properties Sold by Month
+## Properties Sold
 
 ```{r sold-month, child='Embeds/visual_sales_bymonth.Rmd', echo=FALSE}
 ```
 
-### Properties Sold by Damage
-
 ```{r sold-damage, child='Embeds/visual_sales_damage.Rmd', echo=FALSE}
 ```
-
-### Properties Sold by Ownership
 
 ```{r sold-owner, child='Embeds/visual_sales_owner_renter.Rmd', echo=FALSE}
 ```
 
-## Housing Being Rebuilt
-
-### Permits by Area
+## Permits
 
 ```{r permits-area, child='Embeds/visual_permits_damage.Rmd', echo=FALSE}
 ```
 
-### Permits by Ownership
-
 ```{r permits-owner, child='Embeds/visual_permits_owner.Rmd', echo=FALSE}
 ```
 
-## Rebuilding Considerations
-
-### Lead Contamination 
+## Lead Contamination 
 
 ```{r res-lead, child='Embeds/visual_restype_highlead.Rmd', echo=FALSE}
 ```
@@ -184,12 +172,12 @@ EMG
 ```{r owner-lead, child='Embeds/visual_homeowner_highlead.Rmd', echo=FALSE}
 ```
 
-### Fire Hazards
+## Fire Hazards
 
 ```{r fhsz, child='Embeds/visual_damage_fhsz.Rmd', echo=FALSE}
 ```
 
-### Zoning
+## Zoning
 
 ```{r zoning, child='Embeds/visual_zoning.Rmd', echo=FALSE}
 ```
