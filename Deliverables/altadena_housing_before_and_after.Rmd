@@ -1,13 +1,13 @@
 ---
-title: 'Altadena Before and After the Eaton Fire'
-subtitle: "Changes in Altadena Housing Stock Post the Eaton Fire"
+title: 'Preserving Altadena Housing in Recovery and Rebuilding'
+subtitle: "Changes in Housing Stock Before and After the Eaton Fire"
 author: "Catalyst California"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
   html_document:
     css: "W:\\RDA Team\\R\\cc_brandguide.css"
     toc: yes
-    toc_depth: 2
+    toc_depth: 3
     toc_float: yes
 ---
 <!-- link to Google Font -->
@@ -76,47 +76,52 @@ MTK - bullets on findings from literature review
 # Key Findings
 EMG
 
-# Housing Stock Before the Fire
+# Methods
+EMG
 
-```{r}
-# map of all properties in East/West Altadena with layers for residential housing type, homeowner/renter, unit size, and square footage
+
+# Altadena Before
+
+## Map
+
+```{r map-before, child='Embeds/map_before_eaton.Rmd', echo=FALSE}
 ```
+
 
 ## Residential Housing Types
 
 ```{r restype-before, child='Embeds/visual_housing_before.Rmd',echo=FALSE}
 ```
 
-## Homeowner and Rental Properties
-
-```{r owner-before, child='Embeds/visual_homeowner_before.Rmd', echo=FALSE}
-```
-
-## Rental Unit Types
+## Rental Units
 
 ```{r units-before, child='Embeds/visual_units_before.Rmd', echo=FALSE}
 ```
 
-## Square Footage
+## Ownership Types
+
+```{r owner-before, child='Embeds/visual_homeowner_before.Rmd', echo=FALSE}
+```
+
+
+## Average Square Footage
 
 ```{r sqfeet-before, child='Embeds/visual_sqftg_before.Rmd', echo=FALSE}
 ```
 
-# Housing Stock Damaged
+# Altadena After
 
-```{r}
-# map of properties significant damaged or destroyed with layers for residential housing type, homeowner/renter, total units, square footage
-
+## Map
+```{r map-after, child='Embeds/map_after_eaton.Rmd', echo=FALSE}
 ```
 
-## Housing Types Lost
+
+## Residential Types Lost
 
 ```{r restype-after, child='Embeds/visual_housing_after.Rmd', echo=FALSE}
 ```
 
-## Ownership of Properties Lost
-
-```{r owner-after, child='Embeds/visual_homeowner_after.Rmd', echo=FALSE}
+```{r multi-after, child='Embeds/visual_multifamily_after.Rmd', echo=FALSE}
 ```
 
 ## Rental Units Lost
@@ -124,70 +129,58 @@ EMG
 ```{r units-after, child='Embeds/visual_units_after.Rmd', echo=FALSE}
 ```
 
+## Ownership Types Lost
+
+```{r owner-after, child='Embeds/visual_homeowner_after.Rmd', echo=FALSE}
+```
+
 ## Average Square Footage Lost
 
 ```{r sqftg-after, child='Embeds/visual_sqftg_after.Rmd', echo=FALSE}
 ```
 
-# Changes Since the Fire
+# Altadena Rebuilding
 
-```{r}
-# map of properties being sold or rebuilt
-
+## Map
+```{r planning-map, child='Embeds/map_damage.Rmd', echo=FALSE}
 ```
 
-## Properties Sold by Damage
+## Properties Sold
+
+```{r sold-month, child='Embeds/visual_sales_bymonth.Rmd', echo=FALSE}
+```
 
 ```{r sold-damage, child='Embeds/visual_sales_damage.Rmd', echo=FALSE}
 ```
 
-## Properties Sold by Ownership
-
 ```{r sold-owner, child='Embeds/visual_sales_owner_renter.Rmd', echo=FALSE}
 ```
 
-## Properties Being Rebuilt
-How many properties that have been damaged or rebuilt are in the rebuilding phases--what are the characteristics of those being rebuilt
-```{r}
+## Permits
+
+```{r permits-area, child='Embeds/visual_permits_damage.Rmd', echo=FALSE}
 ```
 
-
-# Environmental Hazards & Zoning
-
-```{r}
-# map with damaged/destroyed properties and then lead, zoning, and fire hazard zones
-
+```{r permits-owner, child='Embeds/visual_permits_owner.Rmd', echo=FALSE}
 ```
 
 ## Lead Contamination 
-Share of damaged properties in high lead areas in Altadena, East, and West
-```{r}
+
+```{r res-lead, child='Embeds/visual_restype_highlead.Rmd', echo=FALSE}
 ```
 
-## Zoning
-What are the zoning uses of properties in Altadena, East, and West
-```{r}
+```{r owner-lead, child='Embeds/visual_homeowner_highlead.Rmd', echo=FALSE}
 ```
 
 ## Fire Hazards
-How many properties are in high fire zones
-```{r}
+
+```{r fhsz, child='Embeds/visual_damage_fhsz.Rmd', echo=FALSE}
 ```
 
-# Altadena Maps {.tabset}
+## Zoning
 
-## Before
-```{r map-before, child='Embeds/map_before_eaton.Rmd', echo=FALSE}
+```{r zoning, child='Embeds/visual_zoning.Rmd', echo=FALSE}
 ```
-
-## After
-```{r map-after, child='Embeds/map_after_eaton.Rmd', echo=FALSE}
-```
-
-## Future
-```{r planning-map, child='Embeds/map_damage.Rmd', echo=FALSE}
-```
-
 
 # Recommendations
 
