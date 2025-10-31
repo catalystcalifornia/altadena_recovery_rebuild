@@ -153,6 +153,9 @@ In January 2025, immediately before the Eaton Fire, Altadena was primarily a low
 ```{r owner-before, child='Embeds/visual_homeowner_before.Rmd', echo=FALSE}
 ```
 
+```{r multi-before, child='Embeds/visual_multifamily_before.Rmd', echo=FALSE}
+```
+
 ## Rental Units
 
 ```{r units-before, child='Embeds/visual_units_before.Rmd', echo=FALSE}
