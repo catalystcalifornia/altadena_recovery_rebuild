@@ -438,7 +438,7 @@ leaflet(
   padding: 2%;
   height: 100%;
   margin: 2px;
-  width: 250px;
+  width: 200px;
 }
 
 
