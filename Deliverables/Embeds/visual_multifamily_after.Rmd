@@ -46,7 +46,9 @@ Given the loss of multifamily properties and their low numbers in Altadena, we a
 
 ```{r}
 #### VISUAL ####
-df_ <- st_read(con, query="Select * from data.analysis_multifamily_damage_prc") 
+df_ <- st_read(con, query="Select * from data.analysis_multifamily_damage_prc")  %>%
+  mutate(multifamily_unit_category = ifelse(multifamily_unit_category == 
+                                              "Two Units","Two Units or Less", multifamily_unit_category))
 
 df <- df_ %>%
   filter(damage_category == "Significant Damage") %>% 
