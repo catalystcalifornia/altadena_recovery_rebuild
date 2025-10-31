@@ -81,14 +81,6 @@ parcels_res$res_type_factor <- factor(
 # Create a color palette based on the factor
 res_pal <- colorFactor(palette = c("#F25922","#FF9E0D","#FFCC00"), domain = parcels_res$res_type_factor)
 
-popup_res <-  paste0(
-      "AIN: ", parcels_res$ain, "</br>",
-      "Residential Type: ",  parcels_res$res_type, "</br>",
-      "Ownership Type: ",  parcels_res$owner_renter, "</br>",
-      "Total/Rental Units: ",  parcels_res$total_units, "/", parcels_res$landlord_units, "</br>",
-      "Total Square Feet: ", parcels_res$total_square_feet, "</br>",
-       "Use Code: ",  parcels_res$use_code)
-
 # total units layer ----
 # table(parcels_res$total_units) # check numbers
 
@@ -135,95 +127,124 @@ parcels_res$owner_renter_factor<- factor(
 owner_pal <- colorFactor(palette = c("#E7FF39","#BCD313","#C27AA1","#733256","#6F6F6F","#BABABA"), domain = parcels_res$owner_renter_factor)
 
 
+# create popup
+popup_res <-  paste0(
+      "AIN: ", parcels_res$ain, "</br>",
+      "Residential Type: ",  parcels_res$res_type, "</br>",
+      "Ownership Type: ",  parcels_res$owner_renter, "</br>",
+      "Total/Rental Units: ",  parcels_res$total_units, "/", parcels_res$landlord_units, "</br>",
+      "Total Square Feet: ", parcels_res$total_square_feet, "</br>",
+       "Use Code: ",  parcels_res$use_code)
 ```
 
 ```{r}
-leaflet () %>%
-addProviderTiles(providers$CartoDB.Positron) %>%
-     setView(-118.131127, 34.194432, zoom = 13) %>%
-  addPolygons(data=eaton_fire,
-              fillColor="white",
-              fillOpacity=0,
-              color="black",
-              weight=2.5,
-              opacity=1,
-              options=pathOptions(clickable=FALSE),
-              group="Eaton Fire Perimeter") %>%
-          addPolygons(data=east,
-              fillColor="white",
-              fillOpacity=0,
-              color=meteorite,
-              weight=2.5,
-              opacity=1,
-              popup=~"East Altadena",
-              group="East Altadena") %>%
-  addPolygons(data=west,
-              fillColor="white",
-              fillOpacity=0,
-              color=ccblue,
-              weight=2.5,
-              opacity=1,
-              popup=~"West Altadena",
-              group="West Altadena") %>%
-    addPolygons(data=parcels_res,
-              fillColor=~res_pal(res_type_factor),
-              fillOpacity=0.9,
-              color="white",
-              weight=.4,
-              opacity=1,
-              popup=~popup_res,
-              group="Residential Property Types") %>%
-        addLegend(
-        position = "bottomleft",
-        pal = res_pal,
-        values =  parcels_res$res_type_factor,
-        group="Residential Property Types",
-        title = "Residential Property Type"
-      ) %>%
-      addPolygons(data=parcels_res,
-              fillColor=~unit_pal(unit_category_factor),
-              fillOpacity=0.9,
-              color="white",
-              weight=.4,
-              opacity=1,
-              popup=~popup_res,
-              group="Residential Unit Sizes") %>%
-        addLegend(
-        position = "bottomleft",
-        pal = unit_pal,
-        values =  parcels_res$unit_category_factor,
-        group="Residential Unit Sizes",
-        title = "Number of Residential Units"
-      ) %>%
-        addPolygons(data=parcels_res,
-              fillColor=~owner_pal(owner_renter_factor),
-              fillOpacity=0.9,
-              color="white",
-              weight=.4,
-              opacity=1,
-              popup=~popup_res,
-              group="Ownership Type") %>%
-        addLegend(
-        position = "bottomleft",
-        pal = owner_pal,
-        values =  parcels_res$owner_renter_factor,
-        group="Ownership Type",
-        title = "Ownership Type"
-      ) %>%
-      addPolygons(data=parcels_mixed,
-              fillColor="#F25922",
-              fillOpacity=0.9,
-              color="white",
-              weight=.2,
-              opacity=1,
-              popup=~res_type,
-              group="Mixed Use Properties") %>%
+leaflet(
+  width = "100%",
+  height = "600px",
+  options = leafletOptions(zoomSnap = 0.2, zoomDelta = 0.2,
+                           attributionControl=FALSE)) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  setView(-118.131, 34.1944, zoom = 13) %>%
+  addPolygons(
+    data=eaton_fire,
+    fillColor="white",
+    fillOpacity=0,
+    color="black",
+    weight=2.5,
+    opacity=1,
+    options=pathOptions(clickable=FALSE),
+    group="Eaton Fire Perimeter") %>%
+  addPolygons(
+    data=east,
+    fillColor="white",
+    fillOpacity=0,
+    color=meteorite,
+    weight=2.5,
+    opacity=1,
+    popup=~"East Altadena",
+    group="East Altadena") %>%
+  addPolygons(
+    data=west,
+    fillColor="white",
+    fillOpacity=0,
+    color=ccblue,
+    weight=2.5,
+    opacity=1,
+    popup=~"West Altadena",
+    group="West Altadena") %>%
+  addPolygons(
+    data=parcels_res,
+    fillColor=~res_pal(res_type_factor),
+    fillOpacity=1,
+    color="white",
+    weight=.4,
+    opacity=1,
+    popup=~popup_res,
+    group="Residential Property Types") %>%
+  addLegend(
+    position = "bottomright",
+    pal = res_pal,
+    values =  parcels_res$res_type_factor,
+    group="Residential Property Types",
+    title = "Residential Property Type",
+    opacity=1) %>%
+  addPolygons(
+    data=parcels_res,
+    fillColor=~unit_pal(unit_category_factor),
+    fillOpacity=1,
+    color="white",
+    weight=.4,
+    opacity=1,
+    popup=~popup_res,
+    group="Residential Unit Sizes") %>%
+  addLegend(
+    position = "bottomright",
+    pal = unit_pal,
+    values =  parcels_res$unit_category_factor,
+    group="Residential Unit Sizes",
+    title = "Number of Residential Units",
+    opacity=1) %>%
+  addPolygons(
+    data=parcels_res,
+    fillColor=~owner_pal(owner_renter_factor),
+    fillOpacity=1,
+    color="white",
+    weight=.4,
+    opacity=1,
+    popup=~popup_res,
+    group="Ownership Type") %>%
+  addLegend(
+    position = "bottomright",
+    pal = owner_pal,
+    values =  parcels_res$owner_renter_factor,
+    group="Ownership Type",
+    title = "Ownership Type",
+    opacity = 1) %>%
+  addPolygons(
+    data=parcels_mixed,
+    fillColor="#F25922",
+    fillOpacity=1,
+    color="white",
+    weight=.2,
+    opacity=1,
+    popup=~res_type,
+    group="Mixed Use Properties") %>%
   addLayersControl(
-          overlayGroups = c("Residential Property Types","Residential Unit Sizes","Ownership Type","Mixed Use Properties","West Altadena","East Altadena","Eaton Fire Perimeter"),
-        options = layersControlOptions(collapsed = FALSE
-                                       # ,  autoZIndex = TRUE)
-        ))  %>%
-  hideGroup(c("Eaton Fire Perimeter","Residential Unit Sizes","Ownership Type","Mixed Use Properties"))
-
+    overlayGroups = c("Residential Property Types","Residential Unit Sizes",
+                      "Ownership Type","Mixed Use Properties","West Altadena",
+                      "East Altadena","Eaton Fire Perimeter"),
+    options = layersControlOptions(collapsed = FALSE))  %>%
+  hideGroup(c("Eaton Fire Perimeter","Residential Unit Sizes","Ownership Type",
+              "Mixed Use Properties"))
 
 ```
+
+<style type="text/css">
+.leaflet-right .leaflet-control {
+  background-color: white;
+  opacity: 1.0;
+  padding: 2%;
+  margin: 2px;
+  width: 200px;
+}
+</style>
