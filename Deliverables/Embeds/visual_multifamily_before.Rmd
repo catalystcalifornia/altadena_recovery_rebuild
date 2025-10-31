@@ -42,7 +42,7 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Across Altadena, most (about 61%) multifamily unit types had two units or less. While comparing East and West Altadena, more than half the multifamily properties have two units or less but many more properties in East Altadena have three to four units at a rate of 41% compared to West Altadena at 22%. Multifamily units are an essential part of increasing housing and lower costs. Before the fire, these multifamily properties in Altadena encouraged diverse and inclusive communities because lower-income families can afford to live here even if they are unable to afford a single family home. 
+We looked further into the sizes of multifamily properties in Altadena to understand their composition. Across Altadena, most multifamily unit types (61%) had two units or less. While comparing East and West Altadena, many more properties in East Altadena have three to four units at a rate of 41% compared to West Altadena at 22%. Multifamily units are an essential part of increasing housing and lowering costs. Before the fire, these multifamily properties in Altadena encouraged diverse and inclusive communities because lower-income families can afford to live here even if they are unable to afford a single-family home. 
 
 ```{r}
 #### VISUAL ####
@@ -62,11 +62,11 @@ df <- df_ %>%
 table<- df %>%
   select("Area","Multifamily Unit Type", "Multifamily Units", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Multifamily Unit Type") %>%
-  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
+  tab_header(title= "Multifamily Properties by Size")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Multifamily Units', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Multifamily Units', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%

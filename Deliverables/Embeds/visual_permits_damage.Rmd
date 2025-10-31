@@ -42,13 +42,13 @@ gainsboro <- "#DEDEDE"
 
 Meanwhile, owners of significantly damaged properties are facing slow progress toward rebuilding. Based on permit data we scraped and cleaned in October 2025, only one in three significantly damaged properties in Altadena have at least applied for a permit to begin construction.^[This includes properties in the Awaiting Construction Start, Construction in Progress, and Rebuild Complete phases.] We classified properties according to five rebuild categories:
 
-* Debris Removal Incomplete: Debris removal has not been finaled.
+* Debris Removal Incomplete: No indication that debris removal has been completed.
 * Awaiting Permit Application: Debris removal has been completed, but there has been no permit application received.
 * Awaiting Construction Start: A permit application has been approved, but there is no indication on the permit that construction has started.
 * Construction In Progress: A permit application has been approved, and inspections related to the permit indicate that construction has started.
 * Rebuild Complete: For rebuild permits related to temporary or permanent housing, all have been finaled.
 
-Significantly damaged properties in West and East Altadena are similar in their rebuild progress. About 70% of properties in each area have completed debris removal, but have not applied for a permit to rebuild--68% in West Altadena and 71% in East Altadena. This suggests that many property owners have not made progress toward rebuilding and returning to the community--which likely shows the difficult journey property owners are facing toward being able to finance and manage construction. Policymakers must take additional steps toward supporting owners in applying for acquiring permits to rebuild before more properties are sold.
+Significantly damaged properties in West and East Altadena are similar in their rebuild progress. About 70% of properties in each area have completed debris removal, but have not applied for a permit to rebuild--68% in West Altadena and 71% in East Altadena. This suggests that many property owners have not made progress toward rebuilding and returning to the community--demonstrating the difficult journey property owners are facing toward being able to finance and manage construction. Policymakers must take additional steps toward supporting owners in acquiring permits to rebuild before more properties are sold.
 
 ```{r}
 #### VISUAL: Permit statuses by area for significantly damaged properties  ####
