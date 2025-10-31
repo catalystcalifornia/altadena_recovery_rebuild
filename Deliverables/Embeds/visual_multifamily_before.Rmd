@@ -42,32 +42,31 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Given the loss of multifamily properties and their low numbers in Altadena, we also analyzed the share of multifamily properties significantly damaged by unit size. Multifamily properties of two units or less are more common in Altadena and made up a greater number of multifamily properties significantly damaged. A count of over 200 multifamily homes with two units were lost due to the Eaton Fire in Altadena. However, a greater share of the few multifamily properties that were five or more units were significantly damaged. Across Altadena, almost half (47%) of multifamily properties that had five or more units were significantly damaged or destroyed.  Multifamily homes in West Altadena suffered property loss and damage at much higher rates than East Altadena. Three times the rate of multifamily properties with two units were significantly damaged in West Altadena compared to East Altadena. An equitable recovery must also ensure there are appropriate, tailored resources for multifamily units to be rebuilt.
+Across Altadena, most (about 61%) multifamily unit types had two units or less. While comparing East and West Altadena, more than half the multifamily properties have two units or less but many more properties in East Altadena have three to four units at a rate of 41% compared to West Altadena at 22%. Multifamily units are an essential part of increasing housing and lower costs. Before the fire, these multifamily properties in Altadena encouraged diverse and inclusive communities because lower-income families can afford to live here even if they are unable to afford a single family home. 
 
 ```{r}
 #### VISUAL ####
-df_ <- st_read(con, query="Select * from data.analysis_multifamily_damage_prc")  %>%
+df_ <- st_read(con, query="Select * from data.analysis_multifamily_jan2025") %>%
   mutate(multifamily_unit_category = ifelse(multifamily_unit_category == 
                                               "Two Units","Two Units or Less", multifamily_unit_category))
 
 df <- df_ %>%
-  filter(damage_category == "Significant Damage") %>% 
-  mutate("Count (%)"=paste0(comma(property_damage_count)," (",round(property_damage_prc,0),"%)"),
-         "Multifamily Units Lost"=property_damage_prc,
+  mutate("Count (%)"=paste0(comma(property_count)," (",round(property_prc,0),"%)"),
+         "Multifamily Units"=property_prc,
          "Multifamily Unit Type" = multifamily_unit_category,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(property_damage_count)) 
+  arrange(desc(property_count)) 
 
 
 table<- df %>%
-  select("Area","Multifamily Unit Type", "Multifamily Units Lost", "Count (%)")%>%
+  select("Area","Multifamily Unit Type", "Multifamily Units", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Multifamily Unit Type") %>%
-  tab_header(title= "Multifamily Properties Lost by Size")%>%
-  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
+  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Multifamily Units Lost', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Multifamily Units', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
