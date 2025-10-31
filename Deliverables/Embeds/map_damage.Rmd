@@ -158,22 +158,10 @@ df_zoning_lac$zone_label<- factor(
       df_zoning_lac$zone_label,
       levels = c("Single-Family Residence","Two-Family Residence","Multiple Residence","Other Residential","Mixed Use Development","Commercial","Manufacturing","Agricultural","Open Space/Water Shed","Other"))
 
-# Create a color palette based on the factor
-zoning_pal <- colorFactor(
-  palette = c("#feffe2","#f2d84b","#d09a36","#dfd3b6","#b3605d","#E34234","#b7c4db","#c5fb5d","#8ffa4f","#bfbfbf"), 
-  domain = df_zoning_lac$zone_label)
-
-# sold status
+# parcels sold after eaton fire
 sept_sales_sf <- all_df %>%
-  select(ain_sept, sold_after_eaton, geom) %>%
-  mutate(sold_after_eaton_factor = factor(
-    sold_after_eaton,
-    levels=c("TRUE", "FALSE")))
-
-sales_pal <- colorFactor(
-  palette = c("#E34234", "#f2d84b"),
-  domain = sept_sales_sf$sold_after_eaton_factor
-)
+  filter(sold_after_eaton==TRUE) %>%
+  select(ain_sept, sold_after_eaton, geom) 
 
 # rebuild status
 sept_rebuild_sf <- all_df %>%
@@ -181,6 +169,11 @@ sept_rebuild_sf <- all_df %>%
   mutate(rebuild_status_factor = factor(
     rebuild_status, 
     levels=c("Debris Removal Incomplete", "Awaiting Permit Application", "Awaiting Construction Start", "Construction In Progress", "Rebuild Complete")))
+
+# Create a color palette based on the factor
+zoning_pal <- colorFactor(
+  palette = c("#feffe2","#f2d84b","#d09a36","#dfd3b6","#b3605d","#E34234","#b7c4db","#c5fb5d","#8ffa4f","#bfbfbf"), 
+  domain = df_zoning_lac$zone_label)
 
 rebuild_pal <- colorFactor(
   palette = c("#E2D9FF", "#BDAFE9", "#8E7ACA", "#362178", "#211447"),
@@ -268,7 +261,7 @@ custom_sidebar <- paste0("<div class='leaflet-popup-scrolled parcel-sidebar'>",
 leaflet(
   width = "100%",
   height = "600px",
-  options = leafletOptions(zoomSnap = 0.2, zoomDelta = 0.2,
+  options = leafletOptions(zoomSnap = 0.1, zoomDelta = 0.1,
                            attributionControl=FALSE)) %>%
   setView(-118.137, 34.194, zoom = 13) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
@@ -280,9 +273,9 @@ leaflet(
   addPolygons(
     data=all_df,
     fillColor="orange",
-    color = "orange",
-    fillOpacity=1,
-    weight=.6,
+    fillOpacity = 1,
+    color="white",
+    weight=.4,
     opacity=1,
     popup = popup_parcel,
     group="Significantly Damaged Parcels") %>%
@@ -379,20 +372,13 @@ leaflet(
   # Sold Status
   addPolygons(
     data=sept_sales_sf,
-    fillColor=~sales_pal(sold_after_eaton_factor),
+    fillColor="#E34234",
     fillOpacity=1,
     color="white",
     weight=0.6,
     opacity=1,
     popup=popup_parcel,
-    group="Sold Status") %>%
-  addLegend(
-    position = "bottomright",
-    pal = sales_pal,
-    values =  sept_sales_sf$sold_after_eaton_factor,
-    group="Sold Status",
-    title = "Parcel Sold After Eaton Fire",
-    opacity=1) %>% 
+    group="Sold After Eaton Fire") %>%
   # Rebuild Status
   addPolygons(
     data=sept_rebuild_sf,
@@ -415,12 +401,12 @@ leaflet(
   addLayersControl(
     overlayGroups = c("Significantly Damaged Parcels",
                       "Lead Levels in Soil","Local Fire Hazard Zones",
-                      "State Fire Hazard Zones","Zoning", "Sold Status",
+                      "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire",
                       "Rebuild Status", "West Altadena","East Altadena",
                       "Eaton Fire Perimeter"),
     options = layersControlOptions(collapsed = FALSE, autoZIndex = TRUE))  %>%
   hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones",
-              "State Fire Hazard Zones","Zoning", "Sold Status", "Rebuild Status"))
+              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status"))
 
 ```
 
