@@ -372,7 +372,7 @@ leaflet(
   # Sold Status
   addPolygons(
     data=sept_sales_sf,
-    fillColor="#E34234",
+    fillColor="black",
     fillOpacity=1,
     color="white",
     weight=0.6,
