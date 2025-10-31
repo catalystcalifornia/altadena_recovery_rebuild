@@ -40,9 +40,9 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Depending on the ownership type of the property, different strategies may be need to jumpstart property owners rebuilding. Across Altadena, most significantly damaged properties are awaiting permit applications regardless of ownership type. Renter-occupied and LLC-owned properties are most likely to have not completed debris removal though these represent a small percentage of all renter-occupied or LLC-owned properties. In Altadena, over 5% of significantly damaged, renter-occupied properties have not completed debris removal.
+Depending on the ownership type of the property, different strategies will be needed to jumpstart property owners rebuilding. Across Altadena, most significantly damaged properties have not submitted any permit applications regardless of ownership type. Renter-occupied and LLC-owned properties are most likely to have not completed debris removal though these represent a small percentage of all renter-occupied or LLC-owned properties. In Altadena, over 5% of significantly damaged, renter-occupied properties have not completed debris removal.
 
-Generally, only 1.4% of significantly damaged properties in Altadena are rebuilt across ownership types. More properties have at least applied for permits and are awaiting construction. In Altadena, 21-22% of owner-occupied and renter-occupied properties alike are awaiting the start of construction--meaning permits have been approved but construction has not started. A large percentage of all ownership types have not applied for permits. This suggests across the board property owners in Altadena are slowly progressing toward building efforts--requiring further investigation on how to tailor recovery supports for each ownership type, but in the interest of retaining the homeownership rates in Altadena, with an emphasis on owner-occupied properties.
+Generally, only 1.4% of significantly damaged properties in Altadena are rebuilt across ownership types. More properties have at least applied for permits and are awaiting construction. In Altadena, 24% of owner-occupied and 22% renter-occupied properties alike are awaiting the start of construction--meaning permits have been approved but construction has not started. A large percentage of all ownership types have not applied for permits. This suggests across the board property owners in Altadena are slowly progressing toward building efforts. Policymakers should further investigate how to tailor recovery supports for each ownership type, with an emphasis on owner-occupied properties to help retain homeownership rates in Altadena.
 
 ```{r}
 #### VISUAL: Permit statuses by area and owner type for significantly damaged properties  ####
@@ -87,7 +87,7 @@ table<- df %>%
   gt_plt_bar_pct(column= 'Construction In Progress', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   gt_plt_bar_pct(column= 'Rebuild Complete', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   tab_header(title= "Rebuild Status of Significantly Damaged Properties",
-             subtitle = "B y Ownership Type (as of October 2025)")%>%
+             subtitle = "By Ownership Type (as of October 2025)")%>%
   
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and L.A. County Public Works, October 2025."),placement="left")%>%
   # if needed modify column widths here 
