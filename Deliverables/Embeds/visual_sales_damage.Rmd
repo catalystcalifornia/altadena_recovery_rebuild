@@ -42,7 +42,7 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Only a small percentage of properties have been sold in Altadena since the Eaton Fire. In total, 279 properties were sold between February 8th, 2025, and August, 2025 (the latest data received for this project). About 61% of these properties were in West Altadena and 39% in East Altadena. Looking at the rate of sales by damage categories, significantly damaged properties are selling at a faster rate than other damaged properties. However, only four percent of significantly damaged properties have sold in Altadena.
+Only a small percentage of properties have been sold in Altadena since the Eaton Fire. In total, 279 properties were sold between February 8th, 2025, and August, 2025 (the latest data received for this project). About 61% of these properties were in West Altadena and 39% in East Altadena. The high concetration of sales in West Altadena coincides with research from Strategic Actions for a Just Economy (SAJE) that found West Altadena census tracts to be more vulnerable to displacement and gentrification threat.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] Looking at the rate of sales by damage categories, significantly damaged properties are selling at a faster rate than other damaged properties. Owners who properties were significantly damaged face greater challenges in rebuilding as they must replace most or all of their structures to return--navigating insurance, other funding opportunities, and permits to have the dollars to rebuild. However, only four percent of significantly damaged properties have sold in Altadena.
 
 ```{r}
 #### VISUAL: Sale rates by damage and area ####

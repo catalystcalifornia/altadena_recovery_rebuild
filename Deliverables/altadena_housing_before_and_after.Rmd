@@ -69,7 +69,7 @@ con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 # Introduction - in progress
 
-Altadena is rich with historical significance and threads of community resilience. Altadena is an unincorporated region of Los Angeles County below the San Gabriel Mountains and to the north of the City of Pasadena. Throughout the years, the region has become a vibrant hub for communities of color to call home. When housing was racially segregated in the early to mid 1900s, Altadena became one of the few places where Black families could own property. The community grew and became a place where communities of color could thrive. Early this year, the Eaton fire devastated Altadena and now the community faces challenges in recovery and rebuilding this essential part of greater Los Angeles. s
+Altadena is rich with historical significance and threads of community resilience. Altadena is an unincorporated region of Los Angeles County below the San Gabriel Mountains and to the north of the City of Pasadena. Throughout the years, the region has become a vibrant hub for communities of color to call home. When housing was racially segregated in the early to mid 1900s, Altadena became one of the few places where Black families could own property. The community grew and became a place where communities of color could thrive. Early this year, the Eaton fire devastated Altadena and now the community faces challenges in recovery and rebuilding this essential part of greater Los Angeles.
 
 # Prior Research
 The Eaton Fire devastated the Altadena community. Numerous research studies find that Black families and communities of color faced higher loss than others. For example, Black individuals and families experienced severe damage and destruction of their homes at a rate of almost 60%, the highest rate compared to other race/ethnic groups.^[UCLA. (2025, October 9). UCLA analysis finds Altadena faces uneven wildfire recovery as Black, Latino, and AAPI homeowners struggle to rebuild. Pasadena Now. https://pasadenanow.com/main/ucla-analysis-finds-altadena-faces-uneven-wildfire-recovery-as-black-latino-and-aapi-homeowners-struggle-to-rebuild ] Compounding systemic issues makes recovery even more difficult for Black families and communities of color. From Black homeowners in Altadena, 28% report being severely cost-burdened, where only 13% of non-Black homeowners report being cost-burdened.^[UCLA Bunche Center. (n.d.). LA wildfires: Impacts on Altadena’s Black community (P. Ong, C. Pech, L. Frasure, S. Comandur, E. Lee, & S. R. González). Retrieved from https://bunchecenter.ucla.edu/wildfires-altadena-black-community/] Furthermore, rising housing costs and tenure decline leave a vulnerable population to be displaced and more likely to risk losing housing and a loss of generational wealth.^[SAJE (Strategic Actions for a Just Economy). (2025, May). Compounding disaster: A spatial analysis of housing risk and speculation in post-fire Altadena.]  
@@ -135,7 +135,13 @@ In January 2025, immediately before the Eaton Fire, Altadena was primarily a low
 
 # Altadena After
 
+Between January 7th and 31st, 2025, the Eaton Fire burned through the Altadena community. Prior research documents how West Altadena was disproportionately devastated by the fire with all fire-related deaths occurring West of Lake Avenue.^[https://www.nbcnews.com/news/us-news/eaton-fire-deaths-los-angeles-evacuation-orders-took-hours-rcna188729] Due to systemic failures in alert and evacuation operations, West Altadena did not receive evacuation orders until nine hours after the Eaton Fire began. A change in wind speed and direction aggressively pushed the fire west early in the morning of January 8th.^[https://file.lacounty.gov/SDSInter/bos/supdocs/207915.pdf] 
+
+We analyzed the destruction from the fire West and East of Lake Avenue examining the share of housing types significantly damaged by the fire. These trends help inform the housing stock lost to the fire and in need of rebuilding in each community; and therefore, also the Altadenans most at risk of displacement.
+
 ## Map
+
+West Altadena was largely destroyed by the fire with the fire perimeter covering a significant area of the community. There are pockets of housing that sustained no damage, such as portions along Glenrose Avenue and blocks around Lake Avenue and Dolores Drive. East Altadena had more pockets with no damage such as along North Hollister Avenue, East Mendocino Street, and East Calaveras Street. However, throughout Altadena, even pockets with no damage are surrounded by properties significantly damaged or destroyed. 
 
 ```{r map-after, child='Embeds/map_after_eaton.Rmd', echo=FALSE}
 ```
@@ -149,14 +155,14 @@ In January 2025, immediately before the Eaton Fire, Altadena was primarily a low
 ```{r multi-after, child='Embeds/visual_multifamily_after.Rmd', echo=FALSE}
 ```
 
-## Rental Units Lost
-
-```{r units-after, child='Embeds/visual_units_after.Rmd', echo=FALSE}
-```
-
 ## Ownership Types Lost
 
 ```{r owner-after, child='Embeds/visual_homeowner_after.Rmd', echo=FALSE}
+```
+
+## Rental Units Lost
+
+```{r units-after, child='Embeds/visual_units_after.Rmd', echo=FALSE}
 ```
 
 ## Average Square Footage Lost
@@ -166,7 +172,12 @@ In January 2025, immediately before the Eaton Fire, Altadena was primarily a low
 
 # Altadena Rebuilding
 
+The dust from the fire has settled, but Altadena faces a long recovery ahead. To rebuild, varying types of property owners need support in navigating insurance, permits, hazards, and new building standards. Meanwhile, predatory investors have already begun displacing residents and taken advantage of owners when they were most vulnerable. We analyzed the properties that have sold and those that are in progress toward rebuilding as well as the hazard and zoning considerations owners must take into account when rebuilding. All of these factors will affect the path and result of Altadena recovering. Based on September 2025 data from the L.A. County Assessor's office, we mapped and analyzed the properties that have sold. Based on L.A. County permit data we scraped in October 2025, we analyzed the share of significantly damaged properties that are on the road to rebuilding.
+
 ## Map
+
+Few properties have sold since the fire, but most are in West Altadena with several homes selling around Lake Avenue and Wapello Street. Meanwhile, most properties have completed debris removal but have not sought an initial permit to rebuild. As properties rebuild, they must also contend with fire and lead hazards in the community. The northern portions of West and East Altadena are in fire hazard zones, with the northern most portions in very high hazard areas that require additional defense measures. Meanwhile, the southern and most western portions of Altadena face higher lead levels--downwind from the fire. Beyond the direct fire perimeter, homes outside of the Eaton Fire burn area are in grids with average lead levels above recommended screening thresholds.
+
 ```{r planning-map, child='Embeds/map_damage.Rmd', echo=FALSE}
 ```
 

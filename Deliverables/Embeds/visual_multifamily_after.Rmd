@@ -42,7 +42,7 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Across Altadena and multifamily unit types, almost half (47%) of multifamily properties that had five or more units were significantly damaged or destroyed. A count of over 200 multifamily homes with two units were lost due to the Eaton Fire in Altadena. Multifamily homes in West Altadena suffered property loss and damage at much higher rates than East Altadena.    
+Given the loss of multifamily properties and their low numbers in Altadena, we also analyzed the share of multifamily properties significantly damaged by unit size. Multifamily properties of two units or less are more common in Altadena and made up a greater number of multifamily properties significantly damaged. A count of over 200 multifamily homes with two units were lost due to the Eaton Fire in Altadena. However, a greater share of the few multifamily properties that were five or more units were significantly damaged. Across Altadena, almost half (47%) of multifamily properties that had five or more units were significantly damaged or destroyed.  Multifamily homes in West Altadena suffered property loss and damage at much higher rates than East Altadena. Three times the rate of multifamily properties with two units were significantly damaged in West Altadena compared to East Altadena. An equitable recovery must also ensure there are appropriate, tailored resources for multifamily units to be rebuilt.
 
 ```{r}
 #### VISUAL ####
@@ -61,7 +61,7 @@ df <- df_ %>%
 table<- df %>%
   select("Area","Multifamily Unit Type", "Multifamily Units Lost", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Multifamily Unit Type") %>%
-  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
+  tab_header(title= "Multifamily Properties Lost by Size")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%
