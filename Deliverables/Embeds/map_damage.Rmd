@@ -42,31 +42,40 @@ gainsboro <- "#DEDEDE"
 ```{r}
 # Eaton Fire damaged properties
 # residential parcel shapes
-parcels <- st_read(con, query="SELECT * FROM data.rel_assessor_altadena_parcels_sept2025", geom="geom") %>% st_transform(4326)
+parcels <- st_read(con, query="SELECT * FROM data.rel_assessor_altadena_parcels_sept2025", geom="geom") %>% 
+  st_transform(4326)
+
 res_data <- st_read(con, query="SELECT * FROM data.rel_assessor_residential_sept2025")
 damage <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")
+
 # join parcel shapes to residential data
 parcels <- parcels %>% left_join(res_data, by="ain_sept") %>% left_join(damage, by="ain_sept")
+
 # make one layer for all residential - use this to visualize all properties
-parcels_res_damaged <- parcels %>% filter(residential==TRUE & total_units>0 & damage_category=="Significant Damage") 
+parcels_res_damaged <- parcels %>% 
+  filter((residential==TRUE & total_units>0 & damage_category=="Significant Damage"))
 
 # east and west altadena boundaries --
-west <- st_read(con, query="SELECT * FROM data.west_altadena_3310", geom="geom") %>% st_transform(4326) %>% ms_simplify()
-east <- st_read(con, query="SELECT * FROM data.east_altadena_3310", geom="geom") %>% st_transform(4326) %>%  ms_simplify()
+west <- st_read(con, query="SELECT * FROM data.west_altadena_3310", geom="geom") %>% 
+  st_transform(4326) %>% ms_simplify()
+
+east <- st_read(con, query="SELECT * FROM data.east_altadena_3310", geom="geom") %>% 
+  st_transform(4326) %>%  ms_simplify()
 
 df_lead <- st_read(con, query="Select * from data.lacdph_lead_results_grid_2025", geom="geom") %>% 
   st_transform(4326) %>%
+  ms_simplify() %>%
   mutate(hi_lead_flag = case_when(is.na(lead_geometric_mean) ~ "Not Tested",
                                lead_geometric_mean >= 80 ~ "Above Threshold",
                                lead_geometric_mean <80 ~ "Below Threshold",
-                               TRUE ~ NA))
+                               TRUE ~ NA)) 
 
 #NOTE: taking time to transform even after filtering
-df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326)
+df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326) %>% ms_simplify()
 
-df_local_fhsz <- st_read(con, query="Select * from data.eaton_local_fhsz_4326 WHERE fhsz_descr != 'NonWildland'", geom="geom")
+df_local_fhsz <- st_read(con, query="Select * from data.eaton_local_fhsz_4326 WHERE fhsz_descr != 'NonWildland'", geom="geom") 
 
-df_state_fhsz <- st_read(con, query="Select * from data.eaton_state_fhsz_4326", geom="geom") 
+df_state_fhsz <- st_read(con, query="Select * from data.eaton_state_fhsz_4326", geom="geom")
 
 eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom") %>% st_transform(4326) %>%  ms_simplify()
 
@@ -109,7 +118,9 @@ df_lead$hi_lead_flag <- factor(
       levels = c("Not Tested","Below Threshold","Above Threshold"))
 
 # Create a color palette based on the factor
-lead_pal <- colorFactor(palette = c("gray","#ffcccc","red"), domain = df_lead$hi_lead_flag)
+lead_pal <- colorFactor(
+  palette = c("gray","#ffcccc","red"), 
+  domain = df_lead$hi_lead_flag)
 
 # fire zone colors
 df_local_fhsz$fhsz_descr <- factor(
@@ -147,22 +158,10 @@ df_zoning_lac$zone_label<- factor(
       df_zoning_lac$zone_label,
       levels = c("Single-Family Residence","Two-Family Residence","Multiple Residence","Other Residential","Mixed Use Development","Commercial","Manufacturing","Agricultural","Open Space/Water Shed","Other"))
 
-# Create a color palette based on the factor
-zoning_pal <- colorFactor(
-  palette = c("#feffe2","#f2d84b","#d09a36","#dfd3b6","#b3605d","#E34234","#b7c4db","#c5fb5d","#8ffa4f","#bfbfbf"), 
-  domain = df_zoning_lac$zone_label)
-
-# sold status
+# parcels sold after eaton fire
 sept_sales_sf <- all_df %>%
-  select(ain_sept, sold_after_eaton, geom) %>%
-  mutate(sold_after_eaton_factor = factor(
-    sold_after_eaton,
-    levels=c("TRUE", "FALSE")))
-
-sales_pal <- colorFactor(
-  palette = c("#E34234", "#f2d84b"),
-  domain = sept_sales_sf$sold_after_eaton_factor
-)
+  filter(sold_after_eaton==TRUE) %>%
+  select(ain_sept, sold_after_eaton, geom) 
 
 # rebuild status
 sept_rebuild_sf <- all_df %>%
@@ -170,6 +169,11 @@ sept_rebuild_sf <- all_df %>%
   mutate(rebuild_status_factor = factor(
     rebuild_status, 
     levels=c("Debris Removal Incomplete", "Awaiting Permit Application", "Awaiting Construction Start", "Construction In Progress", "Rebuild Complete")))
+
+# Create a color palette based on the factor
+zoning_pal <- colorFactor(
+  palette = c("#feffe2","#f2d84b","#d09a36","#dfd3b6","#b3605d","#E34234","#b7c4db","#c5fb5d","#8ffa4f","#bfbfbf"), 
+  domain = df_zoning_lac$zone_label)
 
 rebuild_pal <- colorFactor(
   palette = c("#E2D9FF", "#BDAFE9", "#8E7ACA", "#362178", "#211447"),
@@ -254,151 +258,155 @@ custom_sidebar <- paste0("<div class='leaflet-popup-scrolled parcel-sidebar'>",
 
 ```{r}
 
-leaflet(width = "100%",
-        height = "600px",
-        options = leafletOptions(zoomControl = FALSE,
-                                 attributionControl=FALSE)) %>%
-  setView(-118.131127, 34.194432, zoom = 13) %>%
+leaflet(
+  width = "100%",
+  height = "600px",
+  options = leafletOptions(zoomSnap = 0.1, zoomDelta = 0.1,
+                           attributionControl=FALSE)) %>%
+  setView(-118.137, 34.194, zoom = 13) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   
   # add custom sidebar
   addControl(html=custom_sidebar, position = "topleft") %>%
      
   #Damaged/Destroyed Properties
-  addPolygons(data=all_df,
-                   fillColor="orange",
-                   color = "orange",
-                   fillOpacity=0.3,
-                   weight=.6,
-                   opacity=1,
-                   popup = popup_parcel,
-                   group="Significantly Damaged Parcels") %>%
+  addPolygons(
+    data=all_df,
+    fillColor="orange",
+    fillOpacity = 1,
+    color="white",
+    weight=.4,
+    opacity=1,
+    popup = popup_parcel,
+    group="Significantly Damaged Parcels") %>%
   #Eaton Fire Perimeter
-  addPolygons(data=eaton_fire,
-              fillColor="white",
-              fillOpacity=0,
-              color="black",
-              weight=2.5,
-              opacity=1,
-              options=pathOptions(clickable=FALSE),
-              group="Eaton Fire Perimeter") %>%
+  addPolygons(
+    data=eaton_fire,
+    fillColor="white",
+    fillOpacity=0,
+    color="black",
+    weight=2.5,
+    opacity=1,
+    options=pathOptions(clickable=FALSE),
+    group="Eaton Fire Perimeter") %>%
   #East Perimeter
-  addPolygons(data=east,
-              fillColor="white",
-              fillOpacity=0,
-              color=meteorite,
-              weight=2.5,
-              opacity=1,
-              options=pathOptions(clickable=FALSE),
-              group="East Altadena") %>%
+  addPolygons(
+    data=east,
+    fillColor="white",
+    fillOpacity=0,
+    color=meteorite,
+    weight=2.5,
+    opacity=1,
+    options=pathOptions(clickable=FALSE),
+    group="East Altadena") %>%
   #West Perimeter
-  addPolygons(data=west,
-              fillColor="white",
-              fillOpacity=0,
-              color=ccblue,
-              weight=2.5,
-              opacity=1,
-              options=pathOptions(clickable=FALSE),
-              group="West Altadena") %>%
+  addPolygons(
+    data=west,
+    fillColor="white",
+    fillOpacity=0,
+    color=meteorite,
+    weight=2.5,
+    opacity=1,
+    options=pathOptions(clickable=FALSE),
+    group="West Altadena") %>%
   #Lead Data 
-  addPolygons(data=df_lead,
-              fillColor = ~lead_pal(hi_lead_flag),
-              fillOpacity=0.4,
-              color="white",
-              weight=.5,
-              opacity=1,
-              popup=~paste0("Average Lead Level Measured in mg/kg: ", df_lead$lead_geometric_mean, "</br>",
-                            "Higher than 80 mg/kg Safety Threshold: ", df_lead$hi_lead_flag),
-              group="Lead Levels in Soil") %>% 
-                addLegend(
-                  position = "bottomright",
-                  pal = lead_pal,
-                  values =  df_lead$hi_lead_flag,
-                  group="Lead Levels in Soil",
-                  title = "Lead Levels",
-                opacity=0.4
-                ) %>%
-  #Fire Hazard Zones 
-  addPolygons(data=df_local_fhsz,
-              fillColor=~colorpal_local_fhsz(fhsz_descr),
-              fillOpacity=0.5,
-              color="white",
-              weight=1,
-              popup=~fhsz_descr,
-              group="Local Fire Hazard Zones") %>%
-                addLegend(
-                position = "bottomright",
-                pal = colorpal_local_fhsz,
-                values =  df_local_fhsz$fhsz_descr,
-                group="Local Fire Hazard Zones",
-                title = "Fire Hazard Level",
-                opacity=0.5) %>%
-  addPolygons(data=df_state_fhsz,
-              fillColor="red",
-              fillOpacity=0.5,
-              color="white",
-              weight=1,
-              popup=~fhsz_descr,
-              group="State Fire Hazard Zones") %>%
-  #Zoning 
-  addPolygons(data=df_zoning_lac,
-              fillColor=~zoning_pal(zone_label),
-              fillOpacity=0.5,
-              color="white",
-              weight=1,
-              opacity=1,
-              popup=~paste0("Zoning Description: ", df_zoning_lac$z_desc),
-              group="Zoning") %>%
-                addLegend(
-                position = "bottomright",
-                pal = zoning_pal,
-                values =  df_zoning_lac$zone_label,
-                group="Zoning",
-                title = "Allowable Uses",
-                opacity=0.5) %>% 
-  # Sold Status
-  addPolygons(data=sept_sales_sf,
-              fillColor=~sales_pal(sold_after_eaton_factor),
-              fillOpacity=1,
-              color="white",
-              weight=0.6,
-              opacity=1,
-              popup=popup_parcel,
-              group="Sold Status") %>%
-                addLegend(
-                position = "bottomright",
-                pal = sales_pal,
-                values =  sept_sales_sf$sold_after_eaton_factor,
-                group="Sold Status",
-                title = "Parcel Sold After Eaton Fire",
-                opacity=1) %>% 
-  # Rebuild Status
-  addPolygons(data=sept_rebuild_sf,
-              fillColor=~rebuild_pal(rebuild_status_factor),
-              fillOpacity=1,
-              color="white",
-              weight=0.6,
-              opacity=1,
-              popup=popup_parcel,
-              group="Rebuild Status") %>%
+  addPolygons(
+    data=df_lead,
+    fillColor = ~lead_pal(hi_lead_flag),
+    fillOpacity=0.4,
+    color="white",
+    weight=.5,
+    opacity=1,
+    popup=~paste0("Average Lead Level Measured in mg/kg: ", 
+                  df_lead$lead_geometric_mean, "</br>",
+                  "Higher than 80 mg/kg Safety Threshold: ", df_lead$hi_lead_flag),
+    group="Lead Levels in Soil") %>%
   addLegend(
-                position = "bottomright",
-                pal = rebuild_pal,
-                values =  sept_rebuild_sf$rebuild_status_factor,
-                group="Rebuild Status",
-                title = "Rebuild Status",
-                opacity=1) %>% 
+    position = "bottomright",
+    pal = lead_pal,
+    values =  df_lead$hi_lead_flag,
+    group="Lead Levels in Soil",
+    title = "Lead Levels",
+    opacity=0.4) %>%
+  #Fire Hazard Zones 
+  addPolygons(
+    data=df_local_fhsz,
+    fillColor=~colorpal_local_fhsz(fhsz_descr),
+    fillOpacity=0.5,
+    color="white",
+    weight=1,
+    popup=~fhsz_descr,
+    group="Local Fire Hazard Zones") %>%
+  addLegend(
+    position = "bottomright",
+    pal = colorpal_local_fhsz,
+    values =  df_local_fhsz$fhsz_descr,
+    group="Local Fire Hazard Zones",
+    title = "Fire Hazard Level",
+    opacity=0.5) %>%
+  addPolygons(
+    data=df_state_fhsz,
+    fillColor="red",
+    fillOpacity=0.5,
+    color="white",
+    weight=1,
+    popup=~fhsz_descr,
+    group="State Fire Hazard Zones") %>%
+  #Zoning 
+  addPolygons(
+    data=df_zoning_lac,
+    fillColor=~zoning_pal(zone_label),
+    fillOpacity=0.5,
+    color="white",
+    weight=1,
+    opacity=1,
+    popup=~paste0("Zoning Description: ", df_zoning_lac$z_desc),
+    group="Zoning") %>%
+  addLegend(
+    position = "bottomright",
+    pal = zoning_pal,
+    values =  df_zoning_lac$zone_label,
+    group="Zoning",
+    title = "Allowable Uses",
+    opacity=0.5) %>% 
+  # Sold Status
+  addPolygons(
+    data=sept_sales_sf,
+    fillColor="#E34234",
+    fillOpacity=1,
+    color="white",
+    weight=0.6,
+    opacity=1,
+    popup=popup_parcel,
+    group="Sold After Eaton Fire") %>%
+  # Rebuild Status
+  addPolygons(
+    data=sept_rebuild_sf,
+    fillColor=~rebuild_pal(rebuild_status_factor),
+    fillOpacity=1,
+    color="white",
+    weight=0.6,
+    opacity=1,
+    popup=popup_parcel,
+    group="Rebuild Status") %>%
+  addLegend(
+    position = "bottomright",
+    pal = rebuild_pal,
+    values =  sept_rebuild_sf$rebuild_status_factor,
+    group="Rebuild Status",
+    title = "Rebuild Status",
+    opacity=1) %>% 
   
   #Controling Layers
   addLayersControl(
     overlayGroups = c("Significantly Damaged Parcels",
                       "Lead Levels in Soil","Local Fire Hazard Zones",
-                      "State Fire Hazard Zones","Zoning", "Sold Status",
+                      "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire",
                       "Rebuild Status", "West Altadena","East Altadena",
                       "Eaton Fire Perimeter"),
     options = layersControlOptions(collapsed = FALSE, autoZIndex = TRUE))  %>%
   hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones",
-              "State Fire Hazard Zones","Zoning", "Sold Status", "Rebuild Status"))
+              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status"))
 
 ```
 
@@ -422,7 +430,8 @@ leaflet(width = "100%",
   border-bottom:1px solid #737373;
 }
 /* Target all leaflet controls on the left side, regardless of top/bottom position */
-.leaflet-left .leaflet-control {
+/* when keeping zoom buttons, remember to exclude from this styling */
+.leaflet-left .leaflet-control:not(.leaflet-control-zoom) {
   background-color: white;
   opacity: 1.0;
   overflow: auto;

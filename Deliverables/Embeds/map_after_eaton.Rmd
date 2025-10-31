@@ -41,7 +41,7 @@ con_alt <- connect_to_db("altadena_recovery_rebuild")
 eaton_fire <- st_read(con_alt, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom")
 
 # east and west altadena boundaries --
-west <- st_read(con_alt, query="SELECT * FROM data.west_altadena_3310", geom="geom")
+west <- st_read(con_alt, query="SELECT * FROM data.west_altadena_3310", geom="geom") 
 east <- st_read(con_alt, query="SELECT * FROM data.east_altadena_3310", geom="geom")
 
 # residential parcel shapes
@@ -88,7 +88,7 @@ popup_res <-  paste0(
       "Damage Category: ",  parcels_res$damage_category, "</br>",
       "Residential Type: ",  parcels_res$res_type, "</br>",
       "Ownership Type: ",  parcels_res$owner_renter, "</br>",
-      "Total/Rental Units: ",  parcels_res$total_units, "/", parcels_res$landlord_units, "</br>",
+      "Units (Total/Rental): ",  parcels_res$total_units, "/", parcels_res$landlord_units, "</br>",
       "Total Square Feet: ", parcels_res$total_square_feet, "</br>",
       "Use Code: ",  parcels_res$use_code)
 
@@ -100,7 +100,7 @@ popup_rent <-  paste0(
       "Damage Category: ",  rental_units$damage_category, "</br>",
       "Residential Type: ",  rental_units$res_type, "</br>",
       "Ownership Type: ",  rental_units$owner_renter, "</br>",
-      "Total/Rental Units: ",  rental_units$total_units, "/", rental_units$landlord_units, "</br>",
+      "Units (Total/Rental): ",  rental_units$total_units, "/", rental_units$landlord_units, "</br>",
       "Total Square Feet: ", rental_units$total_square_feet, "</br>",
       "Use Code: ",  rental_units$use_code)
 
@@ -111,7 +111,7 @@ popup_single <-  paste0(
       "Damage Category: ",  single_family$damage_category, "</br>",
       "Residential Type: ",  single_family$res_type, "</br>",
       "Ownership Type: ",  single_family$owner_renter, "</br>",
-      "Total/Rental Units: ",  single_family$total_units, "/", single_family$landlord_units, "</br>",
+      "Units (Total/Rental): ",  single_family$total_units, "/", single_family$landlord_units, "</br>",
       "Total Square Feet: ", single_family$total_square_feet, "</br>",
       "Use Code: ",  single_family$use_code)
 
@@ -122,88 +122,108 @@ popup_multi <-  paste0(
       "Damage Category: ",  multifamily$damage_category, "</br>",
       "Residential Type: ",  multifamily$res_type, "</br>",
       "Ownership Type: ",  multifamily$owner_renter, "</br>",
-      "Total/Rental Units: ",  multifamily$total_units, "/", multifamily$landlord_units, "</br>",
+      "Units (Total/Rental): ",  multifamily$total_units, "/", multifamily$landlord_units, "</br>",
       "Total Square Feet: ", multifamily$total_square_feet, "</br>",
       "Use Code: ",  multifamily$use_code)
 
 ```
 
 ```{r}
-leaflet () %>%
-addProviderTiles(providers$CartoDB.Positron) %>%
-     setView(-118.131127, 34.194432, zoom = 13) %>%
-  addPolygons(data=eaton_fire,
-              fillColor="white",
-              fillOpacity=0,
-              color="black",
-              weight=2.5,
-              opacity=1,
-              options=pathOptions(clickable=FALSE),
-              group="Eaton Fire Perimeter") %>%
-          addPolygons(data=east,
-              fillColor="white",
-              fillOpacity=0,
-              color=meteorite,
-              weight=2.5,
-              opacity=1,
-              popup=~"East Altadena",
-              group="East Altadena") %>%
-  addPolygons(data=west,
-              fillColor="white",
-              fillOpacity=0,
-              color=ccblue,
-              weight=2.5,
-              opacity=1,
-              popup=~"West Altadena",
-              group="West Altadena") %>%
-    addPolygons(data=parcels_res,
-              fillColor=~damage_pal(damage_factor),
-              fillOpacity=1,
-              color="white",
-              weight=.4,
-              opacity=1,
-              popup=~popup_res,
-              group="Residential Properties Damage Levels") %>%
-        addLegend(
-        position = "bottomleft",
-        pal = damage_pal,
-        values =  parcels_res$damage_factor,
-        group="Residential Properties Damage Levels",
-        title = "Damage Level"
-      ) %>%
-  addPolygons(data=rental_units,
-                   fillColor="black",
-                   color = "white",
-                   fillOpacity=0.9,
-                   weight=.3,
-                   opacity=1,
-                            popup=~popup_rent,
-                   group="Rental Properties Lost") %>%
-  addPolygons(data=single_family,
-                   fillColor="black",
-                   color = "white",
-                   fillOpacity=0.9,
-                   weight=.3,
-                   opacity=1,
-                            popup=~popup_single,
-                   group="Single-family Properties Lost") %>%
-  addPolygons(data=multifamily,
-                   fillColor="black",
-                   color = "white",
-                   fillOpacity=0.9,
-                   weight=.3,
-                   opacity=1,
-                            popup=~popup_multi,
-                   group="Multifamily Properties Lost") %>%
+leaflet(
+  width = "100%",
+  height = "600px",
+  options = leafletOptions(zoomSnap = 0.1, zoomDelta = 0.1,
+                           attributionControl=FALSE)) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  setView(-118.124, 34.1944, zoom = 13.5) %>%
+  addPolygons(
+    data=eaton_fire,
+    fillColor="white",
+    fillOpacity=0,
+    color="black",
+    weight=2.5,
+    opacity=1,
+    options=pathOptions(clickable=FALSE),
+    group="Eaton Fire Perimeter") %>%
+  addPolygons(
+    data=east,
+    fillColor="white",
+    fillOpacity=0,
+    color=meteorite,
+    weight=2.5,
+    opacity=1,
+    popup=~"East Altadena",
+    group="East Altadena") %>%
+  addPolygons(
+    data=west,
+    fillColor="white",
+    fillOpacity=0,
+    color=ccblue,
+    weight=2.5,
+    opacity=1,
+    popup=~"West Altadena",
+    group="West Altadena") %>%
+  addPolygons(
+    data=parcels_res,
+    fillColor=~damage_pal(damage_factor),
+    fillOpacity=1,
+    color="white",
+    weight=.4,
+    opacity=1,
+    popup=~popup_res,
+    group="Residential Properties Damage Levels") %>%
+  addLegend(
+    position = "bottomright",
+    pal = damage_pal,
+    values =  parcels_res$damage_factor,
+    group="Residential Properties Damage Levels",
+    title = "Damage Level",
+    opacity=1) %>%
+  addPolygons(
+    data=rental_units,
+    fillColor="black",
+    color = "white",
+    fillOpacity=1,
+    weight=.3,
+    opacity=1,
+    popup=~popup_rent,
+    group="Rental Properties Lost") %>%
+  addPolygons(
+    data=single_family,
+    fillColor="black",
+    color = "white",
+    fillOpacity=1,
+    weight=.3,
+    opacity=1,
+    popup=~popup_single,
+    group="Single-family Properties Lost") %>%
+  addPolygons(
+    data=multifamily,
+    fillColor="black",
+    color = "white",
+    fillOpacity=1,
+    weight=.3,
+    opacity=1,
+    popup=~popup_multi,
+    group="Multifamily Properties Lost") %>%
   addLayersControl(
-          overlayGroups = c("Residential Properties Damage Levels",
-                            "Rental Properties Lost", "Single-family Properties Lost", "Multifamily Properties Lost",
-                            "West Altadena","East Altadena","Eaton Fire Perimeter"),
-        options = layersControlOptions(collapsed = FALSE
-                                       # ,  autoZIndex = TRUE)
-        ))  %>%
-  hideGroup(c("Eaton Fire Perimeter", "Rental Properties Lost", "Single-family Properties Lost", "Multifamily Properties Lost"
-              ))
+    overlayGroups = c("Residential Properties Damage Levels",
+                      "Rental Properties Lost", "Single-family Properties Lost",
+                      "Multifamily Properties Lost", "West Altadena",
+                      "East Altadena","Eaton Fire Perimeter"),
+    options = layersControlOptions(collapsed = FALSE))  %>%
+  hideGroup(c("Eaton Fire Perimeter", "Rental Properties Lost", 
+              "Single-family Properties Lost", "Multifamily Properties Lost"))
 
 
 ```
+
+<style type="text/css">
+.leaflet-right .leaflet-control {
+  background-color: white;
+  opacity: 1.0;
+  padding: 2%;
+  margin: 2px;
+  width: 200px;
+}
+</style>
