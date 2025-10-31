@@ -48,7 +48,7 @@ damage <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level_sept2
 # join parcel shapes to residential data
 parcels <- parcels %>% left_join(res_data, by="ain_sept") %>% left_join(damage, by="ain_sept")
 # make one layer for all residential - use this to visualize all properties
-parcels_res_damaged <- parcels %>% filter(residential==TRUE & total_units>0 & damage_category=="Significant Damage") 
+parcels_res_damaged <- parcels %>% filter(residential==TRUE & total_units>0 & damage_category=="Significant Damage")
 
 # east and west altadena boundaries --
 west <- st_read(con, query="SELECT * FROM data.west_altadena_3310", geom="geom") %>% st_transform(4326) %>% ms_simplify()
@@ -59,14 +59,15 @@ df_lead <- st_read(con, query="Select * from data.lacdph_lead_results_grid_2025"
   mutate(hi_lead_flag = case_when(is.na(lead_geometric_mean) ~ "Not Tested",
                                lead_geometric_mean >= 80 ~ "Above Threshold",
                                lead_geometric_mean <80 ~ "Below Threshold",
-                               TRUE ~ NA))
+                               TRUE ~ NA)) %>% 
+  ms_simplify()
 
 #NOTE: taking time to transform even after filtering
-df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326)
+df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326) %>% ms_simplify()
 
-df_local_fhsz <- st_read(con, query="Select * from data.eaton_local_fhsz_4326 WHERE fhsz_descr != 'NonWildland'", geom="geom")
+df_local_fhsz <- st_read(con, query="Select * from data.eaton_local_fhsz_4326 WHERE fhsz_descr != 'NonWildland'", geom="geom") 
 
-df_state_fhsz <- st_read(con, query="Select * from data.eaton_state_fhsz_4326", geom="geom") 
+df_state_fhsz <- st_read(con, query="Select * from data.eaton_state_fhsz_4326", geom="geom")
 
 eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom") %>% st_transform(4326) %>%  ms_simplify()
 
@@ -256,9 +257,8 @@ custom_sidebar <- paste0("<div class='leaflet-popup-scrolled parcel-sidebar'>",
 
 leaflet(width = "100%",
         height = "600px",
-        options = leafletOptions(zoomControl = FALSE,
-                                 attributionControl=FALSE)) %>%
-  setView(-118.131127, 34.194432, zoom = 13) %>%
+        options = leafletOptions(attributionControl=FALSE)) %>%
+  setView(-118.137, 34.194, zoom = 13) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   
   # add custom sidebar
@@ -422,14 +422,15 @@ leaflet(width = "100%",
   border-bottom:1px solid #737373;
 }
 /* Target all leaflet controls on the left side, regardless of top/bottom position */
-.leaflet-left .leaflet-control {
+/* when keeping zoom buttons, remember to exclude from this styling */
+.leaflet-left .leaflet-control:not(.leaflet-control-zoom) {
   background-color: white;
   opacity: 1.0;
   overflow: auto;
   padding: 2%;
   height: 100%;
   margin: 2px;
-  width: 200px;
+  width: 250px;
 }
 
 
