@@ -41,7 +41,8 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-Across Altadena, families and residents have lost homes irrespective of residential type. The majority of homes lost are single-family homes and West Altadena faces a higher loss overall of single-family homes compared to East Altadena. More than half of the single-family homes in West Altadena, around 55%, are significantly damaged or destroyed. In comparison, 31% of single-family homes in East Altadena are significantly damaged or destroyed. While the devastation of the fires impacted all of Altadena, there is a greater loss in West Altadena.  
+
+Reflecting the housing composition prior to the fire, single-family homes make up a greater number of homes lost in the fire. A total of 3,713 single-family homes were significantly damaged in West Altadena. Overall, West Altadena faces a higher loss of single-family homes compared to East Altadena. More than half of the single-family homes in West Altadena, around 55%, are significantly damaged or destroyed. In comparison, 31% of single-family homes in East Altadena are significantly damaged or destroyed. In order words, single-family homes in West Altadena were significantly damaged or destroyed at a rate 1.8 times greater than East Altadena. Multifamily properties in West Altadena encountered even greater disparities in devastation. Nearly half of multifamily properties in West Altadena (47%) were significantly damaged compared to 14% in East Altadena. This likely reflects the distribution of multifamily homes and path of the fire which burned through much of West Altadena, but in East Altadena, was mostly concentrated in the north-west quadrants. Rebuilding the housing stock in West Altadena will require significant resources to bring community members back and ensure the same level of housing for single-family and multifamily homes.
 
 ```{r}
 #### VISUAL ####
@@ -66,11 +67,11 @@ pivot_longer(
 table<- df %>%
   select("Area","Residential Type", "Share of Housing Type Lost", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
-  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
+  tab_header(title= "Significantly Damaged Properties by Residential Type")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%

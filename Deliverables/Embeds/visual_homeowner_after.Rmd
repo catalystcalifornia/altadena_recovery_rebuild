@@ -42,9 +42,9 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-We examined the percentage of properties sustaining significant damage out of each ownership type in Altadena. Knowing which ownership types sustained the most damage can help inform strategies to support residential property owners in rebuilding. Owner-occupied versus renter-occupied units may face different challenges in rebuilding, or have varying interests in rebuilding versus selling. 
+We examined the percentage of properties sustaining significant damage out of each ownership type in Altadena. Knowing which ownership types sustained the most damage can help inform strategies to equitably support residential property owners in rebuilding, and protect homeowners against displacement and predatory investors. Owner-occupied versus renter-occupied units may face different challenges in rebuilding. 
 
-While a significant share of owners lost their properties across ownership types and areas in Altadena, owner-occupied, likely owner-occupied, and trust-owned properties had the greatest losses in West and East Altadena with the exception of properties with a church or welfare exemption in East Altadena. Additionally, a greater share of owners in West Altadena lost their properties compared to owners in East Altadena. In West Altadena, nearly twice the rate of owner-occupied properties were significantly damaged or destroyed (57%) compared to East Altadena (31%). Similarly, a greater number of renters lost their homes in West Altadena than in East Altadena. Renter-occupied properties in West Altadena were significantly damaged (44%) at nearly 2.5 times the rate of renter-occupied properties in East Altadena (18%). These trends underscore the focus on West Altadena.
+While a significant share of owners lost their properties across ownership types, owner-occupied, likely owner-occupied, and trust-owned properties had the greatest losses in West and East Altadena with the exception of properties with a church or welfare exemption in East Altadena. Additionally, a greater share of homeowners in West Altadena lost their properties compared to homeowners in East Altadena. In West Altadena, nearly twice the rate of owner-occupied properties were significantly damaged or destroyed (57%) compared to East Altadena (31%). Similarly, a greater number of renters lost their homes in West Altadena than in East Altadena. Renter-occupied properties in West Altadena were significantly damaged (44%) at nearly 2.5 times the rate of renter-occupied properties in East Altadena (18%). These trends underscore the devastation in West Altadena, and the need to have strategies that support both owner-occupied and renter-occupied properties in rebuilding.
 
 ```{r}
 #### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
@@ -74,7 +74,7 @@ table<- df %>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table %>%
-  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
