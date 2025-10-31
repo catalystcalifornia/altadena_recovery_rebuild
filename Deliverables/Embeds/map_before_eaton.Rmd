@@ -132,7 +132,7 @@ popup_res <-  paste0(
       "AIN: ", parcels_res$ain, "</br>",
       "Residential Type: ",  parcels_res$res_type, "</br>",
       "Ownership Type: ",  parcels_res$owner_renter, "</br>",
-      "Total/Rental Units: ",  parcels_res$total_units, "/", parcels_res$landlord_units, "</br>",
+      "Units (Total/Rental): ",  parcels_res$total_units, "/", parcels_res$landlord_units, "</br>",
       "Total Square Feet: ", parcels_res$total_square_feet, "</br>",
        "Use Code: ",  parcels_res$use_code)
 ```
@@ -141,10 +141,10 @@ popup_res <-  paste0(
 leaflet(
   width = "100%",
   height = "600px",
-  options = leafletOptions(zoomSnap = 0.2, zoomDelta = 0.2,
+  options = leafletOptions(zoomSnap = 0.1, zoomDelta = 0.1,
                            attributionControl=FALSE)) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
-  setView(-118.131, 34.1944, zoom = 13) %>%
+  setView(-118.124, 34.1944, zoom = 13.5) %>%
   addPolygons(
     data=eaton_fire,
     fillColor="white",
