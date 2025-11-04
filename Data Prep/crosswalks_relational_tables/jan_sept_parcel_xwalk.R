@@ -1,8 +1,7 @@
 # Create a crosswalk of Jan 2025 and Sept 2025 Altadena parcel data
 
-
+##### Step 0: Set up, initial prep #####
 # Library and environment set up ----
-
 library(sf)
 library(mapview)
 
@@ -31,9 +30,8 @@ parcels_sept <- st_read(con_alt, query="SELECT parcels.ain, parcels.geom, stats.
   mutate(area = st_area(geom))
 
 # get assessor data: not sure if we need this though so commenting out for now
-
- assessor_jan <- st_read(con_alt, query="Select * from data.assessor_data_universe_jan2025")
- assessor_sept <- st_read(con_alt, query="Select * from data.assessor_data_universe_sept2025")
+assessor_jan <- st_read(con_alt, query="Select * from data.assessor_data_universe_jan2025")
+assessor_sept <- st_read(con_alt, query="Select * from data.assessor_data_universe_sept2025")
 
 # double check CRS of both of parcel shapes
 st_crs(parcels_jan)$epsg #3310 good
@@ -59,11 +57,11 @@ match_parcels <- all_parcels %>%
 # 109748
 check <- data.frame(table(match_parcels$dupe_id, useNA = "ifany"))
 check_2 <- data.frame(table(match_parcels$group_count, useNA = "ifany"))
-# number of dupe groups - 44524
+# number of dupe groups - 44524 (excl. NA)
 # number of unique shapes - 354 --> 356?
 # total unique shapes - 44878
 
-# Make wider, clean up values to filter later
+# Make wider, to see if AINs match across the same shape (or something else)
 match_parcels_wide <- match_parcels %>%
   select(-c(area, use_code, address)) %>%
   pivot_wider(
@@ -75,8 +73,8 @@ match_parcels_wide <- match_parcels %>%
     # Convert flags to binary (1/0) and handle NAs in one step
     flag_jan = as.integer(!is.na(flag_jan)),
     flag_sept = as.integer(!is.na(flag_sept)),
-    # Flag for same AIN in both months -- would this be same geom?
-    same_ain = as.integer(flag_jan == 1 & flag_sept == 1)
+    # Flag for same AIN in both months
+    same_ain = as.integer(flag_jan == 1 & flag_sept == 1),
   ) %>%
   # Calculate totals by dupe_id
   group_by(dupe_id) %>%
@@ -86,16 +84,16 @@ match_parcels_wide <- match_parcels %>%
     # Shape match: has dupe_id and both months present
     shape_match = as.integer(!is.na(dupe_id) & total_jan > 0 & total_sept > 0)
   ) %>%
-  mutate(even_counts = ifelse(total_jan==total_sept, 1, 0)) %>%
+  mutate(same_counts = ifelse(total_jan==total_sept, 1, 0)) %>%
   ungroup() %>%
-  select(dupe_id, ain, shape_match, same_ain, even_counts, everything()) %>%
+  select(dupe_id, ain, shape_match, same_ain, same_counts, everything()) %>%
   mutate(
     status = case_when(
       shape_match==0 ~ "run intersect by month", # no shape or ain match
-      shape_match==1 & same_ain == 0 & even_counts==1 & group_count==2 ~ "diff ain pair, simple xwalk",
-      shape_match==1 & same_ain == 0 & even_counts==1 & group_count>2 ~ "ambiguous matches, needs closer look",
-      shape_match==1 & same_ain == 0 & even_counts==0 & group_count>2 ~ "uneven matches, needs closer look",
-      shape_match==1 & same_ain == 1 & even_counts==1 ~ "same ains, simple xwalk",
+      shape_match==1 & same_ain == 0 & same_counts==1 & group_count==2 ~ "diff ain pair, simple xwalk",
+      shape_match==1 & same_ain == 0 & same_counts==1 & group_count>2 ~ "ambiguous matches, needs closer look",
+      shape_match==1 & same_ain == 0 & same_counts==0 & group_count>2 ~ "uneven matches, needs closer look",
+      shape_match==1 & same_ain == 1 & same_counts==1 ~ "same ains, simple xwalk",
       .default = "undefined status, please review")
   )
 
@@ -126,7 +124,7 @@ same_ain_xwalk <- same_ain %>%
   left_join(all_parcels %>% 
               filter(flag=="jan") %>% select(ain,use_code,address) %>% st_drop_geometry, 
             by=c("ain_sept"="ain")) %>%
-  mutate(source="same ain and shape",
+  mutate(source="same shape, same ain",
     status = "no change") %>%
   rename(use_code_jan=use_code.x,
          use_code_sept=use_code.y,
@@ -139,6 +137,10 @@ diff_ain <- match_parcels_wide %>%
   filter(status == "diff ain pair, simple xwalk") 
 
  length(unique(diff_ain$dupe_id)) # 4
+ 
+# notes: 
+ # two of these pairs, jan parcel deleted and renamed to sept ain
+ # other two pairs, sept parcel is wrong? jan parcel is correct.
 
 diff_ain_xwalk <- diff_ain %>%
   group_by(dupe_id) %>%
@@ -152,7 +154,7 @@ diff_ain_xwalk <- diff_ain %>%
               filter(flag=="jan") %>% select(ain,use_code,address) %>% st_drop_geometry, 
             by=c("ain_sept"="ain")) %>%
   mutate(source="same shape, different ain",
-         status = "ain renamed or deleted, same shape") %>%
+         status = "same shape, ain renamed or deleted") %>%
   rename(use_code_jan=use_code.x,
          use_code_sept=use_code.y,
          address_jan=address.x,
@@ -184,7 +186,7 @@ ambiguous_xwalk <- ambiguous %>%
               filter(flag=="jan") %>% select(ain,use_code,address) %>% st_drop_geometry, 
             by=c("ain_sept"="ain")) %>%
   mutate(source="same shape, different, ambiguous ain",
-         status = "ain deleted, same shape") %>%
+         status = "same shape, jan ain deleted") %>%
   rename(use_code_jan=use_code.x,
          use_code_sept=use_code.y,
          address_jan=address.x,
@@ -243,14 +245,22 @@ jan_join <- st_intersection(jan_parcels_filtered, parcels_sept) %>%
   mutate(count= n()) %>%
   ungroup() %>%
   mutate(address_match = ifelse(address==address.1, 1, 0),
-         sept_na = ifelse(is.na(flag.1), 1, 0), # if sept flag is na then not in sept file, use_code can be NA even if in file
-         in_sept_shp = ifelse(ain %in% parcels_sept$ain, 1, 0),
-         ain_match = ifelse(ain==ain.1, 1 ,0)
-         ) %>%
+         # see if use code is NA, possible marker for data quality in sept file
+         sept_use_code_na = ifelse(is.na(use_code.1), 1, 0), 
+         # see if ain is in sept shp file
+         in_sept_shp = ifelse(ain %in% parcels_sept$ain, 1, 0), 
+         ain_match = ifelse(ain==ain.1, 1 ,0)) %>%
   filter(pct_jan_overlap>0)
 
 # explore duplicates
-dup_matches <- jan_join[jan_join$ain %in% jan_join$ain[duplicated(jan_join$ain)], ]
+jan_join_dupes <- jan_join %>% 
+  select(ain) %>% 
+  filter(duplicated(.)) # 32
+
+dup_matches <- jan_join %>%
+  filter(ain %in% jan_join_dupes$ain)
+
+
 # see https://portal.assessor.lacounty.gov/parceldetail/5327012023
 # neither 5327012023 or 5327012026 are in the september file but online map suggests closest match to 5327012026
 
@@ -284,7 +294,9 @@ jan_leftover <- jan_join %>%
 length(unique(jan_leftover$ain)) # 42
 
 # look at duplicates
-dup_matches <- jan_leftover[jan_leftover$ain %in% jan_leftover$ain[duplicated(jan_leftover$ain)], ]
+jan_leftover_dupes <- jan_leftover %>%
+  select(ain) %>% filter(duplicated(.))
+dup_matches <- jan_leftover %>% filter(ain %in% jan_leftover_dupes$ain)
 # very few duplicates
 
 # keep records where there is a 100% overlap with the original january file and there is a september record
