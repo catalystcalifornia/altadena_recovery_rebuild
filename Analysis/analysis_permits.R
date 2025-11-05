@@ -59,7 +59,7 @@ check <- all_df %>%
 
 all_df <- all_df 
          
-#### Step 3: First ANALYSIS- [analysis_permits_area_sept2025] ####
+#### Step 3: First ANALYSIS- [analysis_permits_area_jan2025] ####
 ## What percentage of residential properties for each damage are in each permit stage by area
 # e.g., x% of significantly damaged properties that are in construction are in west altadena
 analysis_permits_area_e_w <- all_df %>%
@@ -80,7 +80,6 @@ analysis_damage_area <- all_df %>%
   summarise(count=n(),
             prc=n()/min(total)*100,
             total=min(total)) 
-  
 
 analysis_permits_final <- analysis_permits_area_e_w
 
@@ -100,9 +99,9 @@ analysis_permits_final <- analysis_permits_area_e_w
 #   "area",
 #   "count of properties in that damage category, permit status, and area - numerator",
 #   "percent of properties in that area out of properties all properties in each damage and permit combo",
-#   "total residential properties that are within that damage category and permit status")
+#   "total residential properties that are within that damage category and permit status - denominator")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-# 
+
 
 # Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_damage_area_jan2025", value = analysis_damage_area, overwrite = FALSE)
@@ -160,9 +159,9 @@ analysis_damage_final<- rbind(analysis_damage_e_w,
 #   "area",
 #   "damage category",
 #   "permit status",
-#   "count of properties",
+#   "count of properties - numerator",
 #   "percent of properties ",
-#   "total residential properties in the area")
+#   "total residential properties in the area - denominator")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 #### Step 5: Third ANALYSIS- [analysis_permits_restype_jan2025] ####
@@ -204,9 +203,9 @@ analysis_permits_restype <- rbind(e_w,
 #   "area",
 #   "residential type",
 #   "permit status",
-#   "count of properties",
+#   "count of properties - numerator",
 #   "percent of properties ",
-#   "total residential properties in the area that were significantly damaged")
+#   "total residential properties in the area that were significantly damaged - denominator")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 #### Step 6: Fourth ANALYSIS- [analysis_permits_owner_renter_jan2025] ####
@@ -246,9 +245,9 @@ analysis_permits_owner <- rbind(e_w,
 #   "area",
 #   "ownership type",
 #   "permit status",
-#   "count of properties",
+#   "count of properties - numerator",
 #   "percent of properties ",
-#   "total residential properties in the area that were significantly damaged")
+#   "total residential properties in the area that were significantly damaged - denominator")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
