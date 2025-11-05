@@ -42,7 +42,9 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-As of September 2025, most properties that have sold were owner-occupied properties before the Eaton fire, but these properties are not selling at a faster rate than other properties in Altadena. East and West Altadena saw the greatest number of sales in owner-occupied properties after the Eaton Fire, but only two percent of owner-occupied properties have sold. Properties that were both owner-occupied and had rental units reported as of January 2025 were least likely to have sold since January -- one percent have sold across Altadena. 
+We also examined the share of each ownership type that has sold since the Eaton Fire. Understanding which properties are selling at faster rates can help signal trends toward displacement and disaster capitalism, or corporate investors exploiting survivors during their recovery.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] As of September 2025, most properties that have sold since the fire were owner-occupied before fire, but these properties are not selling at a faster rate than other properties in Altadena. Owner-occupied properties in East and West Altadena saw the greatest number of sales after the Eaton Fire, but overall only two percent of owner-occupied properties have sold. A higher share of properties that were tax delinquent before the fire have sold in East Altadena--six percent of sold to state/tax delinquent properties from January 2025 have sold.
+
+Recent research from SAJE has shown how corporate investors have already exploited the Altadena community. Between February and July 2025, nearly half of parcels (47%) were purchased by corporate entities compared to only 10% bought by corporate entities in the prior year.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] Long-term strategies to support property owners throughout their recovery are needed to help preserve ownership in Altadena and reduce the track of speculation.
 
 ```{r}
 #### VISUAL: Sale rates by damage and area ####
@@ -55,16 +57,16 @@ df <- df %>%
   select(-c(sold_after_eaton,owner_renter_total)) %>%
   mutate("Count (%)"=paste0(comma(sold_count)," (",round(sold_prc,0),"%)"),
          "Share of Housing Type Sold"=sold_prc,
-         "Owner or Renter Occupied" = owner_renter_jan,
+         "Ownership Type" = owner_renter_jan,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   arrange(desc(sold_count)) 
 
 
 table<- df %>%
-  select("Area","Owner or Renter Occupied", "Share of Housing Type Sold", "Count (%)")%>%
+  select("Area","Ownership Type", "Share of Housing Type Sold", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Owner or Renter Occupied") %>%
-  # tab_header(title= str_wrap("East Altadena has a few more homeowners but overall the region is made up of majority homeowners", width = 20))%>%
+  tab_header(title= "Share of Properties Sold After the Fire Within Each Ownership Type")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table %>%

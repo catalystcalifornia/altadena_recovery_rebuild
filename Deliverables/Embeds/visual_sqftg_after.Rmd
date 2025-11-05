@@ -42,7 +42,7 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Unfortunately, the average square footage lost reveals the devastation felt across Altadena. In West Altadena, the average square footage of single-family homes significantly damaged or destroyed is 1,533 square feet. This is comparable to the average square footage of all single-family homes in West Altadena before the after. The average square footage of significantly damaged or destroyed single-family and multifamily homes in East Altadena is greater than West Altadena, reflecting differences between these areas in their average home size before the fires. For residents to recuperate their housing lost, they would need the funds to at least replace the square footage of their original properties. Multifamily properties need to recuperate more square footage compared to single-family homes.
+The average square footage lost reveals the devastation felt across Altadena, and the size of properties that were destroyed and in highest need of rebuilding. In West Altadena, the average square footage of single-family homes significantly damaged or destroyed is 1,533 square feet. This is comparable to the average square footage of all single-family homes in West Altadena before the after. The average square footage of significantly damaged or destroyed single-family and multifamily homes in East Altadena is greater than West Altadena, reflecting differences between these areas in their average home size before the fires. For residents to recuperate their housing lost, they would need the funds to at least replace at least the square footage of their original properties. Multifamily properties need to recuperate more square footage compared to single-family homes. Additional research into average insurance coverage by property type could better inform the additional investments needed by owners to rebuild their properties.
 
 ```{r}
 #### VISUAL ####
@@ -62,6 +62,7 @@ df <- df_ %>%
 table<- df %>%
   select("Area","Residential Type", "Average Square Footage Lost", " ")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
+    tab_header(title= "Average Square Footage Lost by Residential Type")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%

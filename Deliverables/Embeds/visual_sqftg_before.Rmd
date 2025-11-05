@@ -42,7 +42,7 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-In January 2025, across Altadena, multifamily homes had the highest average square footage at 2,911 square feet. Overall, East Altadena homes had a higher average square footage than those in West Altadena with the exception of condominiums. Condominiums in West Altadena on average had 300 more square footage than the ones in East Altadena. In West Altadena, the average single-family home was 1,571 square feet.
+As property owners rebuild, the size and character of Altadena housing could change, with units getting larger or smaller. Additionally, understanding the square footage of Altadena properties before the fire can help indicate the dollars property owners may need to rebuild like-sized homes. In January 2025, multifamily homes in Altadena were an average of 2,911 square feet--not adjusted to the unit size. Multifamily properties were larger in East Altadena at an average of 3,187 square feeta. East Altadena single-family homes also had a higher average square footage than those in West Altadena (1,979 square feet compared to 1,571 square feet). Condominiums in West Altadena on average had 300 more square footage than the ones in East Altadena.
 
 ```{r}
 #### VISUAL ####
@@ -61,6 +61,7 @@ df <- df_ %>%
 table<- df %>%
   select("Area","Residential Type", "Average Square Footage", " ")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
+    tab_header(title= "Average Square Footage Before the Fire") %>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
