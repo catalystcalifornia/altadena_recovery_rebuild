@@ -339,22 +339,45 @@ table(rel_res_df$owner_renter) # this looks like what I expect. OTHER category w
 
 # move on to trusts and LLCs
 test <- rel_res_df%>%
-  mutate(
-    owner_renter = ifelse(
-      (grepl("TRUST", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("TRUST", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("TRUST", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
-      "Trust owned",owner_renter))%>%
+  # top code corporate
   mutate(
     owner_renter = ifelse(
       (grepl("LLC", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("LLC", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("LLC", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "LLC owned",owner_renter))%>%
-  mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) # manually recoded after original result returned a property with a LLC and trust
+  mutate(
+    owner_renter = ifelse(
+      (grepl("TRUST", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "Trust owned",owner_renter))%>%
+  mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) %>% # manually recoded after original result returned a property with a LLC and trust
+filter(owner_renter %in% c("LLC owned","Trust owned"))
 
+test_2 <- rel_res_df%>%
+  # top code corporate
+  mutate(
+    owner_renter = ifelse(
+      (grepl("LLC| LP| Inc", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "LLC owned",owner_renter))%>%
+  mutate(
+    owner_renter = ifelse(
+      (grepl("TRUST|TRST| TR ", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST|TRST| TR ",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST|TRST| TR ", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "Trust owned",owner_renter))%>%
+  mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) %>% # manually recoded after original result returned a property with a LLC and trust
+  filter(owner_renter %in% c("LLC owned","Trust owned"))
 # check:
 table(test$owner_renter) # this has the number of Trusts I expect -originally had only 115 LLCs instead of 116 --but after exploring and manually adjusting for the single AIN case that had Trust AND LLC in the name, now the numbers are as I expect
+
+trust_llc_check<-test_2 %>%
+  filter(!ain %in% test$ain) %>%
+  select(ain,owner_renter,contains("_owner"),exemption_type, num_howmowner_exemption,landlord_units) %>%
+  View()
 
 # further test result
 other_trust_llc <- other %>%
@@ -465,29 +488,29 @@ rel_res_df_final <- rel_res_df %>%
 length(unique(rel_res_df_final$ain))
 nrow(rel_res_df_final) #same count
 
-table_name <- "rel_assessor_residential_jan2025"
-schema <- "data"
-indicator <- "Relational data table with summarized information and flags for residential and mixed use properties in Altadena as of January 2025. Only includes properties in either West or East Altadena proper"
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
-qa_filepath<-"  QA_sheet_relational_tables.docx "
-dbWriteTable(con_alt, Id(schema, table_name), rel_res_df_final,
-             overwrite = FALSE, row.names = FALSE)
+# table_name <- "rel_assessor_residential_jan2025"
+# schema <- "data"
+# indicator <- "Relational data table with summarized information and flags for residential and mixed use properties in Altadena as of January 2025. Only includes properties in either West or East Altadena proper"
+# source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
+# qa_filepath<-"  QA_sheet_relational_tables.docx "
+# dbWriteTable(con_alt, Id(schema, table_name), rel_res_df_final,
+#              overwrite = FALSE, row.names = FALSE)
 
-# Add metadata
-column_names <- colnames(rel_res_df_final) # Get column names
-column_names
-column_comments <- c('Assessor ID number - use this to match to other relational tables',
-                     'Flag for whether property is a residential use (e.g., use code starting with 0)',
-                     'Flag for whether property is mixed residential-commercial (use code starting with 1 but with a residential combo indicated in 3rd character)',
-                     'Residential type -- either single-family, multifamily, mixed use, condominium, boarding house',
-                     'Housing tenure-ownerships -- either homeowner (indicated by homeowner exemption), renter, trust owned, LLC owned, sold to state, SBE or government owned, or owner likely but with no exemption. For more detailed methodology of choices see R script: Data Prep/resident_exemption_explore.R',
-                     'Total residential units on the property -- use caution when interpreting for mixed use - - can include commercial',
-                     'Total rental units on the property -- use caution when interpreting for mixed use - can include commercial',
-                     'Total square feet of buildings on property',
-                     'Total bedrooms on property',
-                     'Original use code for reference')
-
- add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# # Add metadata
+# column_names <- colnames(rel_res_df_final) # Get column names
+# column_names
+# column_comments <- c('Assessor ID number - use this to match to other relational tables',
+#                      'Flag for whether property is a residential use (e.g., use code starting with 0)',
+#                      'Flag for whether property is mixed residential-commercial (use code starting with 1 but with a residential combo indicated in 3rd character)',
+#                      'Residential type -- either single-family, multifamily, mixed use, condominium, boarding house',
+#                      'Housing tenure-ownerships -- either homeowner (indicated by homeowner exemption), renter, trust owned, LLC owned, sold to state, SBE or government owned, or owner likely but with no exemption. For more detailed methodology of choices see R script: Data Prep/resident_exemption_explore.R',
+#                      'Total residential units on the property -- use caution when interpreting for mixed use - - can include commercial',
+#                      'Total rental units on the property -- use caution when interpreting for mixed use - can include commercial',
+#                      'Total square feet of buildings on property',
+#                      'Total bedrooms on property',
+#                      'Original use code for reference')
+# 
+ # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 # STEP 4: TABLE 2: Table to indicate West or East Altadena with geometry ------
 rel_area_geom_df <- parcels_altadena %>%
@@ -516,14 +539,14 @@ rel_area_geom_df <- rel_area_geom_df %>%
 #                geometry_column = "geom")
 
 
-# Add metadata
-column_names <- colnames(rel_area_geom_df) # Get column names
-column_names
-column_comments <- c('Assessor ID number - use this to match to other relational tables',
-                     'West or East Altadena shortened label',
-                     'West or East Altadena long label',
-                     'geometry')
-
+# # Add metadata
+# column_names <- colnames(rel_area_geom_df) # Get column names
+# column_names
+# column_comments <- c('Assessor ID number - use this to match to other relational tables',
+#                      'West or East Altadena shortened label',
+#                      'West or East Altadena long label',
+#                      'geometry')
+# 
 # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
@@ -657,33 +680,33 @@ residential_ains_no_damage <- residential_ains %>%
 rel_assessor_dins_final_final <- bind_rows(rel_assessor_dins_final,residential_ains_no_damage)
 
 
-table_name <- "rel_assessor_damage_level"
-schema <- "data"
-indicator <- "Relational table that contains summarised damage levels for assessor IDS assessed by CalFire post the Eaton Fire, Unlike the damage inspection database, this table is at the unique parcel level rather than building level
-Table includes all residential parcels in Altadena. If they werent assessed then No Damage is assumed. The source column indicates if the parcel was assessed or we are assuming No Damage because outside of fire area and/or not assessed"
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
-qa_filepath<-"  QA_sheet_relational_tables.docx "
+# table_name <- "rel_assessor_damage_level"
+# schema <- "data"
+# indicator <- "Relational table that contains summarised damage levels for assessor IDS assessed by CalFire post the Eaton Fire, Unlike the damage inspection database, this table is at the unique parcel level rather than building level
+# Table includes all residential parcels in Altadena. If they werent assessed then No Damage is assumed. The source column indicates if the parcel was assessed or we are assuming No Damage because outside of fire area and/or not assessed"
+# source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/EMG/altadena_recovery_rebuild/Data Prep/crosswalks_relational_tables/assessor_relational_tables_jan25.R "
+# qa_filepath<-"  QA_sheet_relational_tables.docx "
 
 # dbWriteTable(con_alt, Id(schema, table_name), rel_assessor_dins_final_final,
 #              overwrite = FALSE, row.names = FALSE)
 
 
-# Add metadata
-column_names <- colnames(rel_assessor_dins_final_final) # Get column names
-column_names
-column_comments <- c('Assessor ID number - use this to match to other relational tables',
-                     'Overall damage category level -- top coded so highest damage level of a building on the property takes precedent',
-                     'Whether damage category is based on CalFire DINs or assumed because not in the database',
-                     'Number of structures assessed by CalFire associated with AIN',
-                     'Indicator for whether there was a one type of damage or two or more',
-                     'total count for destroyed structures on property',
-                     'total count for major damage structures on property',
-                     'total count for minor damage structures on property',
-                     'total count for affected damage structures on property',
-                     'total count for no damage structures on property',
-                     'total count for inaccessible structures on property',
-                     'list of unique damage types assigned to property by CalFire',
-                     'Total unique types of damage')
-
+# # Add metadata
+# column_names <- colnames(rel_assessor_dins_final_final) # Get column names
+# column_names
+# column_comments <- c('Assessor ID number - use this to match to other relational tables',
+#                      'Overall damage category level -- top coded so highest damage level of a building on the property takes precedent',
+#                      'Whether damage category is based on CalFire DINs or assumed because not in the database',
+#                      'Number of structures assessed by CalFire associated with AIN',
+#                      'Indicator for whether there was a one type of damage or two or more',
+#                      'total count for destroyed structures on property',
+#                      'total count for major damage structures on property',
+#                      'total count for minor damage structures on property',
+#                      'total count for affected damage structures on property',
+#                      'total count for no damage structures on property',
+#                      'total count for inaccessible structures on property',
+#                      'list of unique damage types assigned to property by CalFire',
+#                      'Total unique types of damage')
+# 
 # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
