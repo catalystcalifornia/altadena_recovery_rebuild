@@ -94,9 +94,9 @@ length(unique(data_altadena$ain))
 # Add total units and total square feet for us to see throughout
 data_altadena <- data_altadena %>%
   mutate(total_units = rowSums(across(ends_with("_units"))),
-       total_square_feet = rowSums(across(ends_with("_square_feet"))),
-       total_bedrooms = rowSums(across(ends_with("_bedrooms")))) %>%
-         mutate(total_units=total_units-landlord_units) # so we don't double count rental units
+         total_square_feet = rowSums(across(ends_with("_square_feet"))),
+         total_bedrooms = rowSums(across(ends_with("_bedrooms")))) %>%
+  mutate(total_units=total_units-landlord_units) # so we don't double count rental units
 
 # check
 data_altadena %>%
@@ -216,7 +216,7 @@ data_altadena_mixed_temp %>%
 
 data_altadena_mixed <- data_altadena_mixed_temp  %>%
   filter(total_units>0)
-  
+
 # check
 data_altadena_mixed %>%
   select(total_units, landlord_units, total_square_feet, total_bedrooms, use_code, everything()) %>%
@@ -255,14 +255,14 @@ rel_res_df <- rbind(data_altadena_res, data_altadena_mixed)
 ### Flags for type of residential property
 rel_res_df  <- rel_res_df  %>%
   mutate(
-         res_type=case_when( # type of residential property
-           # condos first
-          str_detect(use_code, "C$|E$") ~ "Condominium",
-          str_detect(use_code, "^01") ~ "Single-family",
-          str_detect(use_code, "^02|^03|^04|^05") ~ "Multifamily",
-          str_detect(use_code,"^08") ~ "Boarding house",
-          str_detect(use_code,"^12|^17") ~ "Mixed use", 
-          TRUE ~NA))
+    res_type=case_when( # type of residential property
+      # condos first
+      str_detect(use_code, "C$|E$") ~ "Condominium",
+      str_detect(use_code, "^01") ~ "Single-family",
+      str_detect(use_code, "^02|^03|^04|^05") ~ "Multifamily",
+      str_detect(use_code,"^08") ~ "Boarding house",
+      str_detect(use_code,"^12|^17") ~ "Mixed use", 
+      TRUE ~NA))
 
 table(rel_res_df$res_type,useNA='always')
 
@@ -283,7 +283,7 @@ rel_res_df <- rel_res_df %>%
     num_howmowner_exemption>=1 & landlord_units==0 ~ "Owner occupied",
     num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner occupied",
     num_howmowner_exemption==0 & landlord_units>=1 ~ "Renter",
-  TRUE ~ NA))
+    TRUE ~ NA))
 
 check <- rel_res_df %>%
   select(owner_renter,num_howmowner_exemption, homeowner_exemption_val,landlord_units, total_units, use_code, total_bedrooms, everything())
@@ -314,7 +314,6 @@ table(rel_res_df$owner_renter, useNA='always')
 # New category: Church / Welfare exemption
 # New category: Sold to state (tax delinquent)
 # New category: SCE or Government owned
-# New category: likely owner-occupied, no exemption 
 
 
 # Start with exemption type recoding:
@@ -336,11 +335,10 @@ rel_res_df<-rel_res_df%>%
 
 
 # check
-table(rel_res_df$owner_renter) # this looks like what I expect. OTHER category went from 4461 to 4433 and we have 10 new observations under Church/Welfare exemption
+table(rel_res_df$owner_renter) # this looks like what I expect. OTHER category went from 4461 to 4433 and we have 18 new observations under-owner occupied
 
 # move on to trusts and LLCs
-
-rel_res_df<-rel_res_df%>%
+test <- rel_res_df%>%
   mutate(
     owner_renter = ifelse(
       (grepl("TRUST", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
@@ -353,12 +351,12 @@ rel_res_df<-rel_res_df%>%
         (grepl("LLC", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("LLC", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "LLC owned",owner_renter))%>%
-  mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter))
+  mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) # manually recoded after original result returned a property with a LLC and trust
 
 # check:
+table(test$owner_renter) # this has the number of Trusts I expect -originally had only 115 LLCs instead of 116 --but after exploring and manually adjusting for the single AIN case that had Trust AND LLC in the name, now the numbers are as I expect
 
-table(rel_res_df$owner_renter) # this has the number of Trusts I expect but only 115 LLCs instead of 116 --but after exploring and manually adjusting for the single AIN case that had Trust AND LLC in the name, now the numbers are as I expect
-
+# further test result
 other_trust_llc <- other %>%
   filter(
     grepl("TRUST|LLC", first_owner_name, ignore.case = TRUE) |
@@ -382,10 +380,9 @@ other_trust_llc <- other %>%
 
 other_trust_llc%>%
   summarise(llc_tot=sum(flag_llc), # this is 116 LLCs
-            trust_to=sum(flag_trust))
+            trust_to=sum(flag_trust)) # this is 1498 trusts - 10 more trusts assuming these are all owner occupied or verified rentals
 
-# find out which AIN is not getting captured as an LLC in my recoding
-
+# find out which AIN is not getting captured as an LLC in my recoding -- now null since manual fix
 other_llc_ain<-other_trust_llc$ain[other_trust_llc$flag_llc==1]
 
 test_ain<-test$ain[test$owner_renter=="LLC owned"]
@@ -393,22 +390,48 @@ test_ain<-test$ain[test$owner_renter=="LLC owned"]
 not_in_test <- setdiff(other_llc_ain, test_ain)
 print(not_in_test) # AIN 5829032026
 
-other_trust_llc<-other_trust_llc%>%select(ain, flag_llc, flag_trust)%>%filter(ain=="5829032026")
+missing_llc<-other_trust_llc%>%select(ain, flag_llc, flag_trust)%>%filter(ain=="5829032026")
 
-# The reason for the discrepency is because there is one parcel with LLC & Trust in the name
+# The reason for the original discrepency is because there is one parcel with LLC & Trust in the name
 # first_owner_name=="MOOGAR GROUP LLC TRUSTEE  2908"
 # first_owner_name_overflow=="ASITAS AVENUE TRUST"
 
-# I Think this should be coded as LLC owned, will fix code above
+# Decided this should be coded as LLC owned, and fixed code above
+# trust check
+trust_check <- other_trust_llc %>% group_by(flag_trust, flag_llc, exemption_type, owner_renter) %>% summarise(count=n())
+# 9 more trusts that also have veteran's exemption that's fine, keep recoding
 
-## Now lets recode based on tax exemption status:
+rel_res_df <- rel_res_df%>%
+  mutate(
+    owner_renter = ifelse(
+      (grepl("TRUST", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "Trust owned",owner_renter))%>%
+  mutate(
+    owner_renter = ifelse(
+      (grepl("LLC", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "LLC owned",owner_renter))%>%
+  mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) # manually recoded after original result returned a property with a LLC and trust
 
+# check:
+table(rel_res_df$owner_renter) # this has the number of Trusts I expect -originally had only 115 LLCs instead of 116 --but after exploring and manually adjusting for the single AIN case that had Trust AND LLC in the name, now the numbers are as I expect
+
+## Now lets recode based on tax status:
+table(rel_res_df$tax_stat_key)
+
+sold_to_state <- rel_res_df %>% filter(tax_stat_key %in% c("1","2")) %>%
+  select(ain, owner_renter, tax_stat_key, year_sold_to_state, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, landlord_units, owner_renter)
+table(sold_to_state$owner_renter)
+# some are other owner types, prioritizing tax defaulted status as this could affect rebuilding
 
 rel_res_df<-rel_res_df%>%
   mutate(
     owner_renter = case_when(
-      tax_stat_key %in% c("1","2") & owner_renter == "Other" ~ "Sold to state",
-      tax_stat_key %in% "3" & owner_renter == "Other" ~ "SBE or Government owned",
+      tax_stat_key %in% c("1","2") ~ "Sold to state",
+      tax_stat_key %in% "3" ~ "SBE or Government owned",
       TRUE ~ owner_renter  # keeps existing value if none of the above conditions are met
     )
   )
@@ -417,6 +440,10 @@ rel_res_df<-rel_res_df%>%
 table(rel_res_df$owner_renter) # numbers check out
 
 # Now lets recode the remaining as  "likely owner-occupied, no exemption'
+# check remaining other
+remaining_other <-rel_res_df %>% filter(owner_renter=="Other") %>%
+  select(ain, owner_renter, tax_stat_key, year_sold_to_state, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, total_units, landlord_units, owner_renter)
+# some with church in title, recode as church? could also recode 'TR ' or 'TRST' as trust
 
 rel_res_df<-rel_res_df%>%
   mutate(
@@ -427,7 +454,7 @@ rel_res_df<-rel_res_df%>%
   )
 
 # check
-table(rel_res_df$owner_renter) # numbers check out
+table(rel_res_df$owner_renter,useNA='always') # numbers check out
 
 
 ## Clean up and export to postgres ----
@@ -460,7 +487,7 @@ column_comments <- c('Assessor ID number - use this to match to other relational
                      'Total bedrooms on property',
                      'Original use code for reference')
 
- add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 # STEP 4: TABLE 2: Table to indicate West or East Altadena with geometry ------
 rel_area_geom_df <- parcels_altadena %>%
@@ -573,7 +600,7 @@ rel_assessor_dins <- rel_assessor_dins %>%
     no_damage_count>=1 ~ "No Damage",
     inaccessible_damage_count>=1 ~ "No Damage",
     TRUE ~ NA))
-    
+
 # check
 rel_assessor_dins %>%
   select(damage_category,everything()) %>%
@@ -659,4 +686,3 @@ column_comments <- c('Assessor ID number - use this to match to other relational
                      'Total unique types of damage')
 
 # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-
