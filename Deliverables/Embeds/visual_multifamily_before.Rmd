@@ -52,7 +52,7 @@ df_ <- st_read(con, query="Select * from data.analysis_multifamily_jan2025") %>%
 
 df <- df_ %>%
   mutate("Count (%)"=paste0(comma(property_count)," (",round(property_prc,0),"%)"),
-         "Multifamily Units"=property_prc,
+         "Share of Multifamily Properties"=property_prc,
          "Multifamily Unit Type" = multifamily_unit_category,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -60,13 +60,13 @@ df <- df_ %>%
 
 
 table<- df %>%
-  select("Area","Multifamily Unit Type", "Multifamily Units", "Count (%)")%>%
+  select("Area","Multifamily Unit Type", "Share of Multifamily Properties", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Multifamily Unit Type") %>%
   tab_header(title= "Multifamily Properties by Size")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Multifamily Units', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Multifamily Properties', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
