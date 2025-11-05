@@ -1,0 +1,108 @@
+---
+title: ""
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
+---
+<!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet"> -->
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+## The following document outputs a visual of the housing stock before in a table format for the altadena_housing_before_and_after.html 
+
+#### Setting Up ####
+
+library(usethis)
+library(dplyr)
+library(tidyverse)
+library(htmltools) 
+library(htmlwidgets)
+library(gtExtras)
+library(gt)
+library(ggplot2)
+library(sf)
+library(scales)
+library(showtext)
+library(extrafont)
+
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+
+## COLORS ##
+orange <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+## FONTS ## 
+
+font_add_google("Inter")
+
+# font_import()
+loadfonts(device = "win")
+windowsFonts()
+showtext_auto()
+
+
+```
+
+Home sales in Altadena surged after the Eaton fire. In April 2025, over twice as many properties sold compared to either of the past two years. This provides evidence of real estate speculation occurring immediately after the Eaton fire, and how real estate speculators took advantage of property owners in their most vulnerable time. However, since April 2025, sales have dramatically dropped. This subsequent drop raises concerns about why sales are lower now compared to prior years.
+
+```{r}
+#### VISUAL: Sale rates by damage and area ####
+df_ <- st_read(con, query="Select * from data.analysis_sales_month_sept2025") 
+
+df <- df_ %>%
+  mutate(month=case_when(last_sale_month=="01" ~ "Jan",
+                         last_sale_month=="02" ~ "Feb",
+                         last_sale_month=="03" ~ "Mar",
+                         last_sale_month=="04" ~ "Apr",
+                         last_sale_month=="05" ~ "May",
+                         last_sale_month=="06" ~ "Jun",
+                         last_sale_month=="07" ~ "Jul",
+                         last_sale_month=="08" ~ "Aug",
+                         TRUE ~ NA
+  ))
+
+df$month <- factor(df$month, levels = c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"))
+                   
+    ggplot(df, aes(x = month, y = sales_count, color = last_sale_year, group = last_sale_year)) +
+      geom_line() +
+      geom_point() +
+      labs(title = "Altadena Residential Sales by Year and Month",
+           x = "",
+           y = "Properties Sold Count",
+           caption="Catalyst California's calculations of L.A. County Assessor Data, September 2025.") +
+      theme_minimal() + # Optional: for a cleaner theme
+      labs(color="") +
+      theme(legend.position="top",
+             panel.grid.minor.x = element_blank(),
+  # panel.grid.minor.y = element_blank(),
+plot.title = element_text(family = "Inter", size=18, face="bold"),
+        # plot.subtitle = element_text(family = "Inter", size = 12, color = black),
+        plot.caption = element_text(family = "Inter", size = 12, color = "#6F6F6F", hjust=0),
+        legend.title = element_text(family = "Inter", size = 16,),
+        legend.text = element_text(family = "Inter", size = 16),
+axis.text.y=element_text(family = "Inter", size = 12, color = "#6F6F6F"),
+  axis.text.x=element_text(family = "Inter", size = 12, color="black"),
+axis.title.y=element_text(family = "Inter", size = 12, color = "#6F6F6F"),
+axis.title.x=element_text(family = "Inter", size = 12, color = "#6F6F6F")
+  ) +
+      scale_color_manual(values=c(lavender, meteorite, orange))
+    
+            
+```
+
+```{r, include=FALSE}
+dbDisconnect(con) 
+```

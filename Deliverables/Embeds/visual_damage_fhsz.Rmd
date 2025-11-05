@@ -1,0 +1,104 @@
+---
+title: ""
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+#### Setting Up ####
+
+library(usethis)
+library(dplyr)
+library(tidyverse)
+library(htmltools) 
+library(htmlwidgets)
+library(gtExtras)
+library(gt)
+library(sf)
+library(scales)
+
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+
+## COLORS ##
+orange <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+```
+
+As property owners rebuild, they must also consider defensible space and wildland urban interface building code standards. Between April 2024 and March 2025, the California Office of the State Fire Marshall finalized fire hazard severity zones in State Responsibility Areas and Local Responsibility Areas.^[https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones] Property owners within a State Responsibility Area or a Very High Fire Hazard Severity Zones in local areas must comply with defensible space requirements around their property, among other regulations.^[https://readyforwildfire.org/wp-content/uploads/2024/07/Defensible-Space-and-the-Law-Factsheet-Revisions-Jan-2024.pdf] 
+
+In Altadena, only 23% of significantly damaged residential properties are considered to be within a Very High Fire Hazard Severity Zone. And while West Altadena suffered more damage in the Eaton Fire, a lower percentage of significantly damaged properties in West Altadena are considered to be within a very high hazard zone compared to East Altadena--19% compared to 33%. While property owners may find state and local regulations in fire hazard zones burdensome, the low number of significantly damaged properties in Altadena that were classified as in high or very high fire hazard zones is troublesome. This raises questions about how property owners in Altadena, and even other parts of California, can prepare their properties against human- and climate-caused disasters like the Eaton fire. As Altadenans rebuild, they will need support at minimum with complying with state and local regulations to prepare their properties. More broadly, Altadenans and other communities must advocate for broader community preparedness measures and assessments to accurately prepare and assess communities for climate- and human-caused disasters.
+
+```{r}
+#### VISUAL: Sale rates by damage and area ####
+df_ <- st_read(con, query="Select * from data.analysis_damage_fhsz_sept2025") 
+
+df <- df_ %>%
+    filter(damage_category=="Significant Damage") # Focus on significant damage properties
+
+# add a factor level to the hazard field
+df$combined_fhsz <- factor(df$combined_fhsz, levels = c("Very High","High","Moderate","None"))
+
+df <- df %>%
+  mutate("Count (%)"=paste0(comma(fhsz_count)," (",round(fhsz_prc,0),"%)"),
+         "Share of Damaged Properties"=fhsz_prc,
+         "Fire Hazard Severity Zone" = combined_fhsz,
+         "Area" = str_to_title(area_name)) %>%
+  mutate("Area" = factor(Area, levels = c("Altadena", "West", "East")))%>%
+  arrange(desc(fhsz_count))
+
+table<- df %>%
+  select("Area","Fire Hazard Severity Zone", "Share of Damaged Properties", "Count (%)")%>%
+  gt(groupname_col = "Area", rowname_col = "Fire Hazard Severity Zone") %>%
+  tab_header(title= "Fire Hazard Severity Zones for Significantly Damaged Properties")%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and California Office of State Fire Marshall, 2024-2025."),placement="left") 
+
+ table %>%
+  gt_plt_bar_pct(column= 'Share of Damaged Properties', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  # if needed modify column widths here 
+  # cols_width(1~px(210),2~px(100),
+  #            3~px(125))%>%
+  opt_align_table_header("left")%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  tab_options(table.background.color=alabaster,
+    column_labels.background.color = "transparent",
+    table.font.size = px(12),
+    column_labels.font.size = px(12),
+    heading.align = "left",
+    table.font.names = "Inter",
+    heading.title.font.size = px(20),
+    heading.border.bottom.color = "transparent",
+    column_labels.border.bottom.width = px(3),
+    column_labels.border.bottom.color = gainsboro,
+    table.border.top.color = "transparent",
+    table.border.bottom.color = "transparent",
+    table.border.bottom.width = px(3),
+    data_row.padding = px(3),
+    footnotes.font.size = px(10),
+    footnotes.border.bottom.color = "transparent",
+    table.align='left')%>%
+  tab_style(style=
+            cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
+   tab_style(style=
+               cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) # cell_text(font=c(google_font(name="Inter"),default_fonts()),weight=900),locations=cells_title())
+            
+```
+
+```{r, include=FALSE}
+dbDisconnect(con) 
+```

@@ -1,0 +1,575 @@
+---
+output: html_document
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE)
+
+## The following document outputs a visual for the altadena_housing_before_and_after.html 
+
+#### Setting Up ####
+
+library(usethis)
+library(dplyr)
+library(tidyverse)
+library(htmltools) 
+library(htmlwidgets)
+library(gtExtras)
+library(gt)
+library(sf)
+library(scales)
+library(leaflet)
+library(rmapshaper)
+
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+
+## COLORS ##
+orange <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+```
+
+```{r}
+# Eaton Fire damaged properties
+# residential parcel shapes
+parcels <- st_read(con, query="SELECT * FROM data.rel_assessor_altadena_parcels_sept2025", geom="geom") %>% 
+  st_transform(4326)
+
+res_data <- st_read(con, query="SELECT * FROM data.rel_assessor_residential_sept2025")
+damage <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")
+
+# join parcel shapes to residential data
+parcels <- parcels %>% left_join(res_data, by="ain_sept") %>% left_join(damage, by="ain_sept")
+
+# make one layer for all residential - use this to visualize all properties
+parcels_res_damaged <- parcels %>% 
+  filter((residential==TRUE & total_units>0 & damage_category=="Significant Damage"))
+
+# east and west altadena boundaries --
+west <- st_read(con, query="SELECT * FROM data.west_altadena_3310", geom="geom") %>% 
+  st_transform(4326) %>% ms_simplify()
+
+east <- st_read(con, query="SELECT * FROM data.east_altadena_3310", geom="geom") %>% 
+  st_transform(4326) %>%  ms_simplify()
+
+df_lead <- st_read(con, query="Select * from data.lacdph_lead_results_grid_2025", geom="geom") %>% 
+  st_transform(4326) %>%
+  ms_simplify() %>%
+  mutate(hi_lead_flag = case_when(is.na(lead_geometric_mean) ~ "Not Tested",
+                               lead_geometric_mean >= 80 ~ "Above Threshold",
+                               lead_geometric_mean <80 ~ "Below Threshold",
+                               TRUE ~ NA)) 
+
+#NOTE: taking time to transform even after filtering
+df_zoning_lac <- st_read(con, query = "Select * FROM data.lac_unincorporated_zoning_3310 WHERE plng_area = 'West San Gabriel Valley'", geom="geom") %>% st_transform(4326) %>% ms_simplify()
+
+df_local_fhsz <- st_read(con, query="Select * from data.eaton_local_fhsz_4326 WHERE fhsz_descr != 'NonWildland'", geom="geom") 
+
+df_state_fhsz <- st_read(con, query="Select * from data.eaton_state_fhsz_4326", geom="geom")
+
+eaton_fire <- st_read(con, query="SELECT * FROM data.eaton_fire_prmtr_3310", geom="geom") %>% st_transform(4326) %>%  ms_simplify()
+
+#Pulling in data for POP UP 
+sept_zoning <- st_read(con, query="SELECT * FROM data.rel_assessor_zoning_sept2025")
+sept_fhsz <- st_read(con, query="SELECT * FROM data.rel_assessor_fhsz_sept2025") %>% select(-area_name)
+sept_lead <- st_read(con, query="SELECT * FROM data.rel_assessor_lead_sept2025")
+sept_sales <- dbGetQuery(con, statement = "SELECT ain_sept, sold_after_eaton, first_owner_name, first_owner_name_overflow, second_owner_name FROM data.rel_assessor_sales_sept2025;") %>%
+  mutate(owner_names = str_squish(paste(first_owner_name, first_owner_name_overflow, second_owner_name))) %>%
+  select(ain_sept, sold_after_eaton, owner_names)
+sept_rebuild <- dbGetQuery(con, statement="SELECT ain as ain_jan, ain_sept, address_sept, rebuild_status
+FROM data.rel_parcel_rebuild_status_2025_10
+WHERE damage_category='Significant Damage';") %>%
+  mutate(rebuild_status = str_to_title(rebuild_status))
+sept_contact <- dbGetQuery(con, "SELECT ain as ain_sept, mail_house_no, m_fraction, m_direction, m_street_name, m_unit, m_city_state, m_zip FROM data.assessor_data_universe_sept2025;") %>%
+  # create clean address for contact
+  mutate(
+    street_part = trimws(paste(mail_house_no, m_fraction, m_direction, m_street_name)),
+    # Add unit if present
+    unit_part = ifelse(!is.na(m_unit) & trimws(m_unit) != "", paste0(", ", trimws(m_unit)), ""),
+    city_zip_part = paste0(m_city_state, " ", substr(m_zip, 1, 5)),
+    # Combine everything
+    contact_address = str_squish(paste0(street_part, unit_part, ", ", city_zip_part))) %>%
+  select(ain_sept, contact_address) %>% 
+  filter(ain_sept %in% parcels_res_damaged$ain_sept)
+
+all_df <- parcels_res_damaged %>% 
+  left_join(sept_zoning, by = "ain_sept") %>% 
+  left_join(sept_fhsz, by = "ain_sept") %>% 
+  left_join(sept_lead, by="ain_sept") %>%
+  left_join(sept_sales, by="ain_sept") %>%
+  left_join(sept_contact, by = "ain_sept") %>%
+  left_join(sept_rebuild, by="ain_sept")
+
+
+### factors and paletes for other polygons ----
+# high lead grid colors
+df_lead$hi_lead_flag <- factor(
+      df_lead$hi_lead_flag,
+      levels = c("Not Tested","Below Threshold","Above Threshold"))
+
+# Create a color palette based on the factor
+lead_pal <- colorFactor(
+  palette = c("gray","#ffcccc","red"), 
+  domain = df_lead$hi_lead_flag)
+
+# fire zone colors
+df_local_fhsz$fhsz_descr <- factor(
+      df_local_fhsz$fhsz_descr,
+      levels = c("Moderate","High","Very High"))
+
+# Create a color palette based on the factor
+colorpal_local_fhsz  <- colorFactor(palette = c("#ffffb2","#fd8d3c","#f03b20"), domain = df_local_fhsz$fhsz_descr)
+
+
+# zone colors
+# reference https://planning.lacounty.gov/wp-content/uploads/2022/04/map_z_02_Altadena.pdf
+# table(df_zoning_lac$z_desc,useNA='always')
+zoning_codes <- as.data.frame(table(df_zoning_lac$z_category,useNA='always'))
+df_zoning_lac <- df_zoning_lac %>%
+  mutate(zone_label=
+           case_when(
+             str_detect(z_category, "^C") ~ "Commercial",
+             str_detect(z_category, "^A") ~ "Agricultural",
+             str_detect(z_category, "^R-1") ~ "Single-Family Residence",
+             str_detect(z_category, "^R-2") ~ "Two-Family Residence",
+             str_detect(z_category, "^R-3") ~ "Multiple Residence",
+             str_detect(z_category, "^R-4") ~ "Multiple Residence",
+             str_detect(z_category, "^R-5") ~ "Multiple Residence",
+             str_detect(z_category, "^R") ~ "Other Residential",
+             str_detect(z_category, "^MXD") ~ "Mixed Use Development",
+             str_detect(z_category, "^M-") ~ "Manufacturing",
+             str_detect(z_category, "^O-") ~ "Open Space/Water Shed",
+             str_detect(z_category, "^W-") ~ "Open Space/Water Shed",
+             TRUE ~ "Other"))
+# check
+check <- df_zoning_lac %>% st_drop_geometry() %>% group_by(zone_label, z_category) %>% summarise(count=n())
+             
+df_zoning_lac$zone_label<- factor(
+      df_zoning_lac$zone_label,
+      levels = c("Single-Family Residence","Two-Family Residence","Multiple Residence","Other Residential","Mixed Use Development","Commercial","Manufacturing","Agricultural","Open Space/Water Shed","Other"))
+
+# parcels sold after eaton fire
+sept_sales_sf <- all_df %>%
+  filter(sold_after_eaton==TRUE) %>%
+  select(ain_sept, sold_after_eaton, geom) 
+
+# rebuild status
+sept_rebuild_sf <- all_df %>%
+  select(ain_sept, rebuild_status) %>%
+  mutate(rebuild_status_factor = factor(
+    rebuild_status, 
+    levels=c("Debris Removal Incomplete", "Awaiting Permit Application", "Awaiting Construction Start", "Construction In Progress", "Rebuild Complete")))
+
+# Create a color palette based on the factor
+zoning_pal <- colorFactor(
+  palette = c("#feffe2","#f2d84b","#d09a36","#dfd3b6","#b3605d","#E34234","#b7c4db","#c5fb5d","#8ffa4f","#bfbfbf"), 
+  domain = df_zoning_lac$zone_label)
+
+rebuild_pal <- colorFactor(
+  palette = c("#E2D9FF", "#BDAFE9", "#8E7ACA", "#362178", "#211447"),
+  domain= sept_rebuild_sf$rebuild_status_factor
+)
+
+```
+
+```{r}
+# final columns 
+all_df <- all_df %>%
+  select(ain_sept,
+         address_sept,
+         res_type,
+         owner_renter,
+         owner_names,
+         contact_address,
+         total_square_feet,
+         total_units,
+         z_desc,
+         combined_fhsz,
+         hi_lead_label,
+         rebuild_status,
+         sold_after_eaton)
+
+popup_parcel <- paste0("<div class='parcel-popups'> <div class='leaflet-data-parcel' data-ain='", all_df$ain_sept,
+               "' data-parcel-address='", all_df$address_sept,
+               "' data-res-type='", all_df$res_type,
+               "' data-owner-type='", all_df$owner_renter,
+               "' data-owner-names='", all_df$owner_names,
+               "' data-owner-contact='", all_df$contact_address,
+               "' data-total-sqft='", all_df$total_square_feet,
+               "' data-total-units='", all_df$total_units,
+               "' data-lac-zoning='", all_df$z_desc,
+               "' data-fire-zone='", all_df$combined_fhsz, 
+               "' data-lead-level='", all_df$hi_lead_label, 
+               "' data-rebuild-status='", all_df$rebuild_status, 
+               "' data-sold-status='", all_df$sold_after_eaton, 
+               "'></div></div>")
+
+## Create custom popup
+# We are using <div> "class" names (e.g. popup-body) to apply CSS styling (end of script, before JS)
+# We are using <span> "class" names (e.g. res-type) to style with CSS AND insert the data stored in data_popup
+# Note: the <span> "class" names are using the SAME naming conventions as in the data_popup (only difference is no "data-" prefix) - this makes things clear and convenient for JS coding (end of script)
+
+custom_sidebar <- paste0("<div class='leaflet-popup-scrolled parcel-sidebar'>",
+                              "<div class='popup-instruction'>Click on an Altadena parcel to learn more.</div>",
+                              "<div class ='geo-header'>", 
+                              "<div class='popup-body'>",
+                              "AIN: <span class='ain'></span>",
+                              "<br>",
+                              "Parcel Address: <span class='parcel-address'></span>",
+                              "<br>",
+                              "Residential Type: <span class='res-type'></span>",
+                              "<br>",
+                              "Ownership Type: <span class='owner-type'></span>",
+                              "<br>",
+                              "Owner Name(s): <span class='owner-names'></span>",
+                              "<br>",
+                              "Owner Contact: <span class='owner-contact'></span>",
+                              "<br>",
+                              "Total Square Footage: <span class='total-sqft'></span>",
+                              "<br>",
+                              "Total Units: <span class='total-units'></span>",
+                              "<br>",
+                              "L.A. County Zoning: <span class='lac-zoning'></span>",
+                              "<br>",
+                              "Fire Hazard Zone: <span class='fire-zone'></span>",
+                              "<br>",
+                              "Lead Level: <span class='lead-level'></span>",
+                              "<br>",
+                              "Rebuild Status: <span class='rebuild-status'></span>",
+                              "<br>",
+                              "Sold After Eaton: <span class='sold-status'></span>",
+                              "<br>","</div>",
+                              "</div>",
+                              "</div>")
+
+
+```
+
+
+```{r}
+
+leaflet(
+  width = "100%",
+  height = "600px",
+  options = leafletOptions(zoomSnap = 0.1, zoomDelta = 0.1,
+                           attributionControl=FALSE)) %>%
+  setView(-118.137, 34.194, zoom = 13) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  
+  # add custom sidebar
+  addControl(html=custom_sidebar, position = "topleft") %>%
+     
+  #Damaged/Destroyed Properties
+  addPolygons(
+    data=all_df,
+    fillColor="orange",
+    fillOpacity = 1,
+    color="white",
+    weight=.4,
+    opacity=1,
+    popup = popup_parcel,
+    group="Significantly Damaged Parcels") %>%
+  #Eaton Fire Perimeter
+  addPolygons(
+    data=eaton_fire,
+    fillColor="white",
+    fillOpacity=0,
+    color="black",
+    weight=2.5,
+    opacity=1,
+    options=pathOptions(clickable=FALSE),
+    group="Eaton Fire Perimeter") %>%
+  #East Perimeter
+  addPolygons(
+    data=east,
+    fillColor="white",
+    fillOpacity=0,
+    color=meteorite,
+    weight=2.5,
+    opacity=1,
+    options=pathOptions(clickable=FALSE),
+    group="East Altadena") %>%
+  #West Perimeter
+  addPolygons(
+    data=west,
+    fillColor="white",
+    fillOpacity=0,
+    color=meteorite,
+    weight=2.5,
+    opacity=1,
+    options=pathOptions(clickable=FALSE),
+    group="West Altadena") %>%
+  #Lead Data 
+  addPolygons(
+    data=df_lead,
+    fillColor = ~lead_pal(hi_lead_flag),
+    fillOpacity=0.4,
+    color="white",
+    weight=.5,
+    opacity=1,
+    popup=~paste0("Average Lead Level Measured in mg/kg: ", 
+                  df_lead$lead_geometric_mean, "</br>",
+                  "Higher than 80 mg/kg Safety Threshold: ", df_lead$hi_lead_flag),
+    group="Lead Levels in Soil") %>%
+  addLegend(
+    position = "bottomright",
+    pal = lead_pal,
+    values =  df_lead$hi_lead_flag,
+    group="Lead Levels in Soil",
+    title = "Lead Levels",
+    opacity=0.4) %>%
+  #Fire Hazard Zones 
+  addPolygons(
+    data=df_local_fhsz,
+    fillColor=~colorpal_local_fhsz(fhsz_descr),
+    fillOpacity=0.5,
+    color="white",
+    weight=1,
+    popup=~fhsz_descr,
+    group="Local Fire Hazard Zones") %>%
+  addLegend(
+    position = "bottomright",
+    pal = colorpal_local_fhsz,
+    values =  df_local_fhsz$fhsz_descr,
+    group="Local Fire Hazard Zones",
+    title = "Fire Hazard Level",
+    opacity=0.5) %>%
+  addPolygons(
+    data=df_state_fhsz,
+    fillColor="red",
+    fillOpacity=0.5,
+    color="white",
+    weight=1,
+    popup=~fhsz_descr,
+    group="State Fire Hazard Zones") %>%
+  #Zoning 
+  addPolygons(
+    data=df_zoning_lac,
+    fillColor=~zoning_pal(zone_label),
+    fillOpacity=0.5,
+    color="white",
+    weight=1,
+    opacity=1,
+    popup=~paste0("Zoning Description: ", df_zoning_lac$z_desc),
+    group="Zoning") %>%
+  addLegend(
+    position = "bottomright",
+    pal = zoning_pal,
+    values =  df_zoning_lac$zone_label,
+    group="Zoning",
+    title = "Allowable Uses",
+    opacity=0.5) %>% 
+  # Sold Status
+  addPolygons(
+    data=sept_sales_sf,
+    fillColor="black",
+    fillOpacity=1,
+    color="white",
+    weight=0.6,
+    opacity=1,
+    popup=popup_parcel,
+    group="Sold After Eaton Fire") %>%
+  # Rebuild Status
+  addPolygons(
+    data=sept_rebuild_sf,
+    fillColor=~rebuild_pal(rebuild_status_factor),
+    fillOpacity=1,
+    color="white",
+    weight=0.6,
+    opacity=1,
+    popup=popup_parcel,
+    group="Rebuild Status") %>%
+  addLegend(
+    position = "bottomright",
+    pal = rebuild_pal,
+    values =  sept_rebuild_sf$rebuild_status_factor,
+    group="Rebuild Status",
+    title = "Rebuild Status",
+    opacity=1) %>% 
+  
+  #Controling Layers
+  addLayersControl(
+    overlayGroups = c("Significantly Damaged Parcels",
+                      "Lead Levels in Soil","Local Fire Hazard Zones",
+                      "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire",
+                      "Rebuild Status", "West Altadena","East Altadena",
+                      "Eaton Fire Perimeter"),
+    options = layersControlOptions(collapsed = FALSE, autoZIndex = TRUE))  %>%
+  hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones",
+              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status"))
+
+```
+
+<style type="text/css">
+
+/* minimum required css for leaflet maps with custom sidebars */ 
+
+.info {
+    padding: 6px 8px;
+    font-size: 12px;
+    background: white;
+    background: rgba(255,255,255,0.8);
+    border-radius: 5px;
+    color: #000000;
+}
+
+.leaflet-touch .leaflet-control-layers {
+  border-left:1px solid #737373;
+  border-right:1px solid #737373;
+  border-top:1px solid #737373;
+  border-bottom:1px solid #737373;
+}
+/* Target all leaflet controls on the left side, regardless of top/bottom position */
+/* when keeping zoom buttons, remember to exclude from this styling */
+.leaflet-left .leaflet-control:not(.leaflet-control-zoom) {
+  background-color: white;
+  opacity: 1.0;
+  overflow: auto;
+  padding: 2%;
+  height: 100%;
+  margin: 2px;
+  width: 200px;
+}
+
+
+/* Ensure consistent styling for popup content */
+.leaflet-popup-scrolled {
+  overflow: visible !important;
+  max-height: none !important;
+  border-bottom: none !important;
+  border-top: none !important;
+}
+
+/* Ensure the outer container has scrolling enabled */
+.info.leaflet-control {
+  overflow: auto !important;
+  max-height: 596px !important;
+}
+
+.leaflet-right .leaflet-control {
+  background-color: white;
+  opacity: 1.0;
+  padding: 2%;
+  margin: 2px;
+  width: 200px;
+}
+
+.leaflet-control-layers .leaflet-control .leaflet-control-layers-expanded {
+  background-color: white;
+  opacity: 1.0;
+}
+
+.hidden {
+  display: none;
+}
+
+/* css styling for headers */
+.popup-body {
+  color: #000000;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* css styling that can change depending on the map data and custom styling needs */
+
+.popup-instruction {
+  font-style: italic;
+  font-weight: 600; 
+  line-height: 16px;
+  color: #000000;
+  border-bottom: 1px solid #000000;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.ain,
+.parcel-address,
+.res-type,
+.owner-type,
+.owner-names,
+.owner-contact,
+.total-sqft,
+.total-units,
+.lac-zoning,
+.fire-zone,
+.lead-level,
+.rebuild-status,
+.sold-status {
+  font-weight: normal; 
+}
+
+
+</style>
+
+```{js}
+// This function is used to format WRCA Congressional District data in the chloropleth map "popup"/sidebar feature
+// Standard set up for using JS with a leaflet map
+var mapsPlaceholder = [];
+L.Map.addInitHook(function () {
+  mapsPlaceholder.push(this);
+  mapsPlaceholder.forEach(map => {
+
+      // to pre-populate map pop-up (when map loads/before user clicks anywhere)
+      map.on('load', (e) => {
+        setTimeout(() => {
+          document.querySelector('.ain').innerHTML = "5833017027"
+          document.querySelector('.parcel-address').innerHTML = "140 E LAS FLORES DR ALTADENA CA"
+          document.querySelector('.res-type').innerHTML = "Single-family"
+          document.querySelector('.owner-type').innerHTML = "Renter occupied"
+          document.querySelector('.owner-names').innerHTML = "PEREZ,FERNANDO AND VIOLETA TRS PEREZ FAMILY TRUST"
+          document.querySelector('.owner-contact').innerHTML = "140 E LAS FLORES DR, ALTADENA CA 91001"
+          document.querySelector('.total-sqft').innerHTML = "1380"
+          document.querySelector('.total-units').innerHTML = "1"
+          document.querySelector('.lac-zoning').innerHTML = "Single-Family Residence"
+          document.querySelector('.fire-zone').innerHTML = "None"
+          document.querySelector('.lead-level').innerHTML = "Not High Lead Grid"
+          document.querySelector('.rebuild-status').innerHTML = "Construction In Progress"
+          document.querySelector('.sold-status').innerHTML = "FALSE"
+          
+          
+        }, 500) //assumes the map will load within 500ms
+      }) // end map load check
+
+      // hide default leaflet popup
+      map.on('popupopen', (e) => {
+        let popupsParcel = document.querySelectorAll('.leaflet-data-parcel');
+
+        document.querySelectorAll('.parcel-popups').forEach(parcelPopup => {
+          parcelPopup.parentElement.parentElement.parentElement.classList.add('hidden')
+        })
+
+        // populate custom pop-up when user clicks map
+        let popupParcel = popupsParcel[popupsParcel.length-1]
+        document.querySelector('.ain').innerHTML = popupParcel.getAttribute('data-ain')
+        document.querySelector('.parcel-address').innerHTML = popupParcel.getAttribute('data-parcel-address')
+        document.querySelector('.res-type').innerHTML = popupParcel.getAttribute('data-res-type')
+        document.querySelector('.owner-type').innerHTML = popupParcel.getAttribute('data-owner-type')
+        document.querySelector('.owner-names').innerHTML = popupParcel.getAttribute('data-owner-names')
+        document.querySelector('.owner-contact').innerHTML = popupParcel.getAttribute('data-owner-contact')
+        document.querySelector('.total-sqft').innerHTML = popupParcel.getAttribute('data-total-sqft')
+        document.querySelector('.total-units').innerHTML = popupParcel.getAttribute('data-total-units')
+        document.querySelector('.lac-zoning').innerHTML = popupParcel.getAttribute('data-lac-zoning')
+        document.querySelector('.fire-zone').innerHTML = popupParcel.getAttribute('data-fire-zone')
+        document.querySelector('.lead-level').innerHTML = popupParcel.getAttribute('data-lead-level')
+        document.querySelector('.rebuild-status').innerHTML = popupParcel.getAttribute('data-rebuild-status')
+        document.querySelector('.sold-status').innerHTML = popupParcel.getAttribute('data-sold-status')
+      }) // end popupopen check
+  })
+});
+
+```
+
+
+```{r}
+dbDisconnect(con)
+```

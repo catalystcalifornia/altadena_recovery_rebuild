@@ -1,0 +1,104 @@
+---
+title: ""
+output: rmarkdown::html_vignette
+# css: "W:\\RDA Team\\R\\cc_brandguide.css"
+
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
+)
+
+
+#### Setting Up ####
+
+library(usethis)
+library(dplyr)
+library(tidyverse)
+library(htmltools) 
+library(htmlwidgets)
+library(gtExtras)
+library(gt)
+library(sf)
+library(scales)
+
+options(scipen=999)
+
+source("W:\\RDA Team\\R\\credentials_source.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+
+## COLORS ##
+orange <- "#F25922"
+peridot <- "#CEEA01"
+lavender <- "#CEC4E2"
+meteorite <- "#3A207D"
+ccblue <- "#0860BC"
+
+black <- "#000000"
+alabaster<-"#FBFBFB"
+gainsboro <- "#DEDEDE"
+
+```
+
+As property owners rebuild, they must also contend with chemical hazards resulting from the fire. Between February and March 2025, L.A. County Department of Public Health contracted Roux Associates, Inc. to conduct surface soil testing at residential properties near and within the Eaton fire. Their results confirmed lead as a chemical of potential concern from the wildfire.^[http://publichealth.lacounty.gov/media/wildfire/docs/Roux_Community_Soil_Sampling_and_Human_Health_Screening_Report_Eaton_and_Palisades_Fire_Regions.pdf] Lead was the only chemical they found that was (1) above soil screening levels considered protective over a lifetime of exposure, (2) geographically consistent throughout the area, and (3) above background concentrations or ambient levels. Additionally, they found that while lead chemical levels significantly reduced after debris removal, parcels still showed areas with lead concentrations exceeding residential screening levels. Their report recommends that properties with lead concentrations at or above 80 mg/kg pursue additional precautions and mitigation measures to reduce risk for lead contamination.^[See http://publichealth.lacounty.gov/media/wildfire/docs/Reducing_the_Risk_from_Soil_Contaminated_After_Wildfires.pdf for precautions and guidelines.] For properties with children or pregnant people living at the property, they recommend receiving a professional assessment of appropriate mitigation measures. Lastly, for properties with any destroyed structures, they recommend soil impact assessments and management as any part of rebuilding.
+
+Based on these recommendations, we examined the percentage of significantly damaged properties in testing grids with average lead levels above residential screening levels. Significantly damaged condominimums were most likely to be in high lead grids for both West and East Altadena. In East Altadena, 79% of significantly damaged multifamily properties were in high lead grids. In West Altadena, nearly half (48%) of significantly damaged single-family properties were in high lead grids. 
+
+Further analysis also demonstrates the need to consider mitigation measures in properties that sustained no or some damage in the fire. In Altadena, 83.5% of multifamily properties, 58.3% of single-family properties, and 97.8% of condominiums that sustained no damage are in high lead grids. Support should be provided to property owners that sustained the most damage, but also to those with intact properties with high lead concentrations.
+
+```{r}
+#### VISUAL ####
+df_raw <- st_read(con, query="Select * from data.analysis_restype_damage_lead_sept2025") 
+
+high_lead <- df_raw %>%
+  filter(hi_lead_label=="High Lead Grid")
+
+df<- df_raw %>%
+  filter(damage_category=="Significant Damage" & hi_lead_label=="High Lead Grid") %>%
+  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),        
+         "Properties in Areas with High Lead Levels"=prc,
+         "Residential Type" = res_type,
+         "Area" = str_to_title(area_name)) %>%
+  mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>% 
+  arrange(desc(count))
+
+
+table<- df %>%
+  select("Area","Residential Type", "Properties in Areas with High Lead Levels", "Count (%)")%>%
+  gt(groupname_col = c("Area"), rowname_col = "Residential Type") %>%
+    tab_header(title= "Significantly Damaged Properties in Areas with Average Lead Levels Above Protective Screening Levels (>=80 mg/kg by Residential Type)")%>%
+  tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and L.A. County Department of Public Health Soil Testing Program, March 2025."),placement="left") 
+
+ table%>%
+  gt_plt_bar_pct(column= 'Properties in Areas with High Lead Levels', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  opt_align_table_header("left")%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% 
+  tab_options(table.background.color=alabaster,
+    column_labels.background.color = "transparent",
+    table.font.size = px(12),
+    column_labels.font.size = px(12),
+    heading.align = "left",
+    table.font.names = "Inter",
+    heading.title.font.size = px(20),
+    heading.border.bottom.color = "transparent",
+    column_labels.border.bottom.width = px(3),
+    column_labels.border.bottom.color = gainsboro,
+    table.border.top.color = "transparent",
+    table.border.bottom.color = "transparent",
+    table.border.bottom.width = px(3),
+    data_row.padding = px(3),
+    footnotes.font.size = px(10),
+    footnotes.border.bottom.color = "transparent",
+    table.align='left')%>%
+  tab_style(style=
+            cell_borders(sides=c("top","bottom"),color=gainsboro,style="solid",weight=px(1)),locations=cells_body())%>%
+   tab_style(style=
+            cell_text(font=c("Inter", default_fonts()),weight=900),locations=cells_title()) 
+
+```
+
+
+```{r, include=FALSE}
+dbDisconnect(con) 
+```
