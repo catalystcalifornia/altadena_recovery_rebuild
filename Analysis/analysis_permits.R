@@ -46,64 +46,79 @@ all_df <- housing_jan %>% # want the parcels from january
 # check
 table(all_df$damage_category,useNA='always')
 table(all_df$res_type,useNA='always')
-table(all_df$rebuild_status,useNA='always') # no longer NAs
+table(all_df$rebuild_status,useNA='always') # no longer any NAs
 nrow(all_df)
 length(unique(all_df$ain))
 
-missing_permit <- all_df %>%
-  filter(is.na(rebuild_status))
-# sent these AINs to HK for investigation - HK: no longer NA, updated permit type methods 
+# check those that have debris removal completed
+check <- all_df %>%
+  group_by(rebuild_status,damage_category) %>%
+  summarise(count=n())
+# 38 properties have debris removal completed but have no damage
+# fine to keep as is, we control for damage level later
 
-all_df <- all_df %>%
-  mutate(rebuild_status=case_when(
-    is.na(rebuild_status) ~ "Need more info",
-    rebuild_status=="Debris Removal Completed"  ~ NA,
-    rebuild_status== "Debris Removal Not Applicable" ~ NA,
-    .default=rebuild_status))
+all_df <- all_df 
          
 #### Step 3: First ANALYSIS- [analysis_permits_area_sept2025] ####
-## What percentage of residential properties have started permits by area
+## What percentage of residential properties for each damage are in each permit stage by area
+# e.g., x% of significantly damaged properties that are in construction are in west altadena
 analysis_permits_area_e_w <- all_df %>%
-  group_by(area_name) %>%
+  group_by(damage_category,rebuild_status,) %>%
   mutate(total=n()) %>%
   ungroup() %>%
-  group_by(area_name, rebuild_status) %>%
+  group_by(damage_category,rebuild_status,area_name) %>%
   summarise(count=n(),
             prc=n()/min(total)*100,
             total=min(total))
 
-# HK: Note for above - All "Debris Removal Complete" (n=38) are parcels with no damage
-# With the majority occurring in West Altadena for "Assessor Parcel Outside of Fire Area"
-# should filter this status out? Additionally "Debris Removal Not Applicable" is 
-# only applied to No Damage parcels, may want to exclude as well?
-
-analysis_permits_area_alt <- all_df %>% 
-  mutate(area_name="Altadena") %>%
-  group_by(area_name) %>%
+## compare to what % of properties in each area are in each damage category, e.g., x% of significantly damaged properties are in west alt.
+analysis_damage_area <- all_df %>% 
+  group_by(damage_category) %>%
   mutate(total=n()) %>%
   ungroup() %>%
-  group_by(area_name, rebuild_status) %>%
+  group_by(damage_category,area_name) %>%
   summarise(count=n(),
             prc=n()/min(total)*100,
-            total=min(total))
+            total=min(total)) 
+  
 
-analysis_permits_final <- rbind(analysis_permits_area_e_w, analysis_permits_area_alt)
+analysis_permits_final <- analysis_permits_area_e_w
 
 # # Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_permits_area_jan2025", value = analysis_permits_final, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_permits_area_jan2025"
-# indicator <- "Distribution of permitting stages by area in Altadena, e.g., what % of residential properties in West Altadena are awaiting construction"
+# indicator <- "Distribution of residential properties by area in each damage category, e.g., x% of significantly damaged properties that are in construction are in west altadena
+# Include all damage categories but most important to pay attention to significantly damaged"
 # source <- "Source: LA County Assessor Data, January 2025 & Scraped data."
 # qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_permits.docx"
 # column_names <- colnames(analysis_permits_final) # Get column names
 # column_names
 # column_comments <- c(
-#   "area",
+#   "damage category",
 #   "permit status",
-#   "count of properties",
-#   "percent of properties ",
-#   "total residential properties in the area")
+#   "area",
+#   "count of properties in that damage category, permit status, and area - numerator",
+#   "percent of properties in that area out of properties all properties in each damage and permit combo",
+#   "total residential properties that are within that damage category and permit status")
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# 
+
+# Upload tables to postgres and add table/column comments
+# dbWriteTable(con, name = "analysis_damage_area_jan2025", value = analysis_damage_area, overwrite = FALSE)
+# schema <- "data"
+# table_name <- "analysis_damage_area_jan2025"
+# indicator <- "Distribution of permitting stages within each damage category by area in Altadena, e.g., x% of significantly damaged properties are in west alt. Can be used to compare sales or permit distributions"
+# source <- "Source: LA County Assessor Data, January 2025 & CalFire data."
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_permits.docx"
+# column_names <- colnames(analysis_damage_area) # Get column names
+# column_names
+# column_comments <- c(
+#   "damage category",
+#   "area",
+#   "count of properties in that damage category and area - numerator",
+#   "percent of properties in that area out of all properties in each damage category ",
+#   "total residential properties that are within that damage category  - denominator")
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 #### Step 4: Second ANALYSIS- [analysis_permits_damage_jan2025] ####
@@ -135,7 +150,8 @@ analysis_damage_final<- rbind(analysis_damage_e_w,
 # dbWriteTable(con, name = "analysis_permits_damage_jan2025", value = analysis_damage_final, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_permits_damage_jan2025"
-# indicator <- "Distribution of permitting stages by damage category and area in Altadena, e.g., what % of significantly damaged residential properties in West Altadena are awaiting construction"
+# indicator <- "Distribution of permitting stages by damage category and area in Altadena, e.g., what % of significantly damaged residential properties in West Altadena are awaiting construction
+# Most important to pay attention to the significantly damaged category. Permit stages dont necessarily apply to no damage or some damage properties, but some have pursued permits regardless--some damage might need permits to repair minor structures or repairs"
 # source <- "Source: LA County Assessor Data, January 2025 & Scraped data."
 # qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_permits.docx"
 # column_names <- colnames(analysis_damage_final) # Get column names
