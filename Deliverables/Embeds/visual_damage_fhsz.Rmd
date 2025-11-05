@@ -60,7 +60,7 @@ df <- df %>%
          "Fire Hazard Severity Zone" = combined_fhsz,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East")))%>%
-  arrange(desc(fhsz_count))
+  arrange(Area,combined_fhsz)
 
 table<- df %>%
   select("Area","Fire Hazard Severity Zone", "Share of Damaged Properties", "Count (%)")%>%
