@@ -58,11 +58,9 @@ df <- df_ %>%
     pivot_wider( # pivot
       id_cols=c(area_name,owner_renter,total), # keep total
       names_from = rebuild_status,
-        values_from=prc
+      values_from=prc,
+      values_fill = 0
     )
-
-# replace NA with 0
-df[is.na(df)] <- 0
 
 # keep principal ownership types for comparison
 df <- df %>%
