@@ -376,6 +376,22 @@ check <- final_types%>%
   filter(residential==TRUE & (damage_category== "Some Damage" | damage_category == "Significant Damage")) %>%
   unique()
 
+# QA: See if the some damage/significant damage parcels haev any NAs
+sum(is.na(check)) # 4 NAs
+
+check_na <- check %>%
+  filter(if_any(everything(), is.na)) # these 4 NAs are a result of not having usecodes in Sept but being present in the jan data. 
+# Their statuses are all "Debris Removal Completed" and  "Awaiting permit application" 
+
+# pull out AINs flagged by emg (based on QA doc)
+
+ain_emg<-c("5830015015" ,"5841023009" ,"5841023010", "5842007015", "5847020011") # 4 out of 5 of these are the ones with the Sept NA usecodes above
+
+check_emg<-check%>%filter(ain %in% ain_emg)
+
+# The other AIN that is in EMG's flagged AINs but does not have NA in the september usecode: 5842007015
+# # Status == "Debris Removal Completed" and  "Awaiting permit application" 
+
 ##### Export to postgres #####
 con <- connect_to_db("altadena_recovery_rebuild")
 table_name <- "rel_parcel_rebuild_status_2025_10"
