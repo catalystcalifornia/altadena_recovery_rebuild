@@ -272,7 +272,8 @@ qa_01<-use_codes%>%filter(str_detect(Var1, "^01"))%>%mutate(total=sum(Freq))%>%V
 qa_ce<-use_codes%>%filter(str_detect(Var1, "C$|E$"))%>%mutate(total=sum(Freq))%>%View() # 181 --checks out with rel_res_df
 
 
-### Flags for homeowner vs. renter -----
+### Flags for ownership type ----
+##### Homeowner vs. renter occupied coded first -----
 check <- rel_res_df  %>%
   select(num_howmowner_exemption, homeowner_exemption_val,landlord_units, total_units, use_code, total_bedrooms, everything())
 
@@ -291,7 +292,7 @@ check <- rel_res_df %>%
 check %>%
   filter(is.na(owner_renter)) %>%
   View()
-# owned by trusts, churches, etc. count as other?
+# owned by trusts, churches, etc. count as other? explore and recode further later
 
 rel_res_df <- rel_res_df %>%
   mutate(owner_renter=case_when(
@@ -301,28 +302,23 @@ rel_res_df <- rel_res_df %>%
     TRUE ~ "Other"))
 
 table(rel_res_df$owner_renter, useNA='always')
-# might want to count these as homeowner, but let's leave for now as another homeowner type, could be family homes, but not primary residences
-
 ## Recode the remaining "OTHER" category
 
+#### Ownership type typology guide ----
 ## For more details on how we came up with these groups, see the script: Data Prep/resident_exemption_explore.R
-
 # Categories: 
 # Veteran exemption: move to 'Owner occupied'
-# New category: LLC-owned
-# New category: Trust-owned
-# New category: Church / Welfare exemption
+# New category: LLC-owned (LLC, LP, Inc)
+# New category: Trust-owned (TRUST, TRS, TR, TRST)
+# New category: Church / Welfare exemption OR Church in owner name
 # New category: Sold to state (tax delinquent)
 # New category: SCE or Government owned
 
-
+##### Exemption properties - veteran, church, welfare org  -----
 # Start with exemption type recoding:
-
 other<-rel_res_df%>%filter(owner_renter=="Other") # separate out 'Other' so I can perform checks throughout
 
 table(other$exemption_type) 
-
-# Start with recoding by exemption types
 
 rel_res_df<-rel_res_df%>%
   mutate(
@@ -333,30 +329,33 @@ rel_res_df<-rel_res_df%>%
     )
   )
 
-
 # check
 table(rel_res_df$owner_renter) # this looks like what I expect. OTHER category went from 4461 to 4433 and we have 18 new observations under-owner occupied
 
+##### Trusts and LLCs  -----
 # move on to trusts and LLCs
+# test limited recoding
 test <- rel_res_df%>%
-  # top code corporate
-  mutate(
-    owner_renter = ifelse(
-      (grepl("LLC", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
-      "LLC owned",owner_renter))%>%
   mutate(
     owner_renter = ifelse(
       (grepl("TRUST", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("TRUST",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("TRUST", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "Trust owned",owner_renter))%>%
+  mutate(
+    owner_renter = ifelse(
+      (grepl("LLC", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "LLC owned",owner_renter))%>%
   mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) %>% # manually recoded after original result returned a property with a LLC and trust
 filter(owner_renter %in% c("LLC owned","Trust owned"))
 
-test_2 <- rel_res_df%>%
-  # top code corporate
+table(test$owner_renter) 
+
+# test expanding recoding and top coding corporate
+test_2 <- rel_res_df %>%
+  # top code corporate and add other abbreviations
   mutate(
     owner_renter = ifelse(
       (grepl("LLC| LP| Inc", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
@@ -365,65 +364,56 @@ test_2 <- rel_res_df%>%
       "LLC owned",owner_renter))%>%
   mutate(
     owner_renter = ifelse(
-      (grepl("TRUST|TRST| TR ", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("TRUST|TRST| TR ",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("TRUST|TRST| TR ", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      (grepl("TRUST|TRST| TR | TRS", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST|TRST| TR | TRS",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST|TRST| TR | TRS", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "Trust owned",owner_renter))%>%
-  mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) %>% # manually recoded after original result returned a property with a LLC and trust
   filter(owner_renter %in% c("LLC owned","Trust owned"))
-# check:
-table(test$owner_renter) # this has the number of Trusts I expect -originally had only 115 LLCs instead of 116 --but after exploring and manually adjusting for the single AIN case that had Trust AND LLC in the name, now the numbers are as I expect
 
-trust_llc_check<-test_2 %>%
+# check counts:
+table(test_2$owner_renter) # 1 more trust and more LLCs
+
+# check ain that was originally hard coded
+test_2 %>% filter(ain=='5829032026') %>% select(owner_renter) # resolved by top coding
+
+# View expanded results with broader recoding
+test_2 %>%
   filter(!ain %in% test$ain) %>%
   select(ain,owner_renter,contains("_owner"),exemption_type, num_howmowner_exemption,landlord_units) %>%
   View()
+# all valid inclusions
 
-# further test result
-other_trust_llc <- other %>%
-  filter(
-    grepl("TRUST|LLC", first_owner_name, ignore.case = TRUE) |
-      grepl("TRUST|LLC", first_owner_name_overflow, ignore.case = TRUE) |
-      grepl("TRUST|LLC", second_owner_name, ignore.case = TRUE)
-  ) %>%
-  mutate(
-    flag_trust = ifelse(
-      grepl("TRUST", first_owner_name, ignore.case = TRUE) |
-        grepl("TRUST", first_owner_name_overflow, ignore.case = TRUE) |
-        grepl("TRUST", second_owner_name, ignore.case = TRUE),
+# test counts without Other owner_renter requirement--how do counts change?
+other_trust_llc <- rel_res_df %>%
+   mutate(
+    flag_llc = ifelse(
+      (grepl("LLC| LP| Inc", first_owner_name, ignore.case = TRUE)) |
+        (grepl("LLC| LP| Inc", first_owner_name_overflow, ignore.case = TRUE)) |
+        (grepl("LLC| LP| Inc", second_owner_name, ignore.case = TRUE)),
       1, 0
     ),
-    flag_llc = ifelse(
-      grepl("LLC", first_owner_name, ignore.case = TRUE) |
-        grepl("LLC", first_owner_name_overflow, ignore.case = TRUE) |
-        grepl("LLC", second_owner_name, ignore.case = TRUE),
+    flag_trust = ifelse(
+      (grepl("TRUST|TRST| TR | TRS", first_owner_name, ignore.case = TRUE)) |
+        (grepl("TRUST|TRST| TR | TRS",first_owner_name_overflow, ignore.case = TRUE)) |
+        (grepl("TRUST|TRST| TR | TRS", second_owner_name, ignore.case = TRUE)),
       1, 0
     )
   )
 
+# check counts
 other_trust_llc%>%
-  summarise(llc_tot=sum(flag_llc), # this is 116 LLCs
-            trust_to=sum(flag_trust)) # this is 1498 trusts - 10 more trusts assuming these are all owner occupied or verified rentals
+  summarise(llc_tot=sum(flag_llc), # this is 293 LLCs disregarding Other requirement vs. 139 LLCs with Other requirement
+            trust_to=sum(flag_trust)) # this is 5525 trusts vs the 1489 trusts with the Other requirement 
 
-# find out which AIN is not getting captured as an LLC in my recoding -- now null since manual fix
-other_llc_ain<-other_trust_llc$ain[other_trust_llc$flag_llc==1]
+# trust llc check compared to exemptions and owner types
+trust_llc_check <- other_trust_llc %>% group_by(flag_trust, flag_llc, exemption_type, owner_renter) %>% summarise(count=n())
 
-test_ain<-test$ain[test$owner_renter=="LLC owned"]
+View(trust_llc_check)
+# difference is largely due to homeowner properties that are owned in a trust, and some that have clear rental units
+# top coding owner-occupied and renter-occupied
+# 3 more trusts that are also LLC, but decided to top code LLC
 
-not_in_test <- setdiff(other_llc_ain, test_ain)
-print(not_in_test) # AIN 5829032026
-
-missing_llc<-other_trust_llc%>%select(ain, flag_llc, flag_trust)%>%filter(ain=="5829032026")
-
-# The reason for the original discrepency is because there is one parcel with LLC & Trust in the name
-# first_owner_name=="MOOGAR GROUP LLC TRUSTEE  2908"
-# first_owner_name_overflow=="ASITAS AVENUE TRUST"
-
-# Decided this should be coded as LLC owned, and fixed code above
-# trust check
-trust_check <- other_trust_llc %>% group_by(flag_trust, flag_llc, exemption_type, owner_renter) %>% summarise(count=n())
-# 9 more trusts that also have veteran's exemption that's fine, keep recoding
-
+# proceed with recoding
 rel_res_df <- rel_res_df%>%
   mutate(
     owner_renter = ifelse(
@@ -440,8 +430,9 @@ rel_res_df <- rel_res_df%>%
   mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) # manually recoded after original result returned a property with a LLC and trust
 
 # check:
-table(rel_res_df$owner_renter) # this has the number of Trusts I expect -originally had only 115 LLCs instead of 116 --but after exploring and manually adjusting for the single AIN case that had Trust AND LLC in the name, now the numbers are as I expect
+table(rel_res_df$owner_renter) # looks good
 
+##### Government owned/tax defaulted properties  -----
 ## Now lets recode based on tax status:
 table(rel_res_df$tax_stat_key)
 
