@@ -61,9 +61,10 @@ analysis_sqftg_jan2025 <- all_df %>%
             #making table long vs wide
               pivot_longer(
                 cols = -res_type,
-                names_to = c("area", ".value"),
+                names_to = c("area_name", ".value"),
                 names_pattern = "(altadena|west|east)_(sqftg_sum|sqftg_avg|sqftg_med|sqftg_sd|sqftg_min|sqftg_max)"
-              ) 
+              )  %>%
+  mutate(across(everything(), ~ifelse(is.nan(.) | is.infinite(.), NA, .)))
 
 #### Step 4: SECOND ANALYSIS- [analysis_sqftg_damage] ####
 analysis_sqftg_damage <- all_df %>% 
@@ -94,49 +95,50 @@ analysis_sqftg_damage <- all_df %>%
   #making table long vs wide
   pivot_longer(
     cols = -c(res_type, damage_category),
-    names_to = c("area", ".value"),
+    names_to = c("area_name", ".value"),
     names_pattern = "(altadena|west|east)_(sqftg_sum|sqftg_avg|sqftg_med|sqftg_sd|sqftg_min|sqftg_max)"
-  ) 
+  ) %>%
+  mutate(across(everything(), ~ifelse(is.nan(.) | is.infinite(.), NA, .)))
 
 
 #### Step 5: Upload tables to postgres and add table/column comments ####
 
-dbWriteTable(con, name = "analysis_sqftg_jan2025", value = analysis_sqftg_jan2025, overwrite = FALSE)
-schema <- "data"
-table_name <- "analysis_sqftg_jan2025"
-indicator <- "Data on average & median square footage of properties in Altadena, West Altadena, East Altadena by residential type in Jan 2025 (e.g., what was the average square footage of single family properties in Altadena)"
-source <- "Source: LA County Assessor Data, January 2025."
-qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_sqftg.docx"
-column_names <- colnames(analysis_sqftg_jan2025) # Get column names
-column_comments <- c(
-  "type of residence",
-  "area",
-  "sum of square footage",
-  "average of square footage",
-  "median of square footage",
-  "standard deviation of square footage",
-  "minimum of square footage",
-  "maximum of square footage")
-add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-
-dbWriteTable(con, name = "analysis_sqftg_damage", value = analysis_sqftg_damage, overwrite = FALSE)
-schema <- "data"
-table_name <- "analysis_sqftg_damage"
-indicator <- "Data on average & median square footage of properties lost in Altadena, West Altadena, East Altadena by residential type  (what was the median square footage of multifamily properties that sustained significant damage in West Altadena)"
-source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
-qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_sqftg.docx"
-column_names <- colnames(analysis_sqftg_damage) # Get column names
-column_comments <- c(
-  "type of residence",
-  "damage category",
-  "area",
-  "sum of square footage",
-  "average of square footage",
-  "median of square footage",
-  "standard deviation of square footage",
-  "minimum of square footage",
-  "maximum of square footage")
-add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# dbWriteTable(con, name = "analysis_sqftg_jan2025", value = analysis_sqftg_jan2025, overwrite = FALSE)
+# schema <- "data"
+# table_name <- "analysis_sqftg_jan2025"
+# indicator <- "Data on average & median square footage of properties in Altadena, West Altadena, East Altadena by residential type in Jan 2025 (e.g., what was the average square footage of single family properties in Altadena)"
+# source <- "Source: LA County Assessor Data, January 2025."
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_sqftg.docx"
+# column_names <- colnames(analysis_sqftg_jan2025) # Get column names
+# column_comments <- c(
+#   "type of residence",
+#   "area",
+#   "sum of square footage",
+#   "average of square footage",
+#   "median of square footage",
+#   "standard deviation of square footage",
+#   "minimum of square footage",
+#   "maximum of square footage")
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# 
+# dbWriteTable(con, name = "analysis_sqftg_damage", value = analysis_sqftg_damage, overwrite = FALSE)
+# schema <- "data"
+# table_name <- "analysis_sqftg_damage"
+# indicator <- "Data on average & median square footage of properties lost in Altadena, West Altadena, East Altadena by residential type  (what was the median square footage of multifamily properties that sustained significant damage in West Altadena)"
+# source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
+# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_sqftg.docx"
+# column_names <- colnames(analysis_sqftg_damage) # Get column names
+# column_comments <- c(
+#   "type of residence",
+#   "damage category",
+#   "area",
+#   "sum of square footage",
+#   "average of square footage",
+#   "median of square footage",
+#   "standard deviation of square footage",
+#   "minimum of square footage",
+#   "maximum of square footage")
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 #### Step 6: close connection ####
 dbDisconnect(con)
