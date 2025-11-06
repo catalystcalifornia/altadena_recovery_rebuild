@@ -376,7 +376,7 @@ check <- final_types%>%
   filter(residential==TRUE & (damage_category== "Some Damage" | damage_category == "Significant Damage")) %>%
   unique()
 
-# QA: See if the some damage/significant damage parcels haev any NAs
+# QA: See if the some damage/significant damage parcels have any NAs
 sum(is.na(check)) # 4 NAs
 
 check_na <- check %>%
