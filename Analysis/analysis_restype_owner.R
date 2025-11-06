@@ -65,6 +65,7 @@ analysis_restype_damage <- all_df %>%
             west_count = sum(area_name == "West", na.rm = TRUE),
             east_count = sum(area_name == "East", na.rm = TRUE),
             .groups = "drop") %>% 
+  group_by(res_type) %>%
   mutate(altadena_total = sum(altadena_count, na.rm=TRUE),
          west_total = sum(west_count, na.rm=TRUE),
          east_total = sum(east_count, na.rm=TRUE),
@@ -76,7 +77,8 @@ analysis_restype_damage <- all_df %>%
     names_to = c("area_name", ".value"),
     names_sep = "_"
   ) %>% 
-  select(area_name, everything())
+  select(area_name, everything()) %>%
+  arrange(area_name,res_type)
 
 #### Step 5: THIRD ANALYSIS- [analysis_owner_renter_jan2025] ####
 # Distribution of homeownership types (homeowner, renter) for all of Altadena, West Altadena, East Altadena in Jan 2025 (all properties whether or not destroyed), e.g., in jan 2025, X% of residential properties in Altadena were occupied by homeowners
@@ -107,6 +109,7 @@ analysis_owner_renter_damage <- all_df %>%
             west_count = sum(area_name == "West", na.rm = TRUE),
             east_count = sum(area_name == "East", na.rm = TRUE),
             .groups = "drop") %>% 
+  group_by(owner_renter) %>%
   mutate(altadena_total = sum(altadena_count, na.rm=TRUE),
          west_total = sum(west_count, na.rm=TRUE),
          east_total = sum(east_count, na.rm=TRUE),
@@ -118,7 +121,8 @@ analysis_owner_renter_damage <- all_df %>%
     names_to = c("area_name", ".value"),
     names_sep = "_"
   ) %>% 
-  select(area_name, everything())
+  select(area_name, everything()) %>%
+  arrange(area_name, owner_renter)
 
 #### Step 7: Upload tables to postgres and add table/column comments ####
 # 
