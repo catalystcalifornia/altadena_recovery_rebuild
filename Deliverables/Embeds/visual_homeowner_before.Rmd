@@ -60,15 +60,10 @@ In January 2025, most homes in Altadena were occupied by homeowners rather than 
 df_ <- st_read(con, query="Select * from data.analysis_owner_renter_jan2025") 
 
 df <- df_ %>%
-pivot_longer(
-    cols = -owner_renter,
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(count|prc)" 
-  ) %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
          "Share of Housing Stock"=prc,
          "Ownership Type" = owner_renter,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   arrange(desc(count)) 
 

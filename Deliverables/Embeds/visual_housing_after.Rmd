@@ -51,15 +51,10 @@ df_ <- st_read(con, query="Select * from data.analysis_restype_damage")
 df<- df_ %>%
   filter(res_type != "Boarding house",
          damage_category == "Significant Damage") %>% 
-pivot_longer(
-    cols = -c(damage_category, res_type),
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(count|prc)" 
-  ) %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),        
          "Share of Housing Type Lost"=prc,
          "Residential Type" = res_type,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   arrange(desc(count)) 
 
