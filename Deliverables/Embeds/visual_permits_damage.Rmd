@@ -42,7 +42,7 @@ gainsboro <- "#DEDEDE"
 
 Meanwhile, owners of significantly damaged properties are facing slow progress toward rebuilding. Based on permit data we scraped and cleaned in October 2025, only one in three significantly damaged properties in Altadena have at least applied for a permit to begin construction.^[This includes properties in the Awaiting Construction Start, Construction in Progress, and Rebuild Complete phases.] We classified properties according to five rebuild categories:
 
-* Debris Removal Incomplete: No indication that debris removal has been completed.
+* Fire Debris Removal Incomplete: No indication that fire debris removal has been completed.
 * Awaiting Permit Application: Debris removal has been completed, but there has been no permit application received.
 * Awaiting Construction Start: A permit application has been approved, but there is no indication on the permit that construction has started.
 * Construction In Progress: A permit application has been approved, and inspections related to the permit indicate that construction has started.
