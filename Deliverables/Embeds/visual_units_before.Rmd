@@ -42,30 +42,30 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-In January 2025, West Altadena had a higher number of rental units than East Altadena at a count of 2,340. A greater share of rental units in West Altadena were in single-family homes compared to East Altadena (45% compared to 37%). Across Altadena, over half of rental units were in multifamily properties.  
+Given the low number of rental units in Altadena, we also examined what types of residential housing offered rental units. In January 2025, West Altadena overall had a higher number of rental units than East Altadena--2,340 units compared to 1,979 units. A greater share of rental units in West Altadena were in single-family homes compared to East Altadena (45% compared to 37%). In East Altadena, 63% of rental units were in multifamily homes. Across Altadena, over half of rental units were in multifamily properties. Renters are particularly vulnerable after disasters as they are less likely to have insurance and receive government assistance after disaster.^[https://www.brookings.edu/articles/disasters-and-the-rental-housing-community/] Tracking rental units can help provide an indication of how renters are being displaced after the Eaton Fire, and which types of rental units are rebuilding faster than others.  
 
 ```{r}
 #### VISUAL ####
-df_ <- st_read(con, query="Select res_type, area, rent_units, prc_rent from data.analysis_units_jan2025") 
+df_ <- st_read(con, query="Select res_type, area_name, rent_units_count, rent_units_prc from data.analysis_units_jan2025") 
 
 df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
-  mutate("Count (%)"=paste0(comma(rent_units)," (",round(prc_rent,0),"%)"),
-         "Share of Rental Units"=prc_rent,
+  mutate("Count (%)"=paste0(comma(rent_units_count)," (",round(rent_units_prc,0),"%)"),
+         "Share of Rental Units"=rent_units_prc,
          "Residential Type" = res_type,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(rent_units)) 
+  arrange(desc(rent_units_count)) 
 
 
 table<- df %>%
   select("Area","Residential Type", "Share of Rental Units", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
-  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
+  tab_header(title= "Rental Units by Residential Housing Type Before the Fire")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Share of Rental Units', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Rental Units', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%

@@ -41,7 +41,8 @@ alabaster<-"#FBFBFB"
 gainsboro <- "#DEDEDE"
 
 ```
-In January 2025 before the fire, Altadena was largely comprised of single-family homes. Approximately, 91% of housing in Altadena were single-family homes. West Altadena had a higher count of single-family homes than East Altadena but they shared the same percentage of these homes in their respective areas. Of the differing residential types, condominiums are least likely to be found in the Altadena area. Multifamily homes comprised just seven percent of housing in all parts of Altadena.
+
+In January 2025 before the fire, Altadena was largely comprised of single-family homes based on property use codes. Approximately, 91% of housing in Altadena were single-family homes. West Altadena had a higher number of single-family homes than East Altadena but they shared the same percentage of these homes. Condominiums were least likely to be found in Altadena--only one percent of residential housing stock were condominiums. Multifamily homes comprised just seven percent of housing in all parts of Altadena. As Altadena rebuilds, construction of new housing can be compared to these rates to track changes in Altadena housing stock post the Eaton Fire.
 
 ```{r}
 #### VISUAL ####
@@ -65,11 +66,11 @@ pivot_longer(
 table<- df %>%
   select("Area","Residential Type", "Share of Housing Stock", "Count (%)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
-  # tab_header(title= str_wrap("The majority of Alatadena comprises of single-family homes before the fire", width = 20))%>%
+  tab_header(title= "Distribution of Residential Housing Types Before the Fire")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Share of Housing Stock', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Stock', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
