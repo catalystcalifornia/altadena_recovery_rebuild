@@ -397,10 +397,10 @@ con <- connect_to_db("altadena_recovery_rebuild")
 table_name <- "rel_parcel_rebuild_status_2025_10"
 date_ran <- as.character(Sys.Date())
   
-# Now write the table
-dbWriteTable(con, Id(schema="data", table=table_name), final_types,
-             overwrite = FALSE, row.names = FALSE)
-
+# # Now write the table
+# dbWriteTable(con, Id(schema="data", table=table_name), final_types,
+#              overwrite = FALSE, row.names = FALSE)
+# 
 # dbSendQuery(con, paste0("COMMENT ON TABLE data.", table_name, " IS
 #             'Rebuild status for Altadena parcels based on scraped permit data from _2025_10 tables,
 #             Data imported on ",date_ran, "
