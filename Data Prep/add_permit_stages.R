@@ -13,7 +13,7 @@
 ## Overall Yes if Phase 2 Result is Yes, For now assume yes also if parcel qualifies for Bucket 2 (below)  
 ## Overall No otherwise (could specify at what stage but will not implement now)
 
-### 2. Applied for Rebuild Permits (Have folks asked for permits to rebuild?)
+### 2. Permit Application Received (Have folks asked for permits to rebuild?)
 ## Yes
 # Sub-bucket: Permanent Housing (permit_number "^CREB|UNC-BLDR|UNC-BLDF" AND project_name or description.detailed contains "ADU|SFR|SFD|SB9|story|duplex|dwelling|rebuild burned house|main house|residence|dwelling|pre-approved standard plan|rebuild house|mfr|)
 # Sub-bucket: Temporary Housing (permit_number "^UNC-EXPR") AND project_name or description.detailed contains "temp hous|temporary hous"
@@ -202,7 +202,7 @@ combined_permits <- parcels %>%
     bucket_2_comm = paste(bucket_2_comm[bucket_2_comm != ""], collapse = ";"),
     # summarize in a list all misc building permits for that parcel
     bucket_2_misc = paste(bucket_2_misc[bucket_2_misc != ""], collapse = ";"),
-    # summarize in a list all other permits 
+    # summarize in a list all other permits (e.g. PROP, FCR, RRP, SWRC)
     other_permits = paste(other_permits[other_permits != ""], collapse = ";")
   ) %>%
   mutate(
@@ -235,17 +235,17 @@ combined_permits <- parcels %>%
 final_types <- parcels %>%
   left_join(combined_wf, by="ain")
 
-#### Bucket 1: Debris Removal Completed #### 
+#### Bucket 1: Fire Debris Cleared #### 
 ### check if there's an fdr permit or army corps full sign off "fso" to indicate debris removal complete (phase_2_result)
 check_debris <- combined_permits %>%
   select(ain, damage_category, epa_status, roe_status, fso_pkg_received, fso_pkg_approved,
          has_ace_fso, has_fdr, has_fdr_finaled) %>% 
   # if army corp sign off OR fire debris removal is finaled then debris removal complete,
   # if parcel has no damage, say NA
-  # else Debris Removal Incomplete
-  mutate(phase_2_result = case_when((has_ace_fso==1|(has_fdr==1 & has_fdr_finaled==1)) ~ "Debris Removal Completed",
-                                    (has_ace_fso==0 & damage_category == "No Damage") ~ "Debris Removal Not Applicable",
-                                    .default = "Debris Removal Incomplete")) %>%
+  # else Fire Debris Removal Incomplete
+  mutate(phase_2_result = case_when((has_ace_fso==1|(has_fdr==1 & has_fdr_finaled==1)) ~ "Fire Debris Cleared",
+                                    (has_ace_fso==0 & damage_category == "No Damage") ~ "Fire Debris Removal Not Applicable",
+                                    .default = "Fire Debris Removal Incomplete")) %>%
   select(ain, has_ace_fso, has_fdr, has_fdr_finaled, phase_2_result) %>%
   unique() 
 
@@ -259,7 +259,7 @@ final_types <- final_types %>%
 check <- final_types %>% group_by(ain) %>% filter(n()>1) # 0
 table(final_types$bucket_1_status, useNA="ifany")
 
-#### Bucket 2: Applied for Rebuild Permits ####
+#### Bucket 2: Permit Application Received ####
 ### Yes 
 # Sub-bucket: Permanent Housing (permit_number "^CREB|UNC-BLDR|UNC-BLDF" AND project_name or description.detailed contains "ADU|SFR|SFD|SB9|story|duplex|dwelling|rebuild burned house|main house|residence|dwelling|pre-approved standard plan|rebuild house|mfr|mfd)
 # Sub-bucket: Temporary Housing (permit_number "^UNC-EXPR") AND project_name or description.detailed contains "temp hous|temporary hous"
@@ -277,13 +277,13 @@ check_rebuild <- combined_permits %>%
 final_types <- final_types %>%
   left_join(check_rebuild, by="ain") %>%
   # using an assumption that is the parcel has a rebuild app, it is probably finished with debris removal
-  mutate(bucket_1_status = case_when(has_rebuild_app==1 ~ "Debris Removal Completed",
+  mutate(bucket_1_status = case_when(has_rebuild_app==1 ~ "Fire Debris Cleared",
                                      .default=bucket_1_status)) %>%
   # if debris removal complete AND there's a rebuild permit AND parcel has some/sig damage then Applied for rebuild
   # if the above but NO rebuild app then Awaiting application
   # else whatever bucket 1 status is
-  mutate(bucket_2_status = case_when((bucket_1_status=="Debris Removal Completed" & has_rebuild_app==1 & (damage_category=="Some Damage"|damage_category=="Significant Damage")) ~ "Applied for rebuild permits", 
-                                     (bucket_1_status=="Debris Removal Completed" & has_rebuild_app==0 & (damage_category=="Some Damage"|damage_category=="Significant Damage")) ~ "Awaiting permit application",
+  mutate(bucket_2_status = case_when((bucket_1_status=="Fire Debris Cleared" & has_rebuild_app==1 & (damage_category=="Some Damage"|damage_category=="Significant Damage")) ~ "Permit Application Received", 
+                                     (bucket_1_status=="Fire Debris Cleared" & has_rebuild_app==0 & (damage_category=="Some Damage"|damage_category=="Significant Damage")) ~ "Permit Application Not Received",
                                      .default=bucket_1_status))
 
 # check
@@ -293,7 +293,7 @@ table(final_types$bucket_2_status, useNA = "ifany")
 table(final_types$damage_category, final_types$bucket_1_status, useNA = "ifany")
 table(final_types$damage_category, final_types$bucket_2_status, useNA = "ifany")
 
-#### Bucket 3: Rebuild/Construction in progress ####
+#### Bucket 3: Rebuild/Construction In Progress ####
 ## Yes
 # Parcel has Yes for Bucket 2 AND workflow.item that contains "inspection" (excl. "debris removal inspection")
 ## No (default if not yes)
@@ -312,11 +312,11 @@ check_construction <- combined_permits %>%
 # join to final_types, create bucket_3_status
 final_types <- final_types %>%
   left_join(check_construction, by="ain") %>%
-  # if bucket 2 status is applied for rebuild permits and has at least one inspection then Construction in progress
-  # if above but no inspection, Awaiting construction start
+  # if bucket 2 status is Permit Application Received and has at least one inspection then Construction In Progress
+  # if above but no inspection, Construction Not Started
   # else whatever bucket 2 status is
-  mutate(bucket_3_status = case_when((bucket_2_status == "Applied for rebuild permits" & has_1_inspection==1) ~ "Construction in progress", 
-                                     (bucket_2_status == "Applied for rebuild permits" & has_1_inspection==0) ~ "Awaiting construction start", 
+  mutate(bucket_3_status = case_when((bucket_2_status == "Permit Application Received" & has_1_inspection==1) ~ "Construction In Progress", 
+                                     (bucket_2_status == "Permit Application Received" & has_1_inspection==0) ~ "Construction Not Started", 
                                      .default=bucket_2_status))
   
 
@@ -354,13 +354,13 @@ final_types <- final_types %>%
   left_join(check_complete, by="ain") %>%
   rowwise() %>%
   mutate(bucket_4_status = case_when(
-    # if construction in progress and has housing rebuild and all housing permits are finaled then rebuild complete
+    # if Construction In Progress and has housing rebuild and all housing permits are finaled then rebuild complete
     # if above but no housing rebuilds and ONLY misc rebuild where all MISC permits are finaled then rebuild complete
     # else whateever bucket_3_status is
-    (bucket_3_status == "Construction in progress" & 
+    (bucket_3_status == "Construction In Progress" & 
        is_housing==1 & 
        sum(perm_count, temp_count, na.rm=TRUE)==sum(finaled_perm_count, finaled_temp_count, na.rm=TRUE)) ~ "Rebuild Complete",
-    (bucket_3_status == "Construction in progress" & 
+    (bucket_3_status == "Construction In Progress" & 
        is_housing==0 & 
        is_misc==1 & 
        misc_count==finaled_misc_count)~ "Rebuild Complete",
@@ -381,7 +381,7 @@ sum(is.na(check)) # 4 NAs
 
 check_na <- check %>%
   filter(if_any(everything(), is.na)) # these 4 NAs are a result of not having usecodes in Sept but being present in the jan data. 
-# Their statuses are all "Debris Removal Completed" and  "Awaiting permit application" 
+# Their statuses are all "Fire Debris Cleared" and  "Permit Application Not Received" 
 
 # pull out AINs flagged by emg (based on QA doc)
 
@@ -390,7 +390,7 @@ ain_emg<-c("5830015015" ,"5841023009" ,"5841023010", "5842007015", "5847020011")
 check_emg<-check%>%filter(ain %in% ain_emg)
 
 # The other AIN that is in EMG's flagged AINs but does not have NA in the september usecode: 5842007015
-# # Status == "Debris Removal Completed" and  "Awaiting permit application" 
+# # Status == "Fire Debris Cleared" and  "Permit Application Not Received" 
 
 ##### Export to postgres #####
 con <- connect_to_db("altadena_recovery_rebuild")
