@@ -54,15 +54,10 @@ df <- df_ %>%
     filter(damage_category == "Significant Damage") 
 
 df <- df %>%
-pivot_longer(
-    cols = -c(damage_category,owner_renter),
-    names_to = c("area", ".value"),
-    names_pattern = "(altadena|west|east)_(count|prc)" 
-  ) %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
          "Share of Housing Type Lost"=prc,
          "Ownership Type" = owner_renter,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   arrange(desc(count)) 
 
