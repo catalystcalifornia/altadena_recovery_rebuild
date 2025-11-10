@@ -282,7 +282,7 @@ View(check)
 rel_res_df <- rel_res_df %>%
   mutate(owner_renter=case_when(
     num_howmowner_exemption>=1 & landlord_units==0 ~ "Owner occupied",
-    num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner occupied",
+    num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner & renter occupied",
     num_howmowner_exemption==0 & landlord_units>=1 ~ "Renter",
   TRUE ~ NA))
 
@@ -297,7 +297,7 @@ check %>%
 rel_res_df <- rel_res_df %>%
   mutate(owner_renter=case_when(
     num_howmowner_exemption>=1 & landlord_units==0 ~ "Owner occupied",
-    num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner occupied",
+    num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner & Renter occupied",
     num_howmowner_exemption==0 & landlord_units>=1 ~ "Renter occupied",
     TRUE ~ "Other"))
 
@@ -358,9 +358,9 @@ test_2 <- rel_res_df %>%
   # top code corporate and add other abbreviations
   mutate(
     owner_renter = ifelse(
-      (grepl("LLC| LP| Inc", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC| LP| Inc", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC| LP| Inc", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      (grepl("LLC| LP| Inc| Investment", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc| Investment", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc| Investment", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "LLC owned",owner_renter))%>%
   mutate(
     owner_renter = ifelse(
@@ -413,21 +413,21 @@ View(trust_llc_check)
 # top coding owner-occupied and renter-occupied
 # 3 more trusts that are also LLC, but decided to top code LLC
 
-# proceed with recoding
+# proceed with expanded recoding
 rel_res_df <- rel_res_df%>%
+  # top code corporate and add other abbreviations
   mutate(
     owner_renter = ifelse(
-      (grepl("TRUST", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("TRUST", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("TRUST", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
-      "Trust owned",owner_renter))%>%
-  mutate(
-    owner_renter = ifelse(
-      (grepl("LLC", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      (grepl("LLC| LP| Inc | Investment", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc| Investment", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc| Investment", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "LLC owned",owner_renter))%>%
-  mutate(owner_renter=ifelse(ain %in% "5829032026", "LLC owned", owner_renter)) # manually recoded after original result returned a property with a LLC and trust
+  mutate(
+    owner_renter = ifelse(
+      (grepl("TRUST|TRST| TR | TRS", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST|TRST| TR | TRS",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("TRUST|TRST| TR | TRS", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "Trust owned",owner_renter))
 
 # check:
 table(rel_res_df$owner_renter) # looks good
@@ -453,11 +453,91 @@ rel_res_df<-rel_res_df%>%
 # check
 table(rel_res_df$owner_renter) # numbers check out
 
-# Now lets recode the remaining as  "likely owner-occupied, no exemption'
-# check remaining other
-remaining_other <-rel_res_df %>% filter(owner_renter=="Other") %>%
+##### Addtl Church and welfare properties  -----
+# explore other
+rel_res_df %>%
+  filter(owner_renter=="Other") %>%
+  select(ain,owner_renter,contains("_owner"),exemption_type, num_howmowner_exemption,total_units,landlord_units) %>%
+  View()
+
+test <- rel_res_df%>%
+  mutate(
+    owner_renter = ifelse(
+      (grepl("CHURCH|FRATERNAL|SERVICES", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("CHURCH|FRATERNAL|SERVICES",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("CHURCH|FRATERNAL|SERVICES", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "Church/Welfare exemption",owner_renter))%>%
+  filter(owner_renter=="Church/Welfare exemption")
+
+# check recoding
+test %>%
+  filter(owner_renter=="Church/Welfare exemption") %>%
+  filter(!exemption_type %in% c("4", "5", "7")) %>%
+  select(ain,owner_renter,contains("_owner"),exemption_type, num_howmowner_exemption,total_units,landlord_units) %>%
+  View()
+# looks good
+
+# apply recoding
+rel_res_df <- rel_res_df%>%
+  mutate(
+    owner_renter = ifelse(
+      (grepl("CHURCH|FRATERNAL|SERVICES", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("CHURCH|FRATERNAL|SERVICES",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("CHURCH|FRATERNAL|SERVICES", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      "Church/Welfare exemption",owner_renter))
+
+##### Explore other types more  -----
+check_other_owner <- rel_res_df %>%
+  filter(owner_renter=="Other") %>%
+  group_by(first_owner_name,first_owner_name_overflow,second_owner_name) %>%
+  summarise(count=n())
+
+View(check_other_owner)
+# owned by John and Margaret Cameron - https://portal.assessor.lacounty.gov/parceldetail/5840014044
+# SUBSIDIZED HOUSING CORP, Pasadena Cemetery Association -- > welfare
+# Keep LA VINA HOMEOWNERS as Other
+# keep 	LINCOLN AVENUE WATER CO  as other
+# LITTLE,WILLIAM  family who had several homes destroyed
+# https://spectrumnews1.com/ca/southern-california/wildfires/2025/01/12/altadena-siblings-see-their-homes--reduce-to-ashes-
+
+check_other_owner_use_code <- rel_res_df %>%
+  filter(owner_renter=="Other") %>%
+  group_by(use_code) %>%
+  summarise(count=n())
+# use code 010E is almost all owned by John and Margaret Cameron
+# These are attempts to convert rental properties to condos
+# https://library.municode.com/ca/los_angeles_county/codes/code_of_ordinances/349596?nodeId=TIT8COPRBUWARE_DIV3HO_CH8.48COCO
+# how to code these? Formerly in a trust? 
+# https://www.homes.com/property/760-e-mariposa-st-altadena-ca-unit-c/2d77rzpy8qxw0/
+# keep as other
+# first name CAMERON,JOHN K,JR AND  or CAMERON,JOHN K AND
+
+# used this code to filter dataframe for different owner names and get associated AINs and use codes and looked up online
+rel_res_df %>%
+  filter(owner_renter=="Other") %>%
+  select(ain,owner_renter,contains("_owner"),use_code, exemption_type, num_howmowner_exemption,total_units,landlord_units) %>%
+  View()
+
+# A final recode of other
+test <- rel_res_df%>%
+  mutate(
+    owner_renter = ifelse(
+      grepl("SUBSIDIZED HOUSING CORP|Pasadena Cemetery Association", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+      "Church/Welfare exemption",owner_renter),
+    owner_renter = ifelse(
+      grepl("LA VINA HOMEOWNERS|CAMERON,JOHN K,JR AND|CAMERON,JOHN K AND|LINCOLN AVENUE WATER CO", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+    "Other",
+    ifelse(owner_renter=="Other","Likely owner-occupied, no exemption", owner_renter)))
+
+# check other
+remaining_other <-test %>% filter(owner_renter=="Other") %>%
   select(ain, owner_renter, tax_stat_key, year_sold_to_state, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, total_units, landlord_units, owner_renter)
-# some with church in title, recode as church? could also recode 'TR ' or 'TRST' as trust
+# looks good
+
+# check likely homeowner occupied
+likely_homeowner <-test %>% filter(owner_renter=="Likely owner-occupied, no exemption") %>%
+  select(ain, owner_renter, tax_stat_key, year_sold_to_state, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, total_units, landlord_units, owner_renter)
+# investment
 
 rel_res_df<-rel_res_df%>%
   mutate(
