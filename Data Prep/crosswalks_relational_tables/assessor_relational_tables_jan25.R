@@ -410,6 +410,7 @@ trust_llc_check <- other_trust_llc %>% group_by(flag_trust, flag_llc, exemption_
 
 View(trust_llc_check)
 # difference is largely due to homeowner properties that are owned in a trust, and some that have clear rental units
+# notably some renter occupied properties have a church or welfare exemption too
 # top coding owner-occupied and renter-occupied
 # 3 more trusts that are also LLC, but decided to top code LLC
 
@@ -493,11 +494,13 @@ check_other_owner <- rel_res_df %>%
   summarise(count=n())
 
 View(check_other_owner)
+# ordered by count in view and found a large number (>40)
 # owned by John and Margaret Cameron - https://portal.assessor.lacounty.gov/parceldetail/5840014044
+# Reviewed other owner names of 2 or more, flags to change:
 # SUBSIDIZED HOUSING CORP, Pasadena Cemetery Association -- > welfare
 # Keep LA VINA HOMEOWNERS as Other
 # keep 	LINCOLN AVENUE WATER CO  as other
-# LITTLE,WILLIAM  family who had several homes destroyed
+# LITTLE,WILLIAM  family who had several homes destroyed - owner-occupied
 # https://spectrumnews1.com/ca/southern-california/wildfires/2025/01/12/altadena-siblings-see-their-homes--reduce-to-ashes-
 
 check_other_owner_use_code <- rel_res_df %>%
@@ -507,12 +510,10 @@ check_other_owner_use_code <- rel_res_df %>%
 # use code 010E is almost all owned by John and Margaret Cameron
 # These are attempts to convert rental properties to condos
 # https://library.municode.com/ca/los_angeles_county/codes/code_of_ordinances/349596?nodeId=TIT8COPRBUWARE_DIV3HO_CH8.48COCO
-# how to code these? Formerly in a trust? 
-# https://www.homes.com/property/760-e-mariposa-st-altadena-ca-unit-c/2d77rzpy8qxw0/
 # keep as other
 # first name CAMERON,JOHN K,JR AND  or CAMERON,JOHN K AND
 
-# used this code to filter dataframe for different owner names and get associated AINs and use codes and looked up online
+# used this code to view the dataframes main columns and search for different owner names, get associated AINs and use codes, and look up parcels online
 rel_res_df %>%
   filter(owner_renter=="Other") %>%
   select(ain,owner_renter,contains("_owner"),use_code, exemption_type, num_howmowner_exemption,total_units,landlord_units) %>%
@@ -537,21 +538,42 @@ remaining_other <-test %>% filter(owner_renter=="Other") %>%
 # check likely homeowner occupied
 likely_homeowner <-test %>% filter(owner_renter=="Likely owner-occupied, no exemption") %>%
   select(ain, owner_renter, tax_stat_key, year_sold_to_state, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, total_units, landlord_units, owner_renter)
-# investment
+# sorted and skimmed owner names, looks okay
 
 rel_res_df<-rel_res_df%>%
   mutate(
-    owner_renter = case_when(
-      res_type %in% c("Condominium","Single-family", "Multifamily") & owner_renter == "Other" ~ "Likely owner-occupied, no exemption",
-      TRUE ~ owner_renter  # keeps existing value if none of the above conditions are met
-    )
-  )
+    owner_renter = ifelse(
+      grepl("SUBSIDIZED HOUSING CORP|Pasadena Cemetery Association", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+      "Church/Welfare exemption",owner_renter),
+    owner_renter = ifelse(
+      grepl("LA VINA HOMEOWNERS|CAMERON,JOHN K,JR AND|CAMERON,JOHN K AND|LINCOLN AVENUE WATER CO", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+      "Other",
+      ifelse(owner_renter=="Other","Likely owner-occupied, no exemption", owner_renter)))
 
 # check
 table(rel_res_df$owner_renter,useNA='always') # numbers check out
 
 
 ## Clean up and export to postgres ----
+# recode values for clarity
+rel_res_df <- rel_res_df %>%
+  mutate(owner_renter_orig=owner_renter,
+         owner_renter=case_when(
+           owner_renter_orig=="Church/Welfare exemption" ~ "Church or charity owned",
+           owner_renter_orig=="Likely owner-occupied, no exemption" ~ "Likely owner occupied, no exemption",
+           owner_renter_orig=="LLC owned" ~ "Corporation owned",
+           owner_renter_orig=="Other" ~ "Other ownership",
+           owner_renter_orig=="Owner & Renter occupied" ~ "Owner & renter occupied",
+           owner_renter_orig=="SBE or Government owned" ~ "Government owned",
+           owner_renter_orig=="Owner occupied" ~ "Owner occupied, homeowner exemption",
+          TRUE ~ owner_renter_orig
+ ))
+
+# check
+table(rel_res_df$owner_renter_orig,useNA='always') 
+table(rel_res_df$owner_renter,useNA='always') # numbers check out
+
+
 rel_res_df_final <- rel_res_df %>%
   select(ain,residential,mixed_use,res_type,owner_renter,total_units,landlord_units,total_square_feet,total_bedrooms,use_code)
 
@@ -566,7 +588,7 @@ nrow(rel_res_df_final) #same count
 # qa_filepath<-"  QA_sheet_relational_tables.docx "
 # dbWriteTable(con_alt, Id(schema, table_name), rel_res_df_final,
 #              overwrite = FALSE, row.names = FALSE)
-
+# 
 # # Add metadata
 # column_names <- colnames(rel_res_df_final) # Get column names
 # column_names
@@ -574,14 +596,14 @@ nrow(rel_res_df_final) #same count
 #                      'Flag for whether property is a residential use (e.g., use code starting with 0)',
 #                      'Flag for whether property is mixed residential-commercial (use code starting with 1 but with a residential combo indicated in 3rd character)',
 #                      'Residential type -- either single-family, multifamily, mixed use, condominium, boarding house',
-#                      'Housing tenure-ownerships -- either homeowner (indicated by homeowner exemption), renter, trust owned, LLC owned, sold to state, SBE or government owned, or owner likely but with no exemption. For more detailed methodology of choices see R script: Data Prep/resident_exemption_explore.R',
+#                      'Housing tenure-ownerships -- either homeowner (indicated by homeowner exemption), renter, trust owned, corporation owned, sold to state, government owned, other ownership, or owner likely but with no exemption. For more detailed methodology of choices see R script',
 #                      'Total residential units on the property -- use caution when interpreting for mixed use - - can include commercial',
 #                      'Total rental units on the property -- use caution when interpreting for mixed use - can include commercial',
 #                      'Total square feet of buildings on property',
 #                      'Total bedrooms on property',
 #                      'Original use code for reference')
 # 
- # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 # STEP 4: TABLE 2: Table to indicate West or East Altadena with geometry ------
 rel_area_geom_df <- parcels_altadena %>%
