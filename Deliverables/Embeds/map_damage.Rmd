@@ -19,6 +19,7 @@ library(gt)
 library(sf)
 library(scales)
 library(leaflet)
+library(leaflet.extras)
 library(rmapshaper)
 
 options(scipen=999)
@@ -176,7 +177,7 @@ zoning_pal <- colorFactor(
   domain = df_zoning_lac$zone_label)
 
 rebuild_pal <- colorFactor(
-  palette = c("#E2D9FF", "#BDAFE9", "#8E7ACA", "#362178", "#211447"),
+  palette = c("#E3D5FF", "#C3A0F4", "#8B5FBF", "#4C2393", "#2E0C6A"),
   domain= sept_rebuild_sf$rebuild_status_factor
 )
 
@@ -205,7 +206,7 @@ popup_parcel <- paste0("<div class='parcel-popups'> <div class='leaflet-data-par
                "' data-owner-type='", all_df$owner_renter,
                "' data-owner-names='", all_df$owner_names,
                "' data-owner-contact='", all_df$contact_address,
-               "' data-total-sqft='", all_df$total_square_feet,
+               "' data-total-sqft='", comma(all_df$total_square_feet),
                "' data-total-units='", all_df$total_units,
                "' data-lac-zoning='", all_df$z_desc,
                "' data-fire-zone='", all_df$combined_fhsz, 
@@ -375,7 +376,7 @@ leaflet(
     fillColor="black",
     fillOpacity=1,
     color="white",
-    weight=0.6,
+    weight=0.2,
     opacity=1,
     popup=popup_parcel,
     group="Sold After Eaton Fire") %>%
@@ -385,7 +386,7 @@ leaflet(
     fillColor=~rebuild_pal(rebuild_status_factor),
     fillOpacity=1,
     color="white",
-    weight=0.6,
+    weight=0.4,
     opacity=1,
     popup=popup_parcel,
     group="Rebuild Status") %>%
@@ -406,7 +407,7 @@ leaflet(
                       "Eaton Fire Perimeter"),
     options = layersControlOptions(collapsed = FALSE, autoZIndex = TRUE))  %>%
   hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones",
-              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status"))
+              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status")) %>% addFullscreenControl()
 
 ```
 
