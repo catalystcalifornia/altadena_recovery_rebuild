@@ -46,7 +46,7 @@ The average square footage lost reveals the devastation felt across Altadena, an
 
 ```{r}
 #### VISUAL ####
-df_ <- st_read(con, query="Select res_type, damage_category, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_damage") 
+df_ <- st_read(con, query="Select res_type, damage_category, area_name, sqftg_avg, sqftg_sum from data.analysis_sqftg_damage") 
 
 df <- df_ %>%
   filter(res_type != "Boarding house",
@@ -54,7 +54,7 @@ df <- df_ %>%
   mutate(" "=paste0(comma(round(sqftg_avg,0))," sqft"),
          "Average Square Footage Lost"=sqftg_avg,
          "Residential Type" = res_type,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   arrange(desc(sqftg_sum)) 
 

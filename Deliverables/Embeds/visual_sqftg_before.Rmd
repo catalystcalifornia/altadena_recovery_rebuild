@@ -46,14 +46,14 @@ As property owners rebuild, the size and character of Altadena housing could cha
 
 ```{r}
 #### VISUAL ####
-df_ <- st_read(con, query="Select res_type, area, sqftg_avg, sqftg_sum from data.analysis_sqftg_jan2025") 
+df_ <- st_read(con, query="Select res_type, area_name, sqftg_avg, sqftg_sum from data.analysis_sqftg_jan2025") 
 
 df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
   mutate(" "=paste0(comma(round(sqftg_avg,0))," sqft"),
          "Average Square Footage"=sqftg_avg,
          "Residential Type" = res_type,
-         "Area" = str_to_title(area)) %>%
+         "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   arrange(desc(sqftg_sum)) 
 
