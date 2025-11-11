@@ -112,7 +112,7 @@ sum(all_df$total_square_feet[all_df$area_label=="West Altadena"])/sum(all_df$tot
 
 # I am going to push my version to postgres for the team to review and compare:
 
-dbWriteTable(con, name = "analysis_multifamily_sqftg_jan2025_jz", value = analysis_multifamily_sqftg_jan2025_jz, overwrite = FALSE)
+dbWriteTable(con, name = "analysis_multifamily_sqftg_jan2025_method2", value = analysis_multifamily_sqftg_jan2025_jz, overwrite = FALSE)
 schema <- "data"
 table_name <- "analysis_multifamily_sqftg_jan2025_jz"
 indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type of multifamily properties in Jan 2025. This calculates the average
@@ -189,7 +189,7 @@ sum(all_df$total_units[all_df$area_label=="East Altadena" & all_df$damage_catego
 
 # Push my table to postgres for team to compare------------
 
-dbWriteTable(con, name = "analysis_multifamily_sqftg_damage_jz", value = analysis_multifamily_sqftg_damage_jz, overwrite = FALSE)
+dbWriteTable(con, name = "analysis_multifamily_sqftg_damage_method2", value = analysis_multifamily_sqftg_damage_jz, overwrite = FALSE)
 schema <- "data"
 table_name <- "analysis_multifamily_sqftg_damage_jz"
 indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type and by damage category of 
@@ -208,53 +208,38 @@ add_table_comments(con, schema, table_name, indicator, source, qa_filepath, colu
 
 #### Step 6: Upload tables to postgres and add table/column comments ####
 
-# dbWriteTable(con, name = "analysis_multifamily_sqftg_jan2025", value = analysis_multifamily_sqftg_jan2025, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_multifamily_sqftg_jan2025"
-# indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type of multifamily properties in Jan 2025"
-# source <- "Source: LA County Assessor Data, January 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_multifamily_sqftg.docx"
-# column_names <- colnames(analysis_multifamily_sqftg_jan2025) # Get column names
-# column_comments <- c(
-#   "area",
-#   "type of residence",
-#   "sum of square footage",
-#   "sum of units",
-#   "average of square footage")
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-# 
-# dbWriteTable(con, name = "analysis_multifamily_sqftg_damage", value = analysis_multifamily_sqftg_damage, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_multifamily_sqftg_damage"
-# indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type and by damage category of multifamily properties"
-# source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_multifamily_sqftg.docx"
-# column_names <- colnames(analysis_multifamily_sqftg_damage) # Get column names
-# column_comments <- c(
-#   "area",
-#   "type of residence",
-#   "damage category",
-#   "sum of square footage",
-#   "sum of units",
-#   "average of square footage")
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+dbWriteTable(con, name = "analysis_multifamily_sqftg_jan2025_method1", value = analysis_multifamily_sqftg_jan2025, overwrite = FALSE)
+schema <- "data"
+table_name <- "analysis_multifamily_sqftg_jan2025"
+indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type of multifamily properties in Jan 2025"
+source <- "Source: LA County Assessor Data, January 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_multifamily_sqftg.docx"
+column_names <- colnames(analysis_multifamily_sqftg_jan2025) # Get column names
+column_comments <- c(
+  "area",
+  "type of residence",
+  "sum of square footage",
+  "sum of units",
+  "average of square footage")
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
+dbWriteTable(con, name = "analysis_multifamily_sqftg_damage_method1", value = analysis_multifamily_sqftg_damage, overwrite = FALSE)
+schema <- "data"
+table_name <- "analysis_multifamily_sqftg_damage"
+indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type and by damage category of multifamily properties"
+source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_multifamily_sqftg.docx"
+column_names <- colnames(analysis_multifamily_sqftg_damage) # Get column names
+column_comments <- c(
+  "area",
+  "type of residence",
+  "damage category",
+  "sum of square footage",
+  "sum of units",
+  "average of square footage")
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
-# dbWriteTable(con, name = "analysis_multifamily_sqftg_damage", value = analysis_multifamily_sqftg_damage, overwrite = FALSE)
-# schema <- "data"
-# table_name <- "analysis_multifamily_sqftg_damage"
-# indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type and by damage category of multifamily properties"
-# source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
-# qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_multifamily_sqftg.docx"
-# column_names <- colnames(analysis_multifamily_sqftg_damage) # Get column names
-# column_comments <- c(
-#   "area",
-#   "type of residence",
-#   "damage category",
-#   "sum of square footage",
-#   "sum of units",
-#   "average of square footage")
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 #### Step 7: close connection ####
 dbDisconnect(con)
