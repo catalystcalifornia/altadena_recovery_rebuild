@@ -308,11 +308,13 @@ table(rel_res_df$owner_renter, useNA='always')
 ## For more details on how we came up with these groups, see the script: Data Prep/resident_exemption_explore.R
 # Categories: 
 # Veteran exemption: move to 'Owner occupied'
-# New category: LLC-owned (LLC, LP, Inc)
+# New category: LLC-owned (LLC, LP, Inc, Investment)
 # New category: Trust-owned (TRUST, TRS, TR, TRST)
-# New category: Church / Welfare exemption OR Church in owner name
+# New category: Church / Welfare exemption OR Church or services in owner name
 # New category: Sold to state (tax delinquent)
-# New category: SCE or Government owned
+# New category: SBE or Government owned
+# Other: Properties that are clearly not owner occupied
+# likely owner occupied, no exemption--properties that seem to be individually owned but not homeowner exemption
 
 ##### Exemption properties - veteran, church, welfare org  -----
 # Start with exemption type recoding:
@@ -497,7 +499,7 @@ View(check_other_owner)
 # ordered by count in view and found a large number (>40)
 # owned by John and Margaret Cameron - https://portal.assessor.lacounty.gov/parceldetail/5840014044
 # Reviewed other owner names of 2 or more, flags to change:
-# SUBSIDIZED HOUSING CORP, Pasadena Cemetery Association -- > welfare
+# SUBSIDIZED HOUSING CORP, Pasadena Cemetery Association 	PUBLIC WORKS GROUP CORP   -- > welfare
 # Keep LA VINA HOMEOWNERS as Other
 # keep 	LINCOLN AVENUE WATER CO  as other
 # LITTLE,WILLIAM  family who had several homes destroyed - owner-occupied
@@ -523,12 +525,12 @@ rel_res_df %>%
 test <- rel_res_df%>%
   mutate(
     owner_renter = ifelse(
-      grepl("SUBSIDIZED HOUSING CORP|Pasadena Cemetery Association", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+      grepl("SUBSIDIZED HOUSING CORP|Pasadena Cemetery Association|PUBLIC WORKS GROUP CORP", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
       "Church/Welfare exemption",owner_renter),
     owner_renter = ifelse(
-      grepl("LA VINA HOMEOWNERS|CAMERON,JOHN K,JR AND|CAMERON,JOHN K AND|LINCOLN AVENUE WATER CO", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
-    "Other",
-    ifelse(owner_renter=="Other","Likely owner-occupied, no exemption", owner_renter)))
+      grepl("LA VINA HOMEOWNERS|CAMERON,JOHN K,JR AND|CAMERON,JOHN K AND|CAMERON,JOHN K JR AND|LINCOLN AVENUE WATER CO", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+      "Other",
+      ifelse(owner_renter=="Other","Likely owner-occupied, no exemption", owner_renter)))
 
 # check other
 remaining_other <-test %>% filter(owner_renter=="Other") %>%
@@ -543,10 +545,10 @@ likely_homeowner <-test %>% filter(owner_renter=="Likely owner-occupied, no exem
 rel_res_df<-rel_res_df%>%
   mutate(
     owner_renter = ifelse(
-      grepl("SUBSIDIZED HOUSING CORP|Pasadena Cemetery Association", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+      grepl("SUBSIDIZED HOUSING CORP|Pasadena Cemetery Association|PUBLIC WORKS GROUP CORP", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
       "Church/Welfare exemption",owner_renter),
     owner_renter = ifelse(
-      grepl("LA VINA HOMEOWNERS|CAMERON,JOHN K,JR AND|CAMERON,JOHN K AND|LINCOLN AVENUE WATER CO", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+      grepl("LA VINA HOMEOWNERS|CAMERON,JOHN K,JR AND|CAMERON,JOHN K AND|CAMERON,JOHN K JR AND|LINCOLN AVENUE WATER CO", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
       "Other",
       ifelse(owner_renter=="Other","Likely owner-occupied, no exemption", owner_renter)))
 
