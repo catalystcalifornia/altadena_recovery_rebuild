@@ -114,7 +114,7 @@ sum(all_df$total_square_feet[all_df$area_label=="West Altadena"])/sum(all_df$tot
 
 dbWriteTable(con, name = "analysis_multifamily_sqftg_jan2025_method2", value = analysis_multifamily_sqftg_jan2025_jz, overwrite = FALSE)
 schema <- "data"
-table_name <- "analysis_multifamily_sqftg_jan2025_jz"
+table_name <- "analysis_multifamily_sqftg_jan2025_method2"
 indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type of multifamily properties in Jan 2025. This calculates the average
 square footage by calculating total square footage in each geography / total number of units in each geography. Geography refers to West/ East/All of Altadena."
 source <- "Source: LA County Assessor Data, January 2025."
@@ -191,7 +191,7 @@ sum(all_df$total_units[all_df$area_label=="East Altadena" & all_df$damage_catego
 
 dbWriteTable(con, name = "analysis_multifamily_sqftg_damage_method2", value = analysis_multifamily_sqftg_damage_jz, overwrite = FALSE)
 schema <- "data"
-table_name <- "analysis_multifamily_sqftg_damage_jz"
+table_name <- "analysis_multifamily_sqftg_damage_method2"
 indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type and by damage category of 
 multifamily properties. This calculates average square footage by taking total square footage in each geography level for each damage category and divide it by the total number of units in each geography level and each damage category."
 source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
@@ -210,8 +210,9 @@ add_table_comments(con, schema, table_name, indicator, source, qa_filepath, colu
 
 dbWriteTable(con, name = "analysis_multifamily_sqftg_jan2025_method1", value = analysis_multifamily_sqftg_jan2025, overwrite = FALSE)
 schema <- "data"
-table_name <- "analysis_multifamily_sqftg_jan2025"
-indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type of multifamily properties in Jan 2025"
+table_name <- "analysis_multifamily_sqftg_jan2025_method1"
+indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type of multifamily properties in Jan 2025. The method used 
+for this datadrame is to calculate the average square footage or a property by each AIN and then get the average of that by region."
 source <- "Source: LA County Assessor Data, January 2025."
 qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_multifamily_sqftg.docx"
 column_names <- colnames(analysis_multifamily_sqftg_jan2025) # Get column names
@@ -225,8 +226,9 @@ add_table_comments(con, schema, table_name, indicator, source, qa_filepath, colu
 
 dbWriteTable(con, name = "analysis_multifamily_sqftg_damage_method1", value = analysis_multifamily_sqftg_damage, overwrite = FALSE)
 schema <- "data"
-table_name <- "analysis_multifamily_sqftg_damage"
-indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type and by damage category of multifamily properties"
+table_name <- "analysis_multifamily_sqftg_damage_method1"
+indicator <- "Data on sum of and average square footage of properties in Altadena, West Altadena, East Altadena by residential type and by damage category of multifamily properties. The method used 
+for this datadrame is to calculate the average square footage or a property by each AIN and then get the average of that by region."
 source <- "Source: LA County Assessor Data, January 2025. CAL FIRE Damage Data, September 2025."
 qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_analysis_multifamily_sqftg.docx"
 column_names <- colnames(analysis_multifamily_sqftg_damage) # Get column names
