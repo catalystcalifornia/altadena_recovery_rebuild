@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>visual_homeowner_after.knit</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+
+
+
+<p>We examined the percentage of properties sustaining significant
+damage out of each ownership type in Altadena. Knowing which ownership
+types sustained the most damage can help inform strategies to equitably
+support residential property owners in rebuilding, and protect
+homeowners against displacement and predatory investors. Owner-occupied
+versus renter-occupied units may face different challenges in
+rebuilding.</p>
+<p>While a significant share of owners lost their properties across
+ownership types, owner-occupied, likely owner-occupied, and trust-owned
+properties had the greatest losses in West and East Altadena.
+Additionally, a greater share of homeowners in West Altadena lost their
+properties compared to homeowners in East Altadena. In West Altadena,
+nearly twice the rate of owner-occupied properties were significantly
+damaged or destroyed (60%) compared to East Altadena (32%). Similarly, a
+greater number of renters lost their homes in West Altadena than in East
+Altadena. Renter-occupied properties in West Altadena were significantly
+damaged (44%) at nearly 2.5 times the rate of renter-occupied properties
+in East Altadena (18%). These trends underscore the devastation in West
+Altadena, and the need to have strategies that support both
+owner-occupied and renter-occupied properties in rebuilding.</p>
+<p>While the total number is small, a large share of ‘Other ownership’
+properties were significantly damaged in both West and East Altadena.
+These properties are not owner occupied and do not show evidence of
+having any rental units. They also do not appear to be owned in a trust
+or corporation, but rather seem to be owned by private investors.</p>
+<div id="ypdfftdemf" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#ypdfftdemf table {
+font-family: Inter;
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#ypdfftdemf thead, #ypdfftdemf tbody, #ypdfftdemf tfoot, #ypdfftdemf tr, #ypdfftdemf td, #ypdfftdemf th {
+border-style: none;
+}
+#ypdfftdemf p {
+margin: 0;
+padding: 0;
+}
+#ypdfftdemf .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: 0;
+margin-right: auto;
+color: #333333;
+font-size: 12px;
+font-weight: normal;
+font-style: normal;
+background-color: #FBFBFB;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: rgba(255, 255, 255, 0);
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 3px;
+border-bottom-color: rgba(255, 255, 255, 0);
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#ypdfftdemf .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#ypdfftdemf .gt_title {
+color: #333333;
+font-size: 20px;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FBFBFB;
+border-bottom-width: 0;
+}
+#ypdfftdemf .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FBFBFB;
+border-top-width: 0;
+}
+#ypdfftdemf .gt_heading {
+background-color: #FBFBFB;
+text-align: left;
+border-bottom-color: #FBFBFB;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#ypdfftdemf .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: rgba(255, 255, 255, 0);
+}
+#ypdfftdemf .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 3px;
+border-bottom-color: #DEDEDE;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#ypdfftdemf .gt_col_heading {
+color: #333333;
+background-color: rgba(255, 255, 255, 0);
+font-size: 12px;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#ypdfftdemf .gt_column_spanner_outer {
+color: #333333;
+background-color: rgba(255, 255, 255, 0);
+font-size: 12px;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#ypdfftdemf .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#ypdfftdemf .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#ypdfftdemf .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 3px;
+border-bottom-color: #DEDEDE;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#ypdfftdemf .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#ypdfftdemf .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FBFBFB;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#ypdfftdemf .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FBFBFB;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#ypdfftdemf .gt_from_md > :first-child {
+margin-top: 0;
+}
+#ypdfftdemf .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#ypdfftdemf .gt_row {
+padding-top: 3px;
+padding-bottom: 3px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#ypdfftdemf .gt_stub {
+color: #333333;
+background-color: #FBFBFB;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ypdfftdemf .gt_stub_row_group {
+color: #333333;
+background-color: #FBFBFB;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#ypdfftdemf .gt_row_group_first td {
+border-top-width: 2px;
+}
+#ypdfftdemf .gt_row_group_first th {
+border-top-width: 2px;
+}
+#ypdfftdemf .gt_summary_row {
+color: #333333;
+background-color: #FBFBFB;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ypdfftdemf .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#ypdfftdemf .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#ypdfftdemf .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#ypdfftdemf .gt_grand_summary_row {
+color: #333333;
+background-color: #FBFBFB;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ypdfftdemf .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#ypdfftdemf .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#ypdfftdemf .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#ypdfftdemf .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#ypdfftdemf .gt_footnotes {
+color: #333333;
+background-color: #FBFBFB;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: rgba(255, 255, 255, 0);
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#ypdfftdemf .gt_footnote {
+margin: 0px;
+font-size: 10px;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ypdfftdemf .gt_sourcenotes {
+color: #333333;
+background-color: #FBFBFB;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#ypdfftdemf .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ypdfftdemf .gt_left {
+text-align: left;
+}
+#ypdfftdemf .gt_center {
+text-align: center;
+}
+#ypdfftdemf .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#ypdfftdemf .gt_font_normal {
+font-weight: normal;
+}
+#ypdfftdemf .gt_font_bold {
+font-weight: bold;
+}
+#ypdfftdemf .gt_font_italic {
+font-style: italic;
+}
+#ypdfftdemf .gt_super {
+font-size: 65%;
+}
+#ypdfftdemf .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#ypdfftdemf .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#ypdfftdemf .gt_indent_1 {
+text-indent: 5px;
+}
+#ypdfftdemf .gt_indent_2 {
+text-indent: 10px;
+}
+#ypdfftdemf .gt_indent_3 {
+text-indent: 15px;
+}
+#ypdfftdemf .gt_indent_4 {
+text-indent: 20px;
+}
+#ypdfftdemf .gt_indent_5 {
+text-indent: 25px;
+}
+#ypdfftdemf .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#ypdfftdemf div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_title gt_font_normal gt_bottom_border" style="font-family: Inter, system-ui, &#39;Segoe UI&#39;, Roboto, Helvetica, Arial, sans-serif, &#39;Apple Color Emoji&#39;, &#39;Segoe UI Emoji&#39;, &#39;Segoe UI Symbol&#39;, &#39;Noto Color Emoji&#39;; font-weight: 900;">Share of Significantly Damaged Properties Out of Each Ownership Type</td>
+    </tr>
+    
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id></th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Share of Housing Type Lost">Share of Housing Type Lost</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="Count (%)">Count (%)</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr class="gt_group_heading_row">
+      <th colspan="3" class="gt_group_heading" scope="colgroup" id="Altadena">Altadena</th>
+    </tr>
+    <tr class="gt_row_group_first"><th id="stub_1_1" scope="row" class="gt_row gt_left gt_stub">Owner occupied, homeowner exemption</th>
+<td headers="Altadena stub_1_1 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:46.4904753732624%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_1 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">2,709 (46%)</td></tr>
+    <tr><th id="stub_1_2" scope="row" class="gt_row gt_left gt_stub">Likely owner occupied, no exemption</th>
+<td headers="Altadena stub_1_2 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:46.0585585585586%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_2 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">1,227 (46%)</td></tr>
+    <tr><th id="stub_1_3" scope="row" class="gt_row gt_left gt_stub">Trust owned</th>
+<td headers="Altadena stub_1_3 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:45.0444292549556%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_3 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">659 (45%)</td></tr>
+    <tr><th id="stub_1_4" scope="row" class="gt_row gt_left gt_stub">Renter occupied</th>
+<td headers="Altadena stub_1_4 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:33.2674571805007%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_4 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">505 (33%)</td></tr>
+    <tr><th id="stub_1_5" scope="row" class="gt_row gt_left gt_stub">Owner &amp; renter occupied</th>
+<td headers="Altadena stub_1_5 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:37.3370577281192%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_5 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">401 (37%)</td></tr>
+    <tr><th id="stub_1_6" scope="row" class="gt_row gt_left gt_stub">Sold to state</th>
+<td headers="Altadena stub_1_6 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:40.251572327044%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_6 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">64 (40%)</td></tr>
+    <tr><th id="stub_1_7" scope="row" class="gt_row gt_left gt_stub">Corporation owned</th>
+<td headers="Altadena stub_1_7 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:39.8496240601504%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_7 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">53 (40%)</td></tr>
+    <tr><th id="stub_1_8" scope="row" class="gt_row gt_left gt_stub">Other ownership</th>
+<td headers="Altadena stub_1_8 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:93.8775510204082%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_8 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">46 (94%)</td></tr>
+    <tr><th id="stub_1_9" scope="row" class="gt_row gt_left gt_stub">Church or charity owned</th>
+<td headers="Altadena stub_1_9 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:30.3030303030303%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_9 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">10 (30%)</td></tr>
+    <tr><th id="stub_1_10" scope="row" class="gt_row gt_left gt_stub">Government owned</th>
+<td headers="Altadena stub_1_10 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:11.1111111111111%;height:16px;"></div></div></td>
+<td headers="Altadena stub_1_10 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">2 (11%)</td></tr>
+    <tr class="gt_group_heading_row">
+      <th colspan="3" class="gt_group_heading" scope="colgroup" id="West">West</th>
+    </tr>
+    <tr class="gt_row_group_first"><th id="stub_1_11" scope="row" class="gt_row gt_left gt_stub">Owner occupied, homeowner exemption</th>
+<td headers="West stub_1_11 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:59.7509013438217%;height:16px;"></div></div></td>
+<td headers="West stub_1_11 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">1,823 (60%)</td></tr>
+    <tr><th id="stub_1_12" scope="row" class="gt_row gt_left gt_stub">Likely owner occupied, no exemption</th>
+<td headers="West stub_1_12 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:54.7521865889213%;height:16px;"></div></div></td>
+<td headers="West stub_1_12 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">939 (55%)</td></tr>
+    <tr><th id="stub_1_13" scope="row" class="gt_row gt_left gt_stub">Trust owned</th>
+<td headers="West stub_1_13 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:55.9796437659033%;height:16px;"></div></div></td>
+<td headers="West stub_1_13 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">440 (56%)</td></tr>
+    <tr><th id="stub_1_14" scope="row" class="gt_row gt_left gt_stub">Renter occupied</th>
+<td headers="West stub_1_14 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:44.367816091954%;height:16px;"></div></div></td>
+<td headers="West stub_1_14 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">386 (44%)</td></tr>
+    <tr><th id="stub_1_15" scope="row" class="gt_row gt_left gt_stub">Owner &amp; renter occupied</th>
+<td headers="West stub_1_15 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:44.6774193548387%;height:16px;"></div></div></td>
+<td headers="West stub_1_15 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">277 (45%)</td></tr>
+    <tr><th id="stub_1_16" scope="row" class="gt_row gt_left gt_stub">Sold to state</th>
+<td headers="West stub_1_16 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:46.6666666666667%;height:16px;"></div></div></td>
+<td headers="West stub_1_16 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">49 (47%)</td></tr>
+    <tr><th id="stub_1_17" scope="row" class="gt_row gt_left gt_stub">Other ownership</th>
+<td headers="West stub_1_17 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:93.8775510204082%;height:16px;"></div></div></td>
+<td headers="West stub_1_17 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">46 (94%)</td></tr>
+    <tr><th id="stub_1_18" scope="row" class="gt_row gt_left gt_stub">Corporation owned</th>
+<td headers="West stub_1_18 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:46.2365591397849%;height:16px;"></div></div></td>
+<td headers="West stub_1_18 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">43 (46%)</td></tr>
+    <tr><th id="stub_1_19" scope="row" class="gt_row gt_left gt_stub">Church or charity owned</th>
+<td headers="West stub_1_19 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:29.6296296296296%;height:16px;"></div></div></td>
+<td headers="West stub_1_19 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">8 (30%)</td></tr>
+    <tr><th id="stub_1_20" scope="row" class="gt_row gt_left gt_stub">Government owned</th>
+<td headers="West stub_1_20 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:11.7647058823529%;height:16px;"></div></div></td>
+<td headers="West stub_1_20 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">2 (12%)</td></tr>
+    <tr class="gt_group_heading_row">
+      <th colspan="3" class="gt_group_heading" scope="colgroup" id="East">East</th>
+    </tr>
+    <tr class="gt_row_group_first"><th id="stub_1_21" scope="row" class="gt_row gt_left gt_stub">Owner occupied, homeowner exemption</th>
+<td headers="East stub_1_21 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:31.9164265129683%;height:16px;"></div></div></td>
+<td headers="East stub_1_21 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">886 (32%)</td></tr>
+    <tr><th id="stub_1_22" scope="row" class="gt_row gt_left gt_stub">Likely owner occupied, no exemption</th>
+<td headers="East stub_1_22 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:30.3477344573235%;height:16px;"></div></div></td>
+<td headers="East stub_1_22 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">288 (30%)</td></tr>
+    <tr><th id="stub_1_23" scope="row" class="gt_row gt_left gt_stub">Trust owned</th>
+<td headers="East stub_1_23 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:32.3485967503693%;height:16px;"></div></div></td>
+<td headers="East stub_1_23 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">219 (32%)</td></tr>
+    <tr><th id="stub_1_24" scope="row" class="gt_row gt_left gt_stub">Owner &amp; renter occupied</th>
+<td headers="East stub_1_24 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:27.3127753303965%;height:16px;"></div></div></td>
+<td headers="East stub_1_24 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">124 (27%)</td></tr>
+    <tr><th id="stub_1_25" scope="row" class="gt_row gt_left gt_stub">Renter occupied</th>
+<td headers="East stub_1_25 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:18.3641975308642%;height:16px;"></div></div></td>
+<td headers="East stub_1_25 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">119 (18%)</td></tr>
+    <tr><th id="stub_1_26" scope="row" class="gt_row gt_left gt_stub">Sold to state</th>
+<td headers="East stub_1_26 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:27.7777777777778%;height:16px;"></div></div></td>
+<td headers="East stub_1_26 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">15 (28%)</td></tr>
+    <tr><th id="stub_1_27" scope="row" class="gt_row gt_left gt_stub">Corporation owned</th>
+<td headers="East stub_1_27 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:25%;height:16px;"></div></div></td>
+<td headers="East stub_1_27 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">10 (25%)</td></tr>
+    <tr><th id="stub_1_28" scope="row" class="gt_row gt_left gt_stub">Church or charity owned</th>
+<td headers="East stub_1_28 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:33.3333333333333%;height:16px;"></div></div></td>
+<td headers="East stub_1_28 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">2 (33%)</td></tr>
+    <tr><th id="stub_1_29" scope="row" class="gt_row gt_left gt_stub">Government owned</th>
+<td headers="East stub_1_29 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:0%;height:16px;"></div></div></td>
+<td headers="East stub_1_29 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">0 (0%)</td></tr>
+    <tr><th id="stub_1_30" scope="row" class="gt_row gt_left gt_stub">Other ownership</th>
+<td headers="East stub_1_30 Share of Housing Type Lost" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;"><div style="flex-grow:1;margin-left:8px;background:transparent;"><div style="background:#3A207D;width:NA%;height:16px;"></div></div></td>
+<td headers="East stub_1_30 Count (%)" class="gt_row gt_left" style="border-top-width: 1px; border-top-style: solid; border-top-color: #DEDEDE; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #DEDEDE;">0 (NA%)</td></tr>
+  </tbody>
+  
+  <tfoot class="gt_footnotes">
+    <tr>
+      <td class="gt_footnote" colspan="3"> Catalyst California&#39;s calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025.</td>
+    </tr>
+  </tfoot>
+</table>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
