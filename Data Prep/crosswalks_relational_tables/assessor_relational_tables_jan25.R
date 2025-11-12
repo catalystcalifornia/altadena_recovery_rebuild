@@ -606,7 +606,6 @@ nrow(rel_res_df_final) #same count
 #                      'Original use code for reference')
 # 
 # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
->>>>>>> 694b5f0bb3670547d2ac8ded2b5dc04eb412c17c
 
 # STEP 4: TABLE 2: Table to indicate West or East Altadena with geometry ------
 rel_area_geom_df <- parcels_altadena %>%
