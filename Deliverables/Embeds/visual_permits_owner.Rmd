@@ -40,9 +40,9 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Depending on the ownership type of the property, different strategies will be needed to jumpstart property owners rebuilding. Across Altadena, most significantly damaged properties have not submitted any permit applications regardless of ownership type. Renter-occupied and LLC-owned properties are most likely to have not completed debris removal though these represent a small percentage of all renter-occupied or LLC-owned properties. In Altadena, over 5% of significantly damaged, renter-occupied properties have not completed debris removal.
+Depending on the ownership type of the property, different strategies will be needed to jumpstart rebuilding. Across Altadena, most significantly damaged properties have not had any permit applications submitted regardless of ownership type. Renter-occupied properties are most likely to have not completed fire debris removal though these represent a small percentage of all renter-occupied properties. About 5% of significantly damaged, renter-occupied properties have not completed fire debris removal.
 
-Generally, zero to 1.8% of significantly damaged properties in Altadena are rebuilt across ownership types. More properties have at least applied for permits and are awaiting construction. In Altadena, 24% of owner-occupied and 22% renter-occupied properties alike are awaiting the start of construction--meaning permits have been approved but construction has not started. A large percentage of all ownership types have not applied for permits. This suggests across the board property owners in Altadena are slowly progressing toward building efforts. Policymakers should further investigate how to tailor recovery supports for each ownership type, with an emphasis on owner-occupied properties to help retain homeownership rates in Altadena.
+Generally, zero to 3.2% of significantly damaged properties in Altadena are rebuilt across ownership types. More properties have at least applied for permits, but have not started construction. In Altadena, 23% of owner-occupied and 22% of renter-occupied properties alike have been issued permits, but have not started construction. A larger percentage of all ownership types have not applied for permits. This suggests across the board property owners in Altadena are slowly progressing toward building efforts. The few significantly damaged properties in Altadena that have been sold to state or are under other ownership are slightly further behind. About 78% of properties sold to state have not submitted permit applications and 100% of properties that are under other ownership have not submitted permit applications. Policymakers should further investigate how to tailor recovery supports for each ownership type and ensure all properties are progressing toward rebuilding. This can include holding government, corporate, or other owners accountable for rebuilding, and providing support to owner-occupied or renter-occupied properties to preserve the diversity of housing options in Altadena.
 
 ```{r}
 #### VISUAL: Permit statuses by area and owner type for significantly damaged properties  ####
@@ -51,9 +51,7 @@ df_ <- st_read(con, query="Select * from data.analysis_permits_owner_renter_jan2
 # pivot to wide for the table
 df <- df_ %>%
   # clean up labels ahead of pivot
-  mutate(rebuild_status=
-           case_when(rebuild_status=="Need more info" ~ "No Evidence of Progress",
-                     TRUE ~ str_to_title(rebuild_status))) %>%
+  mutate(rebuild_status=str_to_title(rebuild_status)) %>%
   select(-count) %>% # focus on prc
     pivot_wider( # pivot
       id_cols=c(area_name,owner_renter,total), # keep total
@@ -64,24 +62,35 @@ df <- df_ %>%
 
 # keep principal ownership types for comparison
 df <- df %>%
-  filter(!owner_renter %in% c("SBE or Government owned","Church/Welfare exemption"))
+  filter(!owner_renter %in% c("Government owned","Church or charity owned"))
+
+# factor level of ownership types
+df$`Ownership Type`<- factor(df$owner_renter, levels = c(
+                                                             "Owner occupied, homeowner exemption",
+                                                             "Likely owner occupied, no exemption",
+                                                             "Owner & renter occupied",
+                                                             "Renter occupied",
+                                                             "Trust owned",
+                                                             "Corporation owned",
+                                                             "Sold to state",
+                                                             "Other ownership"))
 
 df <- df %>% # 
   # rename columns for visuals
-  mutate("Ownership Type"=owner_renter,
+  mutate(
          "Total Properties"=total,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   # reorder, dropping no evidence of progress given the small %
  select("Area","Ownership Type", "Total Properties",
-        "Debris Removal Incomplete","Awaiting Permit Application","Awaiting Construction Start", "Construction In Progress", "Rebuild Complete")%>%
-  arrange(Area, desc(`Total Properties`))
+        "Fire Debris Removal Incomplete","Permit Application Not Received","Construction Not Started", "Construction In Progress", "Rebuild Complete")%>%
+  arrange(Area, `Ownership Type`)
 
 table<- df %>%
   gt(groupname_col = "Area", rowname_col = "Ownership Type") %>%
-  gt_plt_bar_pct(column= 'Debris Removal Incomplete',  scaled=TRUE, fill=meteorite, background=gainsboro)%>%
-  gt_plt_bar_pct(column= 'Awaiting Permit Application', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
-  gt_plt_bar_pct(column= 'Awaiting Construction Start', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
+  gt_plt_bar_pct(column= 'Fire Debris Removal Incomplete',  scaled=TRUE, fill=meteorite, background=gainsboro)%>%
+  gt_plt_bar_pct(column= 'Permit Application Not Received', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
+  gt_plt_bar_pct(column= 'Construction Not Started', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   gt_plt_bar_pct(column= 'Construction In Progress', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   gt_plt_bar_pct(column= 'Rebuild Complete', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   tab_header(title= "Rebuild Status of Significantly Damaged Properties",
@@ -92,6 +101,9 @@ table<- df %>%
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
   opt_align_table_header("left")%>%
+    cols_align(
+    align = "left",
+    columns = everything())%>%
   opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",
