@@ -7,10 +7,9 @@ output: rmarkdown::html_vignette
 <!-- <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet"> -->
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE
-)
+knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = FALSE)
 
-## The following document outputs a visual of the housing stock before in a table format for the altadena_housing_before_and_after.html 
+
 
 #### Setting Up ####
 
@@ -75,13 +74,16 @@ df <- df_ %>%
   ))
 
 df$month <- factor(df$month, levels = c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"))
-                   
+```
+
+```{r, fig.width = 8, fig.height = 5}
     ggplot(df, aes(x = month, y = sales_count, color = last_sale_year, group = last_sale_year)) +
-      geom_line() +
+      # geom_line() +
+      geom_line(linewidth = 0.75) +
       geom_point() +
       labs(title = "Altadena Residential Sales by Year and Month",
            x = "",
-           y = "Properties Sold Count",
+           y = "Count of Properties Sold",
            caption="Catalyst California's calculations of L.A. County Assessor Data, September 2025.") +
       theme_minimal() + # Optional: for a cleaner theme
       labs(color="") +
@@ -90,7 +92,7 @@ df$month <- factor(df$month, levels = c("Jan","Feb","Mar","Apr","May","Jun","Jul
   # panel.grid.minor.y = element_blank(),
 plot.title = element_text(family = "Inter", size=18, face="bold"),
         # plot.subtitle = element_text(family = "Inter", size = 12, color = black),
-        plot.caption = element_text(family = "Inter", size = 12, color = "#6F6F6F", hjust=0),
+        plot.caption = element_text(family = "Inter", size = 10, color = "#6F6F6F", hjust=0),
         legend.title = element_text(family = "Inter", size = 16,),
         legend.text = element_text(family = "Inter", size = 16),
 axis.text.y=element_text(family = "Inter", size = 12, color = "#6F6F6F"),
