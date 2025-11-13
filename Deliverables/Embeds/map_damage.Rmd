@@ -111,6 +111,9 @@ all_df <- parcels_res_damaged %>%
   left_join(sept_contact, by = "ain_sept") %>%
   left_join(sept_rebuild, by="ain_sept")
 
+```
+
+```{r}
 
 ### factors and paletes for other polygons ----
 # high lead grid colors
@@ -164,12 +167,11 @@ sept_sales_sf <- all_df %>%
   filter(sold_after_eaton==TRUE) %>%
   select(ain_sept, sold_after_eaton, geom) 
 
-# rebuild status
-sept_rebuild_sf <- all_df %>%
-  select(ain_sept, rebuild_status) %>%
+# rebuild status factor
+all_df <- all_df %>%
   mutate(rebuild_status_factor = factor(
     rebuild_status, 
-    levels=c("Debris Removal Incomplete", "Awaiting Permit Application", "Awaiting Construction Start", "Construction In Progress", "Rebuild Complete")))
+    levels=c("Fire Debris Removal Incomplete", "Permit Application Not Received", "Construction Not Started", "Construction In Progress", "Rebuild Complete")))
 
 # Create a color palette based on the factor
 zoning_pal <- colorFactor(
@@ -177,8 +179,8 @@ zoning_pal <- colorFactor(
   domain = df_zoning_lac$zone_label)
 
 rebuild_pal <- colorFactor(
-  palette = c("#E3D5FF", "#C3A0F4", "#8B5FBF", "#4C2393", "#2E0C6A"),
-  domain= sept_rebuild_sf$rebuild_status_factor
+  palette = c("#E2D9FF","#D3B9FF","#7A47BA", "#37157A","#1F0E4D"),
+  domain= all_df$rebuild_status_factor
 )
 
 ```
@@ -198,6 +200,7 @@ all_df <- all_df %>%
          combined_fhsz,
          hi_lead_label,
          rebuild_status,
+         rebuild_status_factor,
          sold_after_eaton)
 
 popup_parcel <- paste0("<div class='parcel-popups'> <div class='leaflet-data-parcel' data-ain='", all_df$ain_sept,
@@ -378,11 +381,11 @@ leaflet(
     color="white",
     weight=0.2,
     opacity=1,
-    popup=popup_parcel,
+    # popup=popup_parcel,
     group="Sold After Eaton Fire") %>%
   # Rebuild Status
   addPolygons(
-    data=sept_rebuild_sf,
+    data=all_df,
     fillColor=~rebuild_pal(rebuild_status_factor),
     fillOpacity=1,
     color="white",
@@ -393,7 +396,7 @@ leaflet(
   addLegend(
     position = "bottomright",
     pal = rebuild_pal,
-    values =  sept_rebuild_sf$rebuild_status_factor,
+    values =  all_df$rebuild_status_factor,
     group="Rebuild Status",
     title = "Rebuild Status",
     opacity=1) %>% 
@@ -407,7 +410,9 @@ leaflet(
                       "Eaton Fire Perimeter"),
     options = layersControlOptions(collapsed = FALSE, autoZIndex = TRUE))  %>%
   hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones",
-              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status")) %>% addFullscreenControl()
+              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status")) 
+
+# %>% addFullscreenControl() # cutting off pop-up
 
 ```
 
