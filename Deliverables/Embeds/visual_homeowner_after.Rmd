@@ -46,7 +46,7 @@ We examined the percentage of properties sustaining significant damage out of ea
 
 While a significant share of owners lost their properties across ownership types, owner-occupied, likely owner-occupied, and trust-owned properties had the greatest losses in West and East Altadena. Additionally, a greater share of homeowners in West Altadena lost their properties compared to homeowners in East Altadena. In West Altadena, nearly twice the rate of owner-occupied properties were significantly damaged or destroyed (60%) compared to East Altadena (32%). Similarly, a greater number of renters lost their homes in West Altadena than in East Altadena. Renter-occupied properties in West Altadena were significantly damaged (44%) at nearly 2.5 times the rate of renter-occupied properties in East Altadena (18%). These trends underscore the devastation in West Altadena, and the need to have strategies that support both owner-occupied and renter-occupied properties in rebuilding.
 
-While the total number is small, a large share of 'Other ownership' properties were significantly damaged in both West and East Altadena. These properties are not owner occupied and do not show evidence of having any rental units. They also do not appear to be owned in a trust or corporation, but rather seem to be owned by private investors. 
+While a large share of 'Other ownership' properties were significantly damaged in West Altadena, these are largely due to condominium complexes where the entire complex was destroyed. These properties are not owner occupied and do not show evidence of having any rental units. They also do not appear to be owned in a trust or corporation, but are owned by a private investor. 
 
 ```{r}
 #### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
@@ -55,13 +55,25 @@ df_ <- st_read(con, query="Select * from data.analysis_owner_renter_damage")
 df <- df_ %>%
     filter(damage_category == "Significant Damage") 
 
+# factor level of ownership types
+df$`Ownership Type`<- factor(df$owner_renter, levels = c("Owner occupied, homeowner exemption",
+                                                             "Likely owner occupied, no exemption",
+                                                             "Renter occupied",
+                                                             "Owner & renter occupied",
+                                                             "Trust owned",
+                                                             "Corporation owned",
+                                                             "Sold to state",
+                                                             "Other ownership",
+                                                             "Government owned",
+                                                             "Church or charity owned"))
+
 df <- df %>%
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
+  mutate("Count (%)"=ifelse(total==0, NA, paste0(comma(count)," (",round(prc,0),"%)")),
+         prc=ifelse(total==0,0,prc),
          "Share of Housing Type Lost"=prc,
-         "Ownership Type" = owner_renter,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(count)) 
+  arrange(Area,`Ownership Type`) 
 
 
 table<- df %>%
@@ -76,6 +88,8 @@ table<- df %>%
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
   opt_align_table_header("left")%>%
+      cols_align(align="left",
+              columns=`Ownership Type`) %>%
   opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",
