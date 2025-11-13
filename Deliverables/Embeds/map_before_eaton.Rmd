@@ -106,29 +106,29 @@ unit_pal <- colorFactor(palette = c("#9BCCFF","#177FEB","#0860BC"), domain = par
 
 
 # homeowner layer ----
-# table(parcels_res$owner_renter, useNA='always') # check numbers
+table(parcels_res$owner_renter, useNA='always') # check numbers
 
 # recode further for simpler labels
 parcels_res <- parcels_res %>%
   mutate(owner_renter_label=case_when(
-    grepl("owner occupied|Owner occupied",owner_renter) ~ "Owner-occupied/Likely owner-occupied",
-    owner_renter=="Sold to state" ~ "Sold to state/Government-owned",
-    owner_renter=="SBE or Government owned" ~ "Sold to state/Government-owned",
-    owner_renter=="Church or charity owned" ~ "Church/Welfare exemption",
+    grepl("owner occupied|Owner occupied",owner_renter) ~ "Owner occupied/Likely owner occupied",
+    owner_renter=="Sold to state" ~ "Sold to state/Government owned",
+    owner_renter=="Government owned" ~ "Sold to state/Government owned",
+     grepl("renter occupied|Renter occupied",owner_renter) ~ "Renter occupied/Owner & renter occupied",
     owner_renter=="Other ownership" ~ "Other",
     TRUE ~ owner_renter
   )) 
 
-# table(parcels_res$owner_renter_label, useNA='always') # check numbers
+table(parcels_res$owner_renter_label, useNA='always') # check numbers
 
 # create factor level
 parcels_res$owner_renter_factor<- factor(
       parcels_res$owner_renter_label,
-      levels = c("Owner & renter occupied", "Owner-occupied/Likely owner-occupied","Renter occupied","Trust owned","Sold to state/Government-owned","Church/Welfare exemption", "Other") # Define the order of levels
+      levels = c("Owner occupied/Likely owner occupied","Renter occupied/Owner & renter occupied","Trust owned","Corporation owned","Sold to state/Government owned","Church or charity owned", "Other") # Define the order of levels
     )
 
 # Create a color palette based on the factor
-owner_pal <- colorFactor(palette = c( "#E9FFAA","#C8F000","#6EA400","#C27AA1","#6F6F6F","#BABABA", "#E0E0E0"), domain = parcels_res$owner_renter_factor)
+owner_pal <- colorFactor(palette = c( "#E9FFAA","#6EA400","#C27AA1","#733256","#6F6F6F","#BABABA", "#E0E0E0"), domain = parcels_res$owner_renter_factor)
 
 # create popup
 popup_res <-  paste0(
