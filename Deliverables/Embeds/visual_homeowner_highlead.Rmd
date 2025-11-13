@@ -54,18 +54,28 @@ df_raw <- st_read(con, query="Select * from data.analysis_owner_renter_damage_le
 high_lead <- df_raw %>%
   filter(hi_lead_label=="High Lead Grid")
 
-# take out 	
-# Church/Welfare exemption and SBE or Government owned for simplicity
 
 df<- df_raw %>%
   filter(damage_category=="Significant Damage" & hi_lead_label=="High Lead Grid") %>%
-  filter(!owner_renter %in% c("Church/Welfare exemption","SBE or Government owned")) %>%
+  filter(!owner_renter %in% c("Church or charity owned","Government owned")) 
+
+# factor level of ownership types
+df$`Ownership Type`<- factor(df$owner_renter, levels = c("Owner occupied, homeowner exemption",
+                                                             "Likely owner occupied, no exemption",
+                                                             "Renter occupied",
+                                                             "Owner & renter occupied",
+                                                             "Trust owned",
+                                                             "Corporation owned",
+                                                             "Sold to state",
+                                                             "Other ownership"
+                                                             ))
+
+df <- df %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),        
          "Properties in Areas with High Lead Levels"=prc,         
-         "Ownership Type" = owner_renter,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>% 
-  arrange(desc(count))
+  arrange(Area,`Ownership Type`) 
 
 
 table<- df %>%
@@ -77,6 +87,8 @@ table<- df %>%
  table%>%
   gt_plt_bar_pct(column= "Properties in Areas with High Lead Levels", scaled=TRUE, fill=meteorite, background="transparent")%>%
   opt_align_table_header("left")%>%
+         cols_align(align="left",
+              columns=`Ownership Type`) %>%
   opt_table_font(font=c("Inter", default_fonts())) %>% 
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",

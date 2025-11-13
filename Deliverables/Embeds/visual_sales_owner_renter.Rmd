@@ -42,9 +42,9 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-We also examined the share of each ownership type that has sold since the Eaton Fire. Understanding which properties are selling at faster rates can help signal trends toward displacement and disaster capitalism, or corporate investors exploiting survivors during their recovery.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] As of September 2025, most properties that have sold since the fire were owner-occupied before fire, but these properties are not selling at a faster rate than other properties in Altadena. Owner-occupied properties in East and West Altadena saw the greatest number of sales after the Eaton Fire, but overall only two percent of owner-occupied properties have sold. A higher share of properties that were owned by a corporation before the fire have sold in East Altadena--8 percent of corporate-owned properties from January 2025 have sold.
+We also examined the share of each ownership type that has sold since the Eaton Fire. Understanding which properties are selling at faster rates can help signal trends toward displacement and disaster capitalism, or corporate investors exploiting survivors during their recovery.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] As of September 2025, most properties that have sold since the fire were owner-occupied before fire, but these properties are not selling at a faster rate than other properties. Overall only two percent of owner-occupied properties have sold. A higher share of properties that were owned by a corporation before the fire have sold--eight percent of corporate-owned properties from January 2025 have sold. The majority of these sales occurred in West Altadena and in fact, a greater share of corporate-owned properties in West Altadena have sold (11%). While property records do not specify whether these properties were owner- or renter-occupied before the fire, we assume the majority were rental units.
 
-Recent research from SAJE has shown how corporate investors have already exploited the Altadena community. Between February and July 2025, nearly half of parcels (47%) were purchased by corporate entities compared to only 10% bought by corporate entities in the prior year.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] Long-term strategies to support property owners throughout their recovery are needed to help preserve ownership in Altadena and reduce the track of speculation.
+Recent research from SAJE has also shown how corporate investors have already exploited the Altadena community. Between February and July 2025, nearly half of parcels (47%) were purchased by corporate entities compared to only 10% bought by corporate entities in the prior year.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] Long-term strategies to support property owners throughout their recovery are needed to help preserve opportunities for homeowners and renters in Altadena and reduce the track of speculation. 
 
 ```{r}
 #### VISUAL: Sale rates by damage and area ####
@@ -53,14 +53,24 @@ df_ <- st_read(con, query="Select * from data.analysis_sales_owner_renter_sept20
 df <- df_ %>%
     filter(sold_after_eaton == "Sold") 
 
+# factor level of ownership types
+df$`Ownership Type`<- factor(df$owner_renter_jan, levels = c("Owner occupied, homeowner exemption",
+                                                             "Likely owner occupied, no exemption",
+                                                             "Renter occupied",
+                                                             "Owner & renter occupied",
+                                                             "Trust owned",
+                                                             "Corporation owned",
+                                                             "Sold to state"
+                                                             ))
+
+
 df <- df %>%
   select(-c(sold_after_eaton,owner_renter_total)) %>%
   mutate("Count (%)"=paste0(comma(sold_count)," (",round(sold_prc,0),"%)"),
          "Share of Housing Type Sold"=sold_prc,
-         "Ownership Type" = owner_renter_jan,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(sold_count)) 
+  arrange(Area,`Ownership Type`) 
 
 
 table<- df %>%
@@ -74,7 +84,9 @@ table<- df %>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
-  opt_align_table_header("left")%>%
+  opt_align_table_header("left")%>%       
+   cols_align(align="left",
+              columns=`Ownership Type`) %>%
   opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",
