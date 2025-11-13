@@ -53,14 +53,24 @@ df_ <- st_read(con, query="Select * from data.analysis_sales_owner_renter_sept20
 df <- df_ %>%
     filter(sold_after_eaton == "Sold") 
 
+# factor level of ownership types
+df$`Ownership Type`<- factor(df$owner_renter_jan, levels = c("Owner occupied, homeowner exemption",
+                                                             "Likely owner occupied, no exemption",
+                                                             "Renter occupied",
+                                                             "Owner & renter occupied",
+                                                             "Trust owned",
+                                                             "Corporation owned",
+                                                             "Sold to state"
+                                                             ))
+
+
 df <- df %>%
   select(-c(sold_after_eaton,owner_renter_total)) %>%
   mutate("Count (%)"=paste0(comma(sold_count)," (",round(sold_prc,0),"%)"),
          "Share of Housing Type Sold"=sold_prc,
-         "Ownership Type" = owner_renter_jan,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(sold_count)) 
+  arrange(Area,`Ownership Type`) 
 
 
 table<- df %>%
@@ -74,7 +84,9 @@ table<- df %>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
-  opt_align_table_header("left")%>%
+  opt_align_table_header("left")%>%       
+   cols_align(align="left",
+              columns=`Ownership Type`) %>%
   opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",
