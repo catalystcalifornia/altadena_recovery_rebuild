@@ -15,8 +15,10 @@ knitr::opts_chunk$set(comment = FALSE, message = FALSE, warning = FALSE, echo = 
 
 library(sf)
 library(dplyr)
+library(scales)
 library(rmapshaper)
 library(leaflet)
+library(leaflet.extras)
 library(htmlwidgets)
 options(scipen=999)
 
@@ -87,7 +89,7 @@ res_pal <- colorFactor(palette = c("#F25922","#FF9E0D","#FFCC00"), domain = parc
 # create typology
 parcels_res <- parcels_res %>%
   mutate(unit_category=case_when(total_units==1 ~ "1",
-                                 total_units>=2 & total_units<5 ~"2-5",
+                                 total_units>=2 & total_units<5 ~"2-4",
                                  total_units>=5 ~ "5 or more",
                                  TRUE ~ NA))
 
@@ -96,7 +98,7 @@ parcels_res <- parcels_res %>%
 # create factor level
 parcels_res$unit_category_factor <- factor(
       parcels_res$unit_category,
-      levels = c("1","2-5","5 or more") # Define the order of levels
+      levels = c("1","2-4","5 or more") # Define the order of levels
     )
 
 # Create a color palette based on the factor
@@ -104,28 +106,29 @@ unit_pal <- colorFactor(palette = c("#9BCCFF","#177FEB","#0860BC"), domain = par
 
 
 # homeowner layer ----
-# table(parcels_res$owner_renter, useNA='always') # check numbers
+table(parcels_res$owner_renter, useNA='always') # check numbers
 
 # recode further for simpler labels
 parcels_res <- parcels_res %>%
   mutate(owner_renter_label=case_when(
-    grepl("owner|Owner",owner_renter) ~ "Owner-occupied/Likely owner-occupied",
-    owner_renter=="Sold to state" ~ "Sold to state/Government-owned",
-    owner_renter=="SBE or Government owned" ~ "Sold to state/Government-owned",
+    grepl("owner occupied|Owner occupied",owner_renter) ~ "Owner occupied/Likely owner occupied",
+    owner_renter=="Sold to state" ~ "Sold to state/Government owned",
+    owner_renter=="Government owned" ~ "Sold to state/Government owned",
+     grepl("renter occupied|Renter occupied",owner_renter) ~ "Renter occupied/Owner & renter occupied",
+    owner_renter=="Other ownership" ~ "Other",
     TRUE ~ owner_renter
-  ))
+  )) 
 
-# table(parcels_res$owner_renter_label, useNA='always') # check numbers
+table(parcels_res$owner_renter_label, useNA='always') # check numbers
 
 # create factor level
 parcels_res$owner_renter_factor<- factor(
       parcels_res$owner_renter_label,
-      levels = c("Owner-occupied/Likely owner-occupied","Renter occupied","Trust owned","LLC owned","Sold to state/Government-owned","Church/Welfare exemption") # Define the order of levels
+      levels = c("Owner occupied/Likely owner occupied","Renter occupied/Owner & renter occupied","Trust owned","Corporation owned","Sold to state/Government owned","Church or charity owned", "Other") # Define the order of levels
     )
 
 # Create a color palette based on the factor
-owner_pal <- colorFactor(palette = c("#E7FF39","#BCD313","#C27AA1","#733256","#6F6F6F","#BABABA"), domain = parcels_res$owner_renter_factor)
-
+owner_pal <- colorFactor(palette = c( "#E9FFAA","#6EA400","#C27AA1","#733256","#6F6F6F","#BABABA", "#E0E0E0"), domain = parcels_res$owner_renter_factor)
 
 # create popup
 popup_res <-  paste0(
@@ -133,7 +136,7 @@ popup_res <-  paste0(
       "Residential Type: ",  parcels_res$res_type, "</br>",
       "Ownership Type: ",  parcels_res$owner_renter, "</br>",
       "Units (Total/Rental): ",  parcels_res$total_units, "/", parcels_res$landlord_units, "</br>",
-      "Total Square Feet: ", parcels_res$total_square_feet, "</br>",
+      "Total Square Feet: ", comma(parcels_res$total_square_feet), "</br>",
        "Use Code: ",  parcels_res$use_code)
 ```
 
@@ -235,7 +238,7 @@ leaflet(
                       "East Altadena","Eaton Fire Perimeter"),
     options = layersControlOptions(collapsed = FALSE))  %>%
   hideGroup(c("Eaton Fire Perimeter","Residential Unit Sizes","Ownership Type",
-              "Mixed Use Properties"))
+              "Mixed Use Properties")) %>% addFullscreenControl()
 
 ```
 
