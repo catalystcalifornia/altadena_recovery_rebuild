@@ -44,15 +44,15 @@ gainsboro <- "#DEDEDE"
 
 We analyzed the ownership types of residential properties in Altadena before and after the Eaton fire. We classified ownership based on owner information, unit types, and exemption characteristics associated with each property. 
 
-* Owner-occupied, homeowner exemption: Properties with a homeowner or veteran's exemption on the property tax bill. This includes properties with a homeowner exemption where a homeowner and renter may live on the property.
+* Owner-occupied, homeowner exemption: Properties with a homeowner or veteran's exemption on the property tax bill, but has no rental units listed on the property record.
 * Likely owner occupied, no exemption: Properties that are owned individually, but have no exemption type listed on the property tax bill. We assume most of these may be homeowners that have not claimed their homeowner exemption.
 * Renter occupied: Properties solely with renter-occupied units on the property, and no exemption type listed.
-* Owner and renter occupied: Properties with a homeowner exemption and landlord units listed on the property.
+* Owner and renter occupied: Properties with a homeowner exemption and rental units listed on the property.
 * Trust owned: Properties with no rental units or property tax exemptions and that are owned in a trust.
 * Sold to state: Properties that are tax delinquent and recorded as being sold to the state. These may include owner- or renter-occupied units.
-* Corporation owned:  Properties with no rental units or property tax exemptions and that are owned in a LLC.
-* Government-owned: Properties that have are government-owned and have no rental units.
-* Church or charity: Properties that have a church, religious, or welfare tax exemption on the property and that have no rental units.
+* Corporation owned:  Properties with no rental units or property tax exemptions and that are owned in a LLC, LP, corporation, or investment company.
+* Government-owned: Properties that are government-owned and have no rental units.
+* Church or charity: Properties that have a church, religious, or welfare tax exemption on the property, or are ownded  and that have no rental units.
 
 In January 2025, most homes in Altadena were occupied by homeowners rather than renters. Overall, at least 45% of properties were owner-occupied. Properties in East Altadena were more likely to be owner-occupied -- 50% of properties were owner-occupied compared 42% in West Altadena. In each area, only 12% of properties were renter-occupied. About 11% of properties across Altadena are owned in a trust, but have no exemptions or rental units. These could be owner-occupied properties that have not claimed an exemption, family homes or inheritances, or rentals that are not recorded accurately. Tracking these ownership characteristics can help evaluate how Altadena changes over time in recovery, including if the number of corporate- or government-owned properties increase.
 
