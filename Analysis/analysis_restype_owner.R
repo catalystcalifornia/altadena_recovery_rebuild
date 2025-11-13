@@ -141,7 +141,7 @@ analysis_owner_renter_damage <- all_df %>%
 #   "percent"
 #   )
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-# 
+
 # dbWriteTable(con, name = "analysis_restype_damage", value = analysis_restype_damage, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_restype_damage"

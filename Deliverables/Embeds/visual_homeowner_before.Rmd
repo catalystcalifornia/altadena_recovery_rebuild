@@ -44,28 +44,41 @@ gainsboro <- "#DEDEDE"
 
 We analyzed the ownership types of residential properties in Altadena before and after the Eaton fire. We classified ownership based on owner information, unit types, and exemption characteristics associated with each property. 
 
-* Owner-occupied: Properties with a homeowner or veteran's exemption on the property tax bill. This includes properties with a homeowner exemption where a homeowner and renter may live on the property.
-* Likely owner-occupied: Properties that are owned individually, but have no exemption type listed on the property tax bill. We assume most of these may be homeowners that have not claimed their homeowner exemption.
-* Renter-occupied: Properties solely with renter-occupied units on the property, and no exemption type listed.
-* Trust-owned: Properties with no rental units or property tax exemptions and that are owned in a trust.
+* Owner occupied, homeowner exemption: Properties with a homeowner or veteran's exemption on the property tax bill, but with no rental units listed on the property record.
+* Likely owner occupied, no exemption: Properties that are owned individually, but have no exemption type listed on the property tax bill. We assume most of these may be homeowners that have not claimed their homeowner exemption.
+* Renter occupied: Properties solely with renter-occupied units on the property, and no exemption type listed.
+* Owner and renter occupied: Properties with a homeowner exemption and rental units listed on the property.
+* Trust owned: Properties with no rental units or property tax exemptions and that are owned in a trust.
 * Sold to state: Properties that are tax delinquent and recorded as being sold to the state. These may include owner- or renter-occupied units.
-* LLC-owned:  Properties with no rental units or property tax exemptions and that are owned in a LLC.
-* SBE or government-owned: Properties that have are government-owned and have no rental units.
-* Church or welfare exemption: Properties that have a church, religious, or welfare tax exemption on the property and that have no rental units.
+* Corporation owned:  Properties with no rental units or property tax exemptions and that are owned in a LLC, LP, corporation, or investment company.
+* Government owned: Properties that are government owned and have no rental units.
+* Church or charity owned: Properties with a church, religious, or welfare tax exemption, or that are owned by churches, social service organizations, or nonprofits, but have no rental units.
+* Other ownership: Properties that are not owner occupied and show no rental units; however, they are also not owned in a trust or corporation. This includes some residential properties owned by water companies and some owned by private investors
 
-In January 2025, most homes in Altadena were occupied by homeowners rather than renters. Overall, at least 53% of properties were owner-occupied. Properties in East Altadena were more likely to be owner-occupied -- 58% of properties were owner-occupied compared 50% in West Altadena. In each area, only 12% of properties were renter-occupied. About 11% of properties across Altadena are owned in a trust, but have no exemptions or rental units. These could be owner-occupied properties that have not claimed an exemption, family homes or inheritances, or rentals that are not recorded accurately. Tracking these ownership characteristics can help evaluate how Altadena changes over time in recovery, including if the number of corporate- or government-owned properties increase.
+In January 2025, most homes in Altadena were occupied by homeowners. Overall, at least 45% of properties were owner-occupied. Properties in East Altadena were more likely to be owner-occupied -- 50% of properties were owner-occupied compared 42% in West Altadena. In each area, 12% of properties were only renter-occupied, but an additional eight percent of properties were owner-occupied with rental units also on the property. About 11% of properties across Altadena are owned in a trust, but have no exemptions or rental units. These could be owner-occupied properties that have not claimed an exemption, family homes or inheritances, or rentals that are not recorded accurately. Tracking these ownership characteristics can help evaluate how Altadena changes over time in recovery, including if the number of corporate- or government-owned properties increase.
 
 ```{r}
 #### VISUAL: Total and types of units prior to the fire in Altadena, East Altadena, West Altadena ####
 df_ <- st_read(con, query="Select * from data.analysis_owner_renter_jan2025") 
 
+# factor level of ownership types
+df_$`Ownership Type`<- factor(df_$owner_renter, levels = c("Owner occupied, homeowner exemption",
+                                                             "Likely owner occupied, no exemption",
+                                                             "Renter occupied",
+                                                             "Owner & renter occupied",
+                                                             "Trust owned",
+                                                             "Corporation owned",
+                                                             "Sold to state",
+                                                             "Other ownership",
+                                                             "Government owned",
+                                                             "Church or charity owned"))
+
 df <- df_ %>%
   mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
          "Share of Housing Stock"=prc,
-         "Ownership Type" = owner_renter,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
-  arrange(desc(count)) 
+  arrange(Area,`Ownership Type`) 
 
 
 table<- df %>%
@@ -80,7 +93,10 @@ table<- df %>%
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
   opt_align_table_header("left")%>%
-  opt_table_font(font=c("Inter", default_fonts())) %>% # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
+  opt_table_font(font=c("Inter", default_fonts())) %>% 
+   cols_align(align="left",
+              columns=`Ownership Type`) %>%
+   # opt_table_font(font=c(google_font(name="Inter"),locations=NULL,default_fonts()))%>%
   tab_options(table.background.color=alabaster,
     column_labels.background.color = "transparent",
     table.font.size = px(12),

@@ -94,9 +94,9 @@ length(unique(data_altadena$ain))
 # Add total units and total square feet for us to see throughout
 data_altadena <- data_altadena %>%
   mutate(total_units = rowSums(across(ends_with("_units"))),
-       total_square_feet = rowSums(across(ends_with("_square_feet"))),
-       total_bedrooms = rowSums(across(ends_with("_bedrooms")))) %>%
-         mutate(total_units=total_units-landlord_units) # so we don't double count rental units
+         total_square_feet = rowSums(across(ends_with("_square_feet"))),
+         total_bedrooms = rowSums(across(ends_with("_bedrooms")))) %>%
+  mutate(total_units=total_units-landlord_units) # so we don't double count rental units
 
 # check
 data_altadena %>%
@@ -216,7 +216,7 @@ data_altadena_mixed_temp %>%
 
 data_altadena_mixed <- data_altadena_mixed_temp  %>%
   filter(total_units>0)
-  
+
 # check
 data_altadena_mixed %>%
   select(total_units, landlord_units, total_square_feet, total_bedrooms, use_code, everything()) %>%
@@ -255,14 +255,14 @@ rel_res_df <- rbind(data_altadena_res, data_altadena_mixed)
 ### Flags for type of residential property
 rel_res_df  <- rel_res_df  %>%
   mutate(
-         res_type=case_when( # type of residential property
-           # condos first
-          str_detect(use_code, "C$|E$") ~ "Condominium",
-          str_detect(use_code, "^01") ~ "Single-family",
-          str_detect(use_code, "^02|^03|^04|^05") ~ "Multifamily",
-          str_detect(use_code,"^08") ~ "Boarding house",
-          str_detect(use_code,"^12|^17") ~ "Mixed use", 
-          TRUE ~NA))
+    res_type=case_when( # type of residential property
+      # condos first
+      str_detect(use_code, "C$|E$") ~ "Condominium",
+      str_detect(use_code, "^01") ~ "Single-family",
+      str_detect(use_code, "^02|^03|^04|^05") ~ "Multifamily",
+      str_detect(use_code,"^08") ~ "Boarding house",
+      str_detect(use_code,"^12|^17") ~ "Mixed use", 
+      TRUE ~NA))
 
 table(rel_res_df$res_type,useNA='always')
 
@@ -284,7 +284,7 @@ rel_res_df <- rel_res_df %>%
     num_howmowner_exemption>=1 & landlord_units==0 ~ "Owner occupied",
     num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner & renter occupied",
     num_howmowner_exemption==0 & landlord_units>=1 ~ "Renter",
-  TRUE ~ NA))
+    TRUE ~ NA))
 
 check <- rel_res_df %>%
   select(owner_renter,num_howmowner_exemption, homeowner_exemption_val,landlord_units, total_units, use_code, total_bedrooms, everything())
@@ -718,7 +718,7 @@ rel_assessor_dins <- rel_assessor_dins %>%
     no_damage_count>=1 ~ "No Damage",
     inaccessible_damage_count>=1 ~ "No Damage",
     TRUE ~ NA))
-    
+
 # check
 rel_assessor_dins %>%
   select(damage_category,everything()) %>%
@@ -804,4 +804,3 @@ rel_assessor_dins_final_final <- bind_rows(rel_assessor_dins_final,residential_a
 #                      'Total unique types of damage')
 # 
 # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-
