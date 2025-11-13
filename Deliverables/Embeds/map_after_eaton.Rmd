@@ -96,7 +96,7 @@ popup_res <-  paste0(
 
 
 # make layer for rental units lost ------
-rental_units <- parcels_res %>% filter(owner_renter=="Renter occupied") %>% filter(damage_category=="Significant Damage")
+rental_units <- parcels_res %>% filter(owner_renter %in% c("Renter occupied", "Owner & renter occupied")) %>% filter(damage_category=="Significant Damage")
 popup_rent <-  paste0(
       "AIN: ", rental_units$ain, "</br>",
       "Damage Category: ",  rental_units$damage_category, "</br>",
