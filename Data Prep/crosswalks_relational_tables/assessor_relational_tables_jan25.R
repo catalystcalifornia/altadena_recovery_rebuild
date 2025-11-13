@@ -804,5 +804,3 @@ rel_assessor_dins_final_final <- bind_rows(rel_assessor_dins_final,residential_a
 #                      'Total unique types of damage')
 # 
 # add_table_comments(con_alt, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
-
->>>>>>> 694b5f0bb3670547d2ac8ded2b5dc04eb412c17c
