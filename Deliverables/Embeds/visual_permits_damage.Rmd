@@ -46,7 +46,7 @@ Meanwhile, owners of significantly damaged properties are facing slow progress t
 * Permit Application Not Received: Fire debris has been removed, either by Army Corps of Engineers or by property owner, but the owner has not applied for a building permit.
 * Construction Not Started: A building permit application has been issued, but there is no indication that construction has started.
 * Construction In Progress: A building permit application has been issued, and at least one inspection has been scheduled, indicating construction has started.
-* Rebuild Complete: All building permits for temporary or permanent housing have been marked "finaled".
+* Rebuild Complete: All building permits for temporary and permanent housing have been marked "finaled".
 
 Significantly damaged properties in West and East Altadena are similar in their rebuild progress. About 70% of properties in each area have completed fire debris removal, but have not applied for a permit to rebuild--68% in West Altadena and 71% in East Altadena. This suggests that many property owners have not made progress toward rebuilding and returning to the community--demonstrating the difficult journey property owners are facing toward being able to finance and manage construction. Policymakers must take additional steps toward supporting owners in acquiring permits to rebuild before more properties are sold.
 
