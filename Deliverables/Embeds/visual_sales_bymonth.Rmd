@@ -55,7 +55,7 @@ showtext_auto()
 
 ```
 
-Home sales in Altadena surged after the Eaton fire. In April 2025, over twice as many properties sold compared to either of the past two years. This provides evidence of real estate speculation occurring immediately after the Eaton fire, and how real estate speculators took advantage of property owners in their most vulnerable time. However, since April 2025, sales have dramatically dropped. This subsequent drop raises concerns about why sales are lower now compared to prior years.
+Home sales in Altadena surged after the Eaton fire. In April 2025, over twice as many properties sold compared to either of the past two years. This provides evidence of real estate speculation occurring immediately after the Eaton fire, and how real estate speculators took advantage of property owners in their most vulnerable time. However, since April 2025, sales have dramatically dropped. This subsequent drop represents a win for community members who do not want to see homes sold to outside interests. However, it's unclear how this drop could affect owners that need to sell.
 
 ```{r}
 #### VISUAL: Sale rates by damage and area ####
@@ -90,15 +90,15 @@ df$month <- factor(df$month, levels = c("Jan","Feb","Mar","Apr","May","Jun","Jul
       theme(legend.position="top",
              panel.grid.minor.x = element_blank(),
   # panel.grid.minor.y = element_blank(),
-plot.title = element_text(family = "Inter", size=18, face="bold"),
+plot.title = element_text(family = "Inter", size=24, face="bold"),
         # plot.subtitle = element_text(family = "Inter", size = 12, color = black),
-        plot.caption = element_text(family = "Inter", size = 10, color = "#6F6F6F", hjust=0),
-        legend.title = element_text(family = "Inter", size = 16,),
-        legend.text = element_text(family = "Inter", size = 16),
-axis.text.y=element_text(family = "Inter", size = 12, color = "#6F6F6F"),
-  axis.text.x=element_text(family = "Inter", size = 12, color="black"),
-axis.title.y=element_text(family = "Inter", size = 12, color = "#6F6F6F"),
-axis.title.x=element_text(family = "Inter", size = 12, color = "#6F6F6F")
+        plot.caption = element_text(family = "Inter", size = 14, color = "#6F6F6F", hjust=0),
+        legend.title = element_text(family = "Inter", size = 20,),
+        legend.text = element_text(family = "Inter", size = 20),
+axis.text.y=element_text(family = "Inter", size = 16, color = "#6F6F6F"),
+  axis.text.x=element_text(family = "Inter", size = 16, color="black"),
+axis.title.y=element_text(family = "Inter", size = 16, color = "#6F6F6F"),
+axis.title.x=element_text(family = "Inter", size = 16, color = "#6F6F6F")
   ) +
       scale_color_manual(values=c(lavender, meteorite, orange))
     

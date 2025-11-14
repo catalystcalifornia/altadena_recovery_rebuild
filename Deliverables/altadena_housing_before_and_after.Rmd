@@ -1,5 +1,5 @@
 ---
-title: 'Toward an Equitable Recovery After Disaster - DRAFT'
+title: 'Toward an Equitable Recovery After Disaster'
 subtitle: "Takeaways From Changes in Altadena Housing Before and After the Eaton Fire"
 author: "Catalyst California"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
@@ -66,6 +66,7 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 ```
+*Not for public distribution*
 
 # Introduction 
 
@@ -83,7 +84,7 @@ It is imperative that policymakers understand these risks and disparities and ad
 
 Less than a year following the Eaton Fire, the data already shows that county and state leaders are not doing enough. Prior research finds that 70% of severely damaged homes show no signs of action toward rebuilding and of the homes that have been resold, almost two-thirds have been given to outside investors.^[UCLA. (2025, October 9). UCLA analysis finds Altadena faces uneven wildfire recovery as Black, Latino, and AAPI homeowners struggle to rebuild. Pasadena Now. https://pasadenanow.com/main/ucla-analysis-finds-altadena-faces-uneven-wildfire-recovery-as-black-latino-and-aapi-homeowners-struggle-to-rebuild ] Many community members and longtime residents are concerned that local ownership has been lost in a county already facing a lack of affordable housing and some of the highest rent costs in the country.^[Phillips, S. (2025, February). The Palisades and Eaton Fires: Neighborhood data and potential housing market effects. UCLA Lewis Center for Regional Policy Studies. https://www.lewis.ucla.edu/research/the-palisades-and-eaton-fires-neighborhood-data-and-potential-housing-market-effects/] Another ripple effect of the fires and other climate related disasters are the hike of insurance costs, another force increasing the already high housing cost burden.^[U.S. Department of the Treasury. (2025, January 16). Homeowners insurance costs rising, availability declining as climate-related events take their toll. https://home.treasury.gov/news/press-releases/jy2791] Insurance companies are also fleeing California altogether because of the negative cost-benefit impact on their bottom line--making it no longer lucrative for them to operate in the state. In turn, the California FAIR Plan, the state-chartered insurer, is having to shoulder insurance coverage costs for formerly private policyholders, posing yet another barrier to recovery.^[https://www.eenews.net/articles/insurers-flee-wildfire-prone-california-despite-state-assistance/]
 
-When the Eaton Fire hit this region earlier this year, the devastation not only destroyed properties but one of the most historically unique regions in Los Angeles. While properties can be built again with cement and gravel, it is going to take equity and community driven work to rebuild the haven Altadena was for so many Black families and communities of color in the county.
+When the Eaton Fire hit this region earlier this year, the devastation not only destroyed properties but one of the most historically unique regions in Los Angeles. While properties can be built again with lumber and steel, it is going to take equity and community driven work to rebuild the haven Altadena was for so many Black families and communities of color in the county.
 
 # Key Findings
 
@@ -91,9 +92,9 @@ To support an equitable recovery where Altadenans are able to return to and rebu
 
 **Before**
 
-* In January 2025, immediately before the Eaton Fire, Altadena was largely a low density, high owner-occupied community. Nearly 91% of residential properties were single-family homes and over 50% of properties were owner-occupied.
+* In January 2025, immediately before the Eaton Fire, Altadena was largely a low density, high owner-occupied community. Nearly 91% of residential properties were single-family homes and nearly half of properties were owner-occupied.
 
-* Multifamily and renter-occupied properties existed in Altadena at low rates before the fire, less than ten and fifteen percent of properties respectively.
+* Other housing choices did exist in Altadena before the fire. At least 20% of properties had rental options.^[Renter-occupied properties comprised 12% of properties and an additional eight percent of properties had owner and rental units]. About seven percent of properties were multifamily homes.
 
 **After**
 
@@ -119,7 +120,7 @@ To support an equitable recovery where Altadenans are able to return to and rebu
 
 While the Eaton Fire affected the Altadena and Pasadena communities, we focused our analysis on Altadena community boundaries in order to gather a full assessment of what this defined community looked like before and after the fire. This also allowed us to focus on scraping permit data for unincorporated L.A. County. For our boundaries, we split Altadena into West and East Altadena using the unincorporated community/place boundaries and splitting the community by West and East of Lake Avenue.
 
-To analyze property characteristics before the fire, we gathered L.A. County Assessor data from January 2025. We focused on residential properties in Altadena, or parcels with a residential use code that were not recorded as vacant land. While we initially included mixed use properties, we found these properties to comprise a very small share of Altadena properties. In January 2025, only 20 properties were mixed use properties with residential units.
+To analyze property characteristics before the fire, we gathered L.A. County Assessor data from January 2025. We focused on residential properties in Altadena, or parcels with a residential use code that were not recorded as vacant land. While we initially included mixed use properties, we found these properties to comprise a very small share of Altadena properties. In January 2025, only 20 properties were mixed use properties with residential units. L.A. County Assessor was the best, most accessible source of housing stock for this project, but also may misrepresent housing density or rental units in Altadena if property rolls were not updated or construction was completely without permits.
 
 To analyze housing lost in the fire, we utilized data from the CalFire Damage Inspection database and matched these structure-level records to their corresponding parcel records. This also required creating a typology to classify parcels as mostly damaged or destroyed even when they had multiple structures with different damage characteristics. We classified parcels into these categories to help focus on residential properties that sustained greater damage and make our findings more easily interpretable (by including fewer categories):
 
@@ -205,7 +206,7 @@ West Altadena was largely destroyed by the fire with the fire perimeter covering
 
 # Altadena Rebuilding
 
-The dust from the fire has settled, but Altadena faces a long recovery ahead. To rebuild, varying types of property owners need support in navigating insurance, permits, hazards, and new building standards. Meanwhile, predatory investors have already begun displacing residents and taken advantage of owners when they were most vulnerable. We analyzed the properties that have sold and those that are in progress toward rebuilding as well as the hazard and zoning considerations owners must take into account when rebuilding. All of these factors will affect the path and result of Altadena recovering. Based on September 2025 data from the L.A. County Assessor's office, we mapped and analyzed the properties that have sold. Based on L.A. County permit data we scraped in October 2025, we analyzed the share of significantly damaged properties that are on the road to rebuilding.
+The dust from the fire has settled, but Altadena faces a long recovery ahead. To rebuild, varying types of property owners need support in navigating insurance, permits, hazards, and new building standards. Meanwhile, real estate speculators have already begun displacing residents and taken advantage of owners when they were most vulnerable, such as making offers to buy properties in the weeks immediately after the fire. We analyzed the properties that have sold and those that are in progress toward rebuilding as well as the hazard and zoning considerations owners must take into account when rebuilding. All of these factors will affect the path and result of Altadena recovering. Based on September 2025 data from the L.A. County Assessor's office, we mapped and analyzed the properties that have sold. Based on L.A. County permit data we scraped in October 2025, we analyzed the share of significantly damaged properties that are on the road to rebuilding.
 
 ## Map
 
@@ -251,23 +252,36 @@ Few properties have sold since the fire, but most are in West Altadena with seve
 ```{r zoning, child='Embeds/visual_zoning.Rmd', echo=FALSE}
 ```
 
-# Recommendations (in progress)
+# Recommendations
 
-* Implement a suite of strategies to support different types of properties and owners in rebuilding. Ensure that taken together policies and programs designed to support Altadena recovery consider what single-family and multifamily homes need as well as what homeowners and landlords from the community need.
+In order to achieve an equitable recovery in Altadena, policymakers and funders must pursue tailored and diverse solutions and engage community members in creating those solutions. Based on this analysis, we see these broad areas as starting points.
+
+**Preserve choices for Altadenan homeowners and renters**
+
+Altadena offered a number of housing choices for homeowners and renters. A suite of strategies is needed to support different types of properties and owners in rebuilding to preserve those choices. Policies and programs designed to support Altadena recovery must consider what single-family and multifamily homes need as well as what homeowners and renters from the community need.
 
 * Help safeguard multifamily properties and rental units to prevent displacement of Altadenan renters, particularly with an emphasis on recovering multifamily and rental units in West Altadena that were disproportionately affected.
 
-* Protect homeowners from real estate speculation to preserve homeownership in Altadena. This includes continuing and enforcing bans on unsolicited offers, as enacted by [AB 851](https://calmatters.digitaldemocracy.org/bills/ca_202520260ab851). For property owners who decide they must sell their properties, invest in community or nonprofit acquisition programs, like community land trusts, and prioritize sales to community buyers.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] Together these policies can help prevent speculation, keep properties in the community, and preserve community ownership.
+* Bolster tenant protections for Altadenan renters whose homes were destroyed and support them in returning to their homes. Hold landlords responsible for repairs and remediation, but also hold landlords accountable for rebuilding in cases of destroyed properties.
 
-* Track property sales and values in Altadena to understand the long-term impact on future home values and wealth, and respond with appropriate policies to protect against surges or drops in property values that are out-of-sync with L.A. County housing market. 
-
-* Implement policies, practices, and funding to support homeowners seeking to retain and rebuild their properties, such as assistance acquiring permits, finding contractors, and funding construction that exceeds funds available through their insurance policies.
+* Implement policies, practices, and funding to support homeowners seeking to retain and rebuild their properties, such as assistance acquiring permits, finding contractors, and funding construction that exceeds funds available through their insurance policies. Allow for streamlined permits for owners rebuilding the same number of dwelling units, but also consider how to streamline permitting for single-family homes seeking to add ADUs.
 
 * Track SB 9 permits to ensure Altadena's single-family homes are preserved and not overwhelmingly changed into higher-density multifamily units. At the same time, track progress toward building multifamily units to preserve the relatively few multifamily housing options in Altadena.
 
 * Identify and address hurdles to rebuilding at various stages in permitting process, such as initially compiling necessary plans and paperwork to obtain permits, and then the financing needed to begin and complete construction.
 
-* Provide additional environmental testing and mitigation support to residential properties in high lead testing grids particularly rental units and multifamily properties in East Altadena, and single-family homes in West Altadena. This includes both intact and significantly damaged homes with high lead levels.
+* Maintain or enhance staffing levels in County departments with a role in permitting and inspecting the rebuild process, including the Fire Prevention Division of the Fire Department, the Building & Safety Division of the Public Works Department, and the Current Planning Division of the Regional Planning Department. 
+
+* Protect homeowners from real estate speculation to preserve homeownership in Altadena. This includes continuing and enforcing bans on unsolicited offers, as enacted by [AB 851](https://calmatters.digitaldemocracy.org/bills/ca_202520260ab851). For property owners who decide they must sell their properties, invest in community or nonprofit acquisition programs, like community land trusts, and prioritize sales to community buyers.^[https://www.saje.net/wp-content/uploads/2025/10/ConfrontingDisaster.10.10.2025.pdf] Together these policies can help prevent speculation, keep properties in the community, and preserve community ownership.
+
+* Track property sales and values in Altadena to understand the long-term impact on future home values and wealth, and respond with appropriate policies to protect against surges or drops in property values that are out-of-sync with L.A. County housing market. 
+
+
+**Support sufficient environmental remediation and disaster preparedness in rebuilding**
+
+While nearly all significantly damaged properties have completed fire debris removal, environmental hazards still exist after the fire and clean up. Homeowners and renters must have support to safely return to their properties and landlords must be held accountable to mitigate hazards before tenants return. Given the presence of fire zones in Altadena, additional supports may also be needed to help prepare properties and community members for future disasters.
+
+* Provide additional environmental testing and mitigation support to residential properties in high lead testing grids particularly rental units and multifamily properties in East Altadena, and single-family homes in West Altadena. This includes both intact and significantly damaged homes with high lead levels. Hold landlords accountable for remediation to protect renters from returning to toxic properties.
 
 * Pursue programs and funding to support Altadenan community members in safely rebuilding their properties in compliance with the state's new defensible space requirements, such as helping to navigate state requirements and finance changes to their properties to address requirements. 
 
@@ -276,4 +290,10 @@ Few properties have sold since the fire, but most are in West Altadena with seve
 * Address systemic issues in emergency management systems that led to the disorganized response in evacuating Altadena and responding to the shifting fire. This can include investing more general fund money into more sound and robust alerting systems and comparable staffing in the Office of Emergency Management (OEM) as well as updating outdated policies, procedures, and technology to ensure evacuation procedures and emergency personnel work efficiently.^[https://file.lacounty.gov/SDSInter/bos/supdocs/207915.pdf]
 
 
-# Conclusion (in progress)
+# Conclusion
+
+Rebuilding Altadena into the vibrant, diverse community it was before the Eaton Fire will require significant work and collaboration to support homeowners, renters, and business owners in their road to recovery. Multiple coalitions on the ground are organizing to advance for policies and practices that will help rebuild Altadena in ways that help preserve the community's diversity of communities and housing choices. Understanding the housing stock of Altadena before, after, and in rebuilding can help inform organizing and advocacy efforts and broaden understanding of Eaton Fire's devastating impact on this unique community. We hope this report, and other research efforts, will help support on-the-ground efforts and be a tool for organizers and decision-makers working toward an equitable recovery.
+
+
+
+For more information about this report and the methods behind it, please contact Elycia Mulholland Graves (egraves@catalystcalifornia.org).
