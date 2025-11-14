@@ -271,7 +271,7 @@ leaflet(
   addProviderTiles(providers$CartoDB.Positron) %>%
   
   # add custom sidebar
-  addControl(html=custom_sidebar, position = "topleft") %>%
+  addControl(html=custom_sidebar, position = "bottomleft") %>%
      
   #Damaged/Destroyed Properties
   addPolygons(
@@ -410,9 +410,8 @@ leaflet(
                       "Eaton Fire Perimeter"),
     options = layersControlOptions(collapsed = FALSE, autoZIndex = TRUE))  %>%
   hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones",
-              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status")) 
-
-# %>% addFullscreenControl() # cutting off pop-up
+              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status")) %>% 
+  addFullscreenControl() # cutting off pop-up
 
 ```
 
@@ -435,9 +434,18 @@ leaflet(
   border-top:1px solid #737373;
   border-bottom:1px solid #737373;
 }
+
+/* Make the top-left container display controls horizontally */
+.leaflet-top.leaflet-left {
+    display: flex;
+    flex-direction: row;
+    gap: 2px; /* adds space between controls */
+    align-items: flex-start;
+}
+
 /* Target all leaflet controls on the left side, regardless of top/bottom position */
 /* when keeping zoom buttons, remember to exclude from this styling */
-.leaflet-left .leaflet-control:not(.leaflet-control-zoom) {
+.leaflet-left .leaflet-control:not(.leaflet-control-zoom):not(.leaflet-control-fullscreen) {
   background-color: white;
   opacity: 1.0;
   overflow: auto;
