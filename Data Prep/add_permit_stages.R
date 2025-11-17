@@ -69,7 +69,9 @@ FROM data.scraped_general_permit_data_2025_10 gen
 LEFT JOIN data.scraped_detailed_permit_data_2025_10 det
 ON gen.ain = det.ain AND gen.permit_number = det.permit_number 
 LEFT JOIN data.scraped_workflow_permit_data_2025_10 wf
-ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;") 
+ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;") %>%
+  # NA statuses should be preserved - will replace with 'None' for later filters
+  mutate(status = replace_na(status, "None"))
 
 # get debris removal data
 debris_status <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_pkg_received, fso_pkg_approved FROM data.usace_debris_removal_parcels_2025;")
@@ -109,7 +111,7 @@ keyword_list <- c("ADU", "SFR", "SFD", "SB9", "story", "duplex", "dwelling",
                   "rebuild burned house", "main house", "residence", "pre-approved standard plan",
                   "rebuild house", "mfr", "mfd")
 
-# use workflow df to fins out which parcels have had ANY permits with an inspection
+# use workflow df to find out which parcels have had ANY permits with an inspection
 combined_wf <- parcels %>%
   left_join(workflow, by="ain") %>%
   # add bucket 3 helper columns - has an inspection occurred (excl. debris removal inspection)
