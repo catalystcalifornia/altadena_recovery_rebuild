@@ -69,9 +69,7 @@ FROM data.scraped_general_permit_data_2025_10 gen
 LEFT JOIN data.scraped_detailed_permit_data_2025_10 det
 ON gen.ain = det.ain AND gen.permit_number = det.permit_number 
 LEFT JOIN data.scraped_workflow_permit_data_2025_10 wf
-ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;") %>%
-  # NA statuses should be preserved - will replace with 'None' for later filters
-  mutate(status = replace_na(status, "None"))
+ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;")
 
 # get debris removal data
 debris_status <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_pkg_received, fso_pkg_approved FROM data.usace_debris_removal_parcels_2025;")
@@ -79,32 +77,29 @@ debris_status <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_p
 ##### 1. Prep data #####
 ### Note update these in the scraping script: (leaving in 0ct 2025 for now)
 # Remove permits where applied_date.general is before 2025
-# Remove permits that start with: FCDP (flood control), FILM, FIRE (related to trees mostly), PWRP (Public Works))
 # Extend permits to include: CREB, FCR, PROP, RRP, SWRC, UNC- 
+# Remove Some Damage parcels (only keep Significant Damage)
+
+# Minor clean up 
+permits <- permits %>%
+  # replace character cols with NA with 'None' for later filters
+  mutate(across(where(is.character), ~replace_na(., "None"))) %>%
+  # filter out permits from before 2025 (i.e., date ends with 2025 or 2026 for future scrapes)
+  filter(grepl("(2025|2026)$", applied_date)) %>%
+  # filter out voided permits
+  filter(status != "Void")
 
 # Filter out 2025 and permits with status Void 
 # (note: ECI doesn't mention doing this but I think we need to to keep data clean and logic reliable)
-permits_filtered <- permits %>% # 5477
-  # filter out permits from before 2025
-  filter(grepl("(2025|2026)$", applied_date)) %>%
-  # filter out voided permits
-  filter(status != "Void") %>%
+permits_df <- permits %>% # 5477
   # remove workflow items to get a dataframe of just permit-level cols
   select(-c(workflow_item, wf_status, wf_status_date)) %>%
   unique()
 
 # create a dataframe of workflow items that we'll use for the bucket 3 check (construction has started)
-workflow_filtered <- permits %>% # 28921
-  # filter out permits from before 2025
-  filter(grepl("(2025|2026)$", applied_date)) %>%
-  # filter out voided permits?
-  filter(status != "Void") %>%
-  unique()
-
-workflow <- workflow_filtered %>% # 28507
+wf_df <- permits %>% # 28921
   select(ain, permit_number, workflow_item, wf_status, wf_status_date) %>%
   unique()
-
 
 # key words used to determine permits related to residential permanent housing
 keyword_list <- c("ADU", "SFR", "SFD", "SB9", "story", "duplex", "dwelling", 
