@@ -322,6 +322,13 @@ check <- as.data.frame(table(final_types$damage_category, final_types$rebuild_st
 
 sig_dmg <- final_types %>% filter(damage_category=="Significant Damage")
 
+# table(sig_dmg$rebuild_status, useNA = "ifany")
+# 
+# Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
+# 466                            1618                              84                            3760 
+# Rebuild Complete 
+# 19 
+
 # QA: See if the some damage/significant damage parcels have any NAs
 sum(is.na(check)) # 4 NAs
 
