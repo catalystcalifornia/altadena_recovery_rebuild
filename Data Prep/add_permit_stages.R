@@ -190,7 +190,8 @@ permits_df <- permits %>%
 
 
 # summarize helper cols to the parcel level, add debris here
-combined_parcels <- permits_df %>%
+combined_parcels <- parcels %>%
+  left_join(permits_df, by="ain") %>%
   left_join(debris, by="ain") %>%
   left_join(combined_wf, by="ain") %>%
   select(ain, permit_number, starts_with("b")) %>%
@@ -265,6 +266,7 @@ final_types <- parcels %>%
   # replace NAs that arise from parcels with no permits
   mutate(across(starts_with("b") & where(is.numeric), ~replace_na(., 0))) %>%
   mutate(across(starts_with("b") & where(is.character), ~replace_na(., ""))) %>%
+  mutate(total_permits=replace_na(0)) %>%
   # Bucket 1 status: Is fire debris cleared?
   mutate(
     bucket_1_status = case_when(
@@ -272,7 +274,8 @@ final_types <- parcels %>%
       # we infer properties with a build permit have Fire Debris Cleared 
       b2_has_build_permit==1 ~ "Fire Debris Cleared",
       b1_has_ace_fso==0 & b1_has_fdr_finaled == 0 & damage_category == "No Damage"  ~ "Fire Debris Removal Not Applicable",
-      .default = "Fire Debris Removal Incomplete")) %>%
+      b1_has_ace_fso==0 & b1_has_fdr_finaled == 0 & damage_category !="No Damage" ~ "Fire Debris Removal Incomplete",
+      .default = "Something else")) %>%
   # Bucket 2 status: Build Permit Application Received
   mutate(
     bucket_2_status = 
@@ -316,6 +319,8 @@ table(final_types$rebuild_status, useNA="ifany")
 
 # Check rebuild status
 check <- as.data.frame(table(final_types$damage_category, final_types$rebuild_status))
+
+sig_dmg <- final_types %>% filter(damage_category=="Significant Damage")
 
 # QA: See if the some damage/significant damage parcels have any NAs
 sum(is.na(check)) # 4 NAs
