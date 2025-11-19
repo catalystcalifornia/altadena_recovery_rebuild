@@ -50,7 +50,7 @@ df <- df_ %>%
     filter(zone_count>=10) # filter out zones that are super low in count, like residential agricultural, open space, neighborhood business
 
 df <- df %>%
-  mutate("Count (%)"=paste0(comma(zone_count)," (",round(zone_prc,0),"%)"),
+  mutate("% (Count)"=paste0(comma(zone_count)," (",round(zone_prc,0),"%)"),
          "Share of Damaged Properties"=zone_prc,
          "Zones" = paste0(z_category_label," (", z_category,")"),
          "Area" = str_to_title(area_name)) %>%
@@ -59,7 +59,7 @@ df <- df %>%
 
 
 table<- df %>%
-  select("Area","Zones", "Share of Damaged Properties", "Count (%)")%>%
+  select("Area","Zones", "Share of Damaged Properties", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Zones") %>%
   tab_header(title= "Allowable Zones for Significantly Damaged Residential Properties")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025; CAL FIRE Damage Data, September 2025; and L.A. County Department of Regional Planning, Zoning, 2025."),placement="left") 
@@ -107,7 +107,7 @@ df_ <- st_read(con, query="Select * from data.analysis_zone_r1_sept2025")
 df_$zone <- factor(df_$zone, levels = c("R-1-7500","R-1-10000","R-1-15000","R-1-20000","R-1-40000"))
 
 df <- df_ %>%
-  mutate("Count (%)"=paste0(comma(zone_count)," (",round(zone_prc,0),"%)"),
+  mutate("% (Count)"=paste0(comma(zone_count)," (",round(zone_prc,0),"%)"),
          "Share of R-1 Damaged Properties"=zone_prc,
          "Zones" = paste0(zone, " sq. ft."),
          "Area" = str_to_title(area_name)) %>%
@@ -116,7 +116,7 @@ df <- df_ %>%
 
 
 table<- df %>%
-  select("Area","Zones", "Share of R-1 Damaged Properties", "Count (%)")%>%
+  select("Area","Zones", "Share of R-1 Damaged Properties", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Zones") %>%
   tab_header(title= "Single-Family Zone Minimum Lot Size Classifications for Significantly Damaged Properties")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025; CAL FIRE Damage Data, September 2025; and L.A. County Department of Regional Planning, Zoning, 2025."),placement="left") 

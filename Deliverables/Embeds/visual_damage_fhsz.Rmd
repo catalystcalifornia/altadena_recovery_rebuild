@@ -55,7 +55,7 @@ df <- df_ %>%
 df$combined_fhsz <- factor(df$combined_fhsz, levels = c("Very High","High","Moderate","None"))
 
 df <- df %>%
-  mutate("Count (%)"=paste0(comma(fhsz_count)," (",round(fhsz_prc,0),"%)"),
+  mutate("% (Count)"=paste0(comma(fhsz_count)," (",round(fhsz_prc,0),"%)"),
          "Share of Damaged Properties"=fhsz_prc,
          "Fire Hazard Severity Zone" = combined_fhsz,
          "Area" = str_to_title(area_name)) %>%
@@ -63,7 +63,7 @@ df <- df %>%
   arrange(Area,combined_fhsz)
 
 table<- df %>%
-  select("Area","Fire Hazard Severity Zone", "Share of Damaged Properties", "Count (%)")%>%
+  select("Area","Fire Hazard Severity Zone", "Share of Damaged Properties", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Fire Hazard Severity Zone") %>%
   tab_header(title= "Fire Hazard Severity Zones for Significantly Damaged Properties")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and California Office of State Fire Marshall, 2024-2025."),placement="left") 

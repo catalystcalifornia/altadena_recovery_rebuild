@@ -74,7 +74,7 @@ df_$`Ownership Type`<- factor(df_$owner_renter, levels = c("Owner occupied, home
                                                              "Church or charity owned"))
 
 df <- df_ %>%
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
+  mutate("% (Count)"=paste0(comma(count)," (",round(prc,0),"%)"),
          "Share of Housing Stock"=prc,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -82,7 +82,7 @@ df <- df_ %>%
 
 
 table<- df %>%
-  select("Area","Ownership Type", "Share of Housing Stock", "Count (%)")%>%
+  select("Area","Ownership Type", "Share of Housing Stock", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Ownership Type") %>%
   tab_header(title= "Ownership Types of Residential Properties Before the Fire") %>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 

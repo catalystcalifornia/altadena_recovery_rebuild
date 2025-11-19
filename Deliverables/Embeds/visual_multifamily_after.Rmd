@@ -52,7 +52,7 @@ df_ <- st_read(con, query="Select * from data.analysis_multifamily_damage_prc") 
 
 df <- df_ %>%
   filter(damage_category == "Significant Damage") %>% 
-  mutate("Count (%)"=paste0(comma(property_damage_count)," (",round(property_damage_prc,0),"%)"),
+  mutate("% (Count)"=paste0(comma(property_damage_count)," (",round(property_damage_prc,0),"%)"),
          "Multifamily Units Lost"=property_damage_prc,
          "Multifamily Unit Type" = multifamily_unit_category,
          "Area" = str_to_title(area_name)) %>%
@@ -61,7 +61,7 @@ df <- df_ %>%
 
 
 table<- df %>%
-  select("Area","Multifamily Unit Type", "Multifamily Units Lost", "Count (%)")%>%
+  select("Area","Multifamily Unit Type", "Multifamily Units Lost", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Multifamily Unit Type") %>%
   tab_header(title= "Multifamily Properties Lost by Size")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 

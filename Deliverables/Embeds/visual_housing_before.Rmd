@@ -50,7 +50,7 @@ df_ <- st_read(con, query="Select * from data.analysis_restype_jan2025")
 
 df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
+  mutate("% (Count)"=paste0(comma(count)," (",round(prc,0),"%)"),
          "Share of Housing Stock"=prc,
          "Residential Type" = res_type,
          "Area" = str_to_title(area_name)) %>%
@@ -59,7 +59,7 @@ df <- df_ %>%
 
 
 table<- df %>%
-  select("Area","Residential Type", "Share of Housing Stock", "Count (%)")%>%
+  select("Area","Residential Type", "Share of Housing Stock", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
   tab_header(title= "Distribution of Residential Housing Types Before the Fire")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 

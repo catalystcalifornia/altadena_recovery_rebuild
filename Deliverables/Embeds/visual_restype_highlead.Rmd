@@ -56,7 +56,7 @@ high_lead <- df_raw %>%
 
 df<- df_raw %>%
   filter(damage_category=="Significant Damage" & hi_lead_label=="High Lead Grid") %>%
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),        
+  mutate("% (Count)"=paste0(comma(count)," (",round(prc,0),"%)"),        
          "Properties in Areas with High Lead Levels"=prc,
          "Residential Type" = res_type,
          "Area" = str_to_title(area_name)) %>%
@@ -65,7 +65,7 @@ df<- df_raw %>%
 
 
 table<- df %>%
-  select("Area","Residential Type", "Properties in Areas with High Lead Levels", "Count (%)")%>%
+  select("Area","Residential Type", "Properties in Areas with High Lead Levels", "% (Count)")%>%
   gt(groupname_col = c("Area"), rowname_col = "Residential Type") %>%
     tab_header(title= "Significantly Damaged Properties in Areas with Average Lead Levels Above Protective Screening Levels (>=80 mg/kg by Residential Type)")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and L.A. County Department of Public Health Soil Testing Program, March 2025."),placement="left") 
