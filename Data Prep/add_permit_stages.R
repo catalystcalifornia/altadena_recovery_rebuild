@@ -272,7 +272,7 @@ permits_check_ain <- permits_check_table %>%
   filter(damage_category=="Significant Damage")
 
 
-# join workflow to parcels and apply flag to any parcel with at least one inspection
+# summarize workflow df to parcel level, apply flag to any parcel with at least one inspection
 combined_wf <- parcels %>%
   left_join(workflow, by="ain") %>%
   group_by(ain) %>%
@@ -281,17 +281,14 @@ combined_wf <- parcels %>%
   select(ain, b3_has_inspection) %>%
   unique()
 
-table(combined_wf$has_inspection, useNA = "ifany")
+table(combined_wf$b3_has_inspection, useNA = "ifany")
 
 # check
 nrow(workflow)
 length(unique(workflow$ain)) # multiple rows per ain
 length(unique(workflow$permit_number)) # multiple rows per permit
 
-
 workflow %>% distinct(ain, permit_number) %>% nrow()
-# remove join to workflow in prior step? Variables not used at all
-
 
         
 # summarize helper cols to the parcel level, add debris here
@@ -300,7 +297,7 @@ combined_parcels_all <- parcels %>%
   left_join(permits, by="ain") %>%
   left_join(debris, by="ain") %>%
   left_join(combined_wf, by="ain") %>%
-  select(ain, permit_number, starts_with("b"))
+  select(ain, permit_number, starts_with("b"), -b1_has_fdr) # exclude permit level flag we no longer need
 
 combined_parcels <- combined_parcels_all %>%
   # summarize helper cols to the parcel level (bucket 1, 2, and 4)
@@ -326,20 +323,20 @@ combined_parcels <- combined_parcels_all %>%
     b2_other = paste(b2_other[b2_other != ""], collapse = ";")) %>%
   mutate(
     # get count of permanent housing permits for the parcel
-    b2_perm_count = lengths(strsplit(b2_perm,";")),
+    b2_perm_count = ifelse(b2_perm=="NA", 0, lengths(strsplit(b2_perm,";"))),
     # get count of temp housing permits for the parcel
-    b2_temp_count = lengths(strsplit(b2_temp,";")),
+    b2_temp_count = ifelse(b2_temp=="NA", 0, lengths(strsplit(b2_temp,";"))),
     # get count of commercial building permits for the parcel
-    b2_comm_count = lengths(strsplit(b2_comm,";")),
+    b2_comm_count = ifelse(b2_comm=="NA", 0, lengths(strsplit(b2_comm,";"))),
     # get count of misc building permits for the parcel
-    b2_misc_count = lengths(strsplit(b2_misc,";")),
+    b2_misc_count = ifelse(b2_misc=="NA", 0, lengths(strsplit(b2_misc,";"))),
     # get count of all other permits for the parcel
-    b2_other_count = lengths(strsplit(b2_other,";"))) %>%
+    b2_other_count = ifelse(b2_other=="NA", 0, lengths(strsplit(b2_other,";")))) %>%
   # bucket 3 - has at least one inspection
   mutate(
     b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm=TRUE)>0, 1, 0)) %>%
   # get count of how many finaled permits exist for parcel
-  mutate(b4_has_finaled_count = sum(b4_has_finaled, na.rm=TRUE)) %>% # should this exclude fire debris removal finaled?
+  mutate(b4_has_finaled_count = sum(b4_has_finaled, na.rm=TRUE)) %>% # should this exclude fire debris removal finaled? - no
   # bucket 4 
   mutate(
     # get count of how many finaled permits exist for each type (permanent, temp, misc, commercial)
@@ -359,18 +356,25 @@ combined_parcels <- combined_parcels_all %>%
       b2_perm_count==0 & 
       b2_temp_count==0, 1, 0)) %>%
   ungroup() %>%
-  mutate(b4_perm_finaled = ifelse((b2_perm != "" & b4_finaled_perm_count==b2_perm_count), 1, 0),
-         b4_temp_finaled = ifelse((b2_temp != "" & b4_finaled_temp_count==b2_temp_count), 1, 0),
-         b4_misc_finaled = ifelse((b2_misc != "" & b4_finaled_misc_count==b2_misc_count), 1, 0)) %>%
+  mutate(b4_perm_finaled = ifelse((b2_perm_count>0 & b4_finaled_perm_count==b2_perm_count), 1, 0),
+         b4_temp_finaled = ifelse((b2_temp_count>0 & b4_finaled_temp_count==b2_temp_count), 1, 0),
+         b4_misc_finaled = ifelse((b2_misc_count>0 & b4_finaled_misc_count==b2_misc_count), 1, 0)) %>%
+  # need to drop flags that we summed to _count cols
+  select(-c(b4_has_finaled, b4_has_finaled_perm, b4_has_finaled_temp, b4_has_finaled_comm, b4_has_finaled_misc)) %>%
   select(sort(colnames(.))) %>%
   select(ain, everything()) %>%
   unique() 
 
-length(unique(combined_parcels$ain))
-nrow(combined_parcels)
-# duplicates in the group by code
+length(unique(combined_parcels$ain)) # 12938
+nrow(combined_parcels) # 12938
+# no more dupes
 
-dups <- combined_parcels[combined_parcels$ain %in% combined_parcels$ain[duplicated(combined_parcels$ain)], ]
+# different results in b4_has_finaled_
+dups <- combined_parcels %>%
+  group_by(ain) %>%
+  filter(n()>1) %>%
+  ungroup()
+                   
 
 combined_parcels_qa <- combined_parcels_all %>%
   # summarize helper cols to the parcel level (bucket 1, 2, 3, and 4)
