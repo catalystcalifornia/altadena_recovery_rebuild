@@ -82,9 +82,12 @@ table(permits_substring$permit_sub)
 
 ##### 1. Prep data #####
 ### Note update these in the scraping script: (leaving in 0ct 2025 for now)
-# Remove permits where applied_date.general is before 2025
 # Extend permits to include: CREB, FCR, PROP, RRP, SWRC, UNC- # everything but UNC and CREB go under other
 # Remove Some Damage parcels (only keep Significant Damage)
+
+# Filter permits for applied date after Jan 7, 2025
+permits_filtered <- permits_orig %>%
+  filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07"))
 
 # Minor clean up, filter, add helper columns
 # get parcel-level data for some and significant damage parcels
@@ -107,7 +110,8 @@ debris <- debris_status %>%
   mutate(
     # does the parcel have full sign off (fso) from army corps
     b1_has_ace_fso = ifelse(!is.na(fso_pkg_approved), 1, 0))
-   
+
+length(unique(debris$ain)) # 7004
 table(debris$b1_has_ace_fso, useNA="ifany")
 
 # does not have a filter for wf_status_date-some wf_status_date are NA, probably just want to filter for permit date here too
