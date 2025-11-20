@@ -54,7 +54,7 @@ df <- df_ %>%
   filter(damage_category == "Significant Damage") %>% 
   mutate("% (Count)"=paste0(round(property_damage_prc,0),"% (", comma(property_damage_count)," out of ", 
                             comma(property_total), ")"),
-         "Multifamily Units Lost"=property_damage_prc,
+         "Share of Property Type Lost"=property_damage_prc,
          "Multifamily Unit Type" = multifamily_unit_category,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -62,13 +62,13 @@ df <- df_ %>%
 
 
 table<- df %>%
-  select("Area","Multifamily Unit Type", "Multifamily Units Lost", "% (Count)")%>%
+  select("Area","Multifamily Unit Type", "Share of Property Type Lost", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Multifamily Unit Type") %>%
-  tab_header(title= "Multifamily Properties Lost by Size")%>%
+  tab_header(title= "Share of Property Type Lost by Size")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Multifamily Units Lost', scaled=FALSE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Property Type Lost', scaled=FALSE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
