@@ -91,7 +91,14 @@ table(permits_substring$permit_sub)
 permits_filtered <- permits_orig %>%
   filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
   # filter out voided permits
-  filter(gen_status != "Void") # 33463
+  filter(gen_status != "Void") %>% # 33463
+  mutate(is_creb = ifelse(grepl("^CREB", permit_number), 1, 0))
+
+check_creb <- permits_filtered %>% select(ain, is_creb) %>%
+  group_by(ain) %>%
+  mutate(has_creb = ifelse(sum(is_creb, na.rm=TRUE)>0, 1, 0))
+
+parcels_creb <- check_creb %>% select(ain, has_creb) %>% unique()
 
 table(permits_filtered$gen_status, useNA="ifany")
 
@@ -498,7 +505,9 @@ table(final_types$bucket_2_status, useNA="ifany")
 table(final_types$bucket_3_status, useNA="ifany")
 table(final_types$bucket_4_status, useNA="ifany")
 table(final_types$rebuild_status, useNA="ifany")
-
+check_final_creb <- final_types %>%  left_join(parcels_creb, by="ain") 
+check <- as.data.frame(table(check_final_creb$has_creb, check_final_creb$rebuild_status))
+# see above - parcels with CREBs are only associated with construction phase (none are "Rebuild Complete")
 
 # Check rebuild status
 check <- as.data.frame(table(final_types$damage_category, final_types$rebuild_status))
