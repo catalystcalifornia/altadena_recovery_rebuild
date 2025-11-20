@@ -370,7 +370,7 @@ combined_parcels <- combined_parcels_all %>%
   mutate(b4_perm_finaled = ifelse((b2_perm_count>0 & b4_finaled_perm_count==b2_perm_count), 1, 0),
          b4_temp_finaled = ifelse((b2_temp_count>0 & b4_finaled_temp_count==b2_temp_count), 1, 0),
          b4_misc_finaled = ifelse((b2_misc_count>0 & b4_finaled_misc_count==b2_misc_count), 1, 0)) %>%
-  # need to drop flags that we summed to _count cols
+  # need to drop flags that we summed to _count cols - keeping introduces duplicates
   select(-c(b4_has_finaled, b4_has_finaled_perm, b4_has_finaled_temp, b4_has_finaled_comm, b4_has_finaled_misc)) %>%
   select(sort(colnames(.))) %>%
   select(ain, everything()) %>%
