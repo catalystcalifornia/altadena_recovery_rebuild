@@ -46,7 +46,7 @@ options(scipen = 999)
 jan_parcels <- dbGetQuery(con, "SELECT * FROM data.rel_assessor_residential_jan2025 where residential=TRUE;")
 xwalk_parcels <- dbGetQuery(con, "SELECT * FROM data.crosswalk_assessor_jan_sept_2025;")
 jan_damage <- dbGetQuery(con, "SELECT ain, damage_category, mixed_damage, structure_count, damage_type_list FROM data.rel_assessor_damage_level;")
-damage <- dbGetQuery(con, "SELECT ain_sept, damage_category FROM data.rel_assessor_damage_level_sept2025;")
+# damage <- dbGetQuery(con, "SELECT ain_sept, damage_category FROM data.rel_assessor_damage_level_sept2025;")
 
 # get debris removal data
 debris_status <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_pkg_received, fso_pkg_approved FROM data.usace_debris_removal_parcels_2025;")
@@ -67,7 +67,7 @@ ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;")
 
 # look at permit numbers
 permits_substring <- permits_orig %>%
-  mutate(permit_sub=substring(permit_number, 1,4))
+  mutate(permit_sub=substring(permit_number, 1,4)) # if you look at first 8 you'll see the building codes under UNC- noted below
 
 table(permits_substring$permit_sub)
 # CREB County Disaster recovery Permit Rebuild Project
@@ -78,7 +78,7 @@ table(permits_substring$permit_sub)
 # PWRP Road permits
 # RRP Construction & Demolition Deposit
 # SWRC Sewer Tap & Saddle Installation
-# UNC- Mechanical, Plumbing, Electrical permits
+# UNC- Mechanical, Plumbing, Electrical permits (and building permits for SFR, MFR, Temporary Housing, Commercial buildings, etc.)
 
 ##### 1. Prep data #####
 ### Note update these in the scraping script: (leaving in 0ct 2025 for now)
