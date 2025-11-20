@@ -116,17 +116,23 @@ table(debris$b1_has_ace_fso, useNA="ifany")
 
 # does not have a filter for wf_status_date-some wf_status_date are NA, probably just want to filter for permit date here too
 # get workflow items and add has_inspection (will use for the bucket 3 check - construction has started)
-workflow <- permits_orig %>% # 28921
+workflow <- permits_filtered %>% 
   select(ain, permit_number, workflow_item, wf_status, wf_status_date) %>%
   unique() %>%
+  # filter out FDR permits (those are pre-build and "debris removal inspection" is not sufficient to exclude)
+  mutate(is_fdr = ifelse(grepl("^FDR", permit_number), 1, 0)) %>%
+  filter(is_fdr==0) %>%
+  filter(wf_status_date != "" | wf_status != "") %>%
+  mutate(has_status_or_date = case_when(wf_status != "" ~1,
+                                        wf_status_date != "" ~1,
+                                        .default=0)) %>%
   # add bucket 3 helper columns - has an inspection occurred (excl. debris removal inspection)
-  mutate(b3_has_inspection = ifelse((grepl("inspection", workflow_item, ignore.case = TRUE) & 
-                                  !grepl("debris removal inspection", workflow_item, ignore.case = TRUE)), 1, 0)) %>%
+  mutate(b3_has_inspection = ifelse(grepl("inspection", workflow_item, ignore.case = TRUE), 1, 0)) %>%
   # summarize to the permit level
   group_by(ain, permit_number) %>%
   mutate(b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm = TRUE)>0, 1, 0)) %>%
-  select(ain, permit_number, wf_status_date, b3_has_inspection) %>%
-  unique()
+  select(ain, permit_number, b3_has_inspection) %>%
+  unique() # 4791
 
 table(workflow$b3_has_inspection, useNA = "ifany")
 
