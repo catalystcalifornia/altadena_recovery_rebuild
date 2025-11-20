@@ -113,10 +113,11 @@ parcels <- jan_parcels %>%
 # check
 length(unique(jan_parcels$ain)) # 12938
 length(unique(parcels$ain))     # 12938
-length(unique(jan_damage$ain))  # 12958 - 20 extra here; 5 are significant damage
+length(unique(jan_damage$ain))  # 12958 - 20 extra here; 5 are significant damage - these are mixed use, not including
 
 extra_ains_list <- setdiff(jan_damage$ain, jan_parcels$ain)
 extra_ains_df <- jan_damage %>% filter(ain %in% extra_ains_list)
+
 
 debris <- debris_status %>%
   mutate(
