@@ -107,7 +107,7 @@ df_ <- st_read(con, query="Select * from data.analysis_zone_r1_sept2025")
 df_$zone <- factor(df_$zone, levels = c("R-1-7500","R-1-10000","R-1-15000","R-1-20000","R-1-40000"))
 
 df <- df_ %>%
-  mutate("% (Count)"=paste0(comma(zone_count)," (",round(zone_prc,0),"%)"),
+  mutate("% (Count)"=paste0(round(zone_prc,0),"% (", comma(zone_count), " out of ", comma(area_total), ")"),
          "Share of R-1 Damaged Properties"=zone_prc,
          "Zones" = paste0(zone, " sq. ft."),
          "Area" = str_to_title(area_name)) %>%

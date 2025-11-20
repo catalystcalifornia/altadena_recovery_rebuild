@@ -68,7 +68,8 @@ df$`Ownership Type`<- factor(df$owner_renter, levels = c("Owner occupied, homeow
                                                              "Church or charity owned"))
 
 df <- df %>%
-  mutate("% (Count)"=ifelse(total==0, NA, paste0(comma(count)," (",round(prc,0),"%)")),
+  mutate("% (Count)"=ifelse(total==0, NA, paste0(round(prc,0),"% (", comma(count)," out of ", 
+                            comma(total), ")")),
          prc=ifelse(total==0,0,prc),
          "Share of Housing Type Lost"=prc,
          "Area" = str_to_title(area_name)) %>%

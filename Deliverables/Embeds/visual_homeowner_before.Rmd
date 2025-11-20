@@ -75,7 +75,7 @@ df_$`Ownership Type`<- factor(df_$owner_renter, levels = c("Owner occupied, home
 
 df <- df_ %>%
   mutate("% (Count)"=paste0(round(prc,0),"% (", comma(count)," out of ", 
-                            comma(total), ")"),,
+                            comma(total), ")"),
          "Share of Housing Stock"=prc,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
