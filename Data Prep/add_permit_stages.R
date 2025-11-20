@@ -92,6 +92,7 @@ permits_filtered <- permits_orig %>%
   filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
   # filter out voided permits
   filter(gen_status != "Void") # 33463
+#### QA NOTE ADD CANCELED or DENIED ######
 
 table(permits_filtered$gen_status, useNA="ifany")
 
@@ -106,7 +107,7 @@ parcels <- jan_parcels %>%
 # check
 length(unique(jan_parcels$ain)) # 12938
 length(unique(parcels$ain))     # 12938
-length(unique(jan_damage$ain))  # 12958 - 20 extra here; 5 are significant damage
+length(unique(jan_damage$ain))  # 12958 - 20 extra here from mixed use properties; 5 are significant damage; this is okay to have these dropped
 
 extra_ains_list <- setdiff(jan_damage$ain, jan_parcels$ain)
 extra_ains_df <- jan_damage %>% filter(ain %in% extra_ains_list)
@@ -119,27 +120,39 @@ debris <- debris_status %>%
 length(unique(debris$ain)) # 7004
 table(debris$b1_has_ace_fso, useNA="ifany")
 
-# does not have a filter for wf_status_date-some wf_status_date are NA, probably just want to filter for permit date here too
 # get workflow items and add has_inspection (will use for the bucket 3 check - construction has started)
-workflow <- permits_filtered %>% 
+workflow_all <- permits_filtered %>% 
   select(ain, permit_number, workflow_item, wf_status, wf_status_date) %>%
   unique() %>%
   # filter out FDR permits (those are pre-build and "debris removal inspection" is not sufficient to exclude)
   mutate(is_fdr = ifelse(grepl("^FDR", permit_number), 1, 0)) %>%
   filter(is_fdr==0) %>%
+  # filter out those that do not have a wf status date or wf status, may indicate no inspection has happened or been scheduled even if inspection is in the workflow description
   filter(wf_status_date != "" | wf_status != "") %>%
+  # flag that a workflow status or date exists
   mutate(has_status_or_date = case_when(wf_status != "" ~1,
                                         wf_status_date != "" ~1,
                                         .default=0)) %>%
-  # add bucket 3 helper columns - has an inspection occurred (excl. debris removal inspection)
-  mutate(b3_has_inspection = ifelse(grepl("inspection", workflow_item, ignore.case = TRUE), 1, 0)) %>%
-  # summarize to the permit level
+  # add bucket 3 helper columns - has an inspection occurred based on workflow description (excluding debris removal)
+  mutate(b3_has_inspection = ifelse(grepl("inspection", workflow_item, ignore.case = TRUE), 1, 0)) 
+
+# check
+check <- workflow_all %>% group_by(b3_has_inspection,workflow_item,wf_status) %>% summarise(count=n())
+View(workflow_all)
+
+# summarize to the permit level
+workflow <- workflow_all %>%
   group_by(ain, permit_number) %>%
   mutate(b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm = TRUE)>0, 1, 0)) %>%
   select(ain, permit_number, b3_has_inspection) %>%
   unique() # 4669
 
+check <- workflow %>% group_by(ain,permit_number) %>% summarise(count=n())
+
 table(workflow$b3_has_inspection, useNA = "ifany")
+workflow %>% distinct(ain,permit_number) %>% nrow() # 4669
+length(unique(workflow$permit_number)) #4653, permit numbers are not necessarily unique, keep in mind
+
 
 # permit level data
 # key words used to determine permits related to residential permanent housing
