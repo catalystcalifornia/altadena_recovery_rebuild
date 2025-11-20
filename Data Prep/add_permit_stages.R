@@ -53,7 +53,7 @@ debris_status <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_p
 
 permits_orig <- dbGetQuery(con, "SELECT gen.ain, gen.permit_number, gen.record_id, gen.applied_date, 
 gen.type, gen.issued_date, gen.project_name, gen.expiration_date, 
-det.status,  gen.finalized_date, gen.main_parcel, gen.address, 
+gen.status as gen_status,  gen.finalized_date, gen.main_parcel, gen.address, 
 det.description, det.completed_percent, 
 det.in_progress_percent, det.not_started_percent, 
 wf.workflow_item, 
@@ -63,7 +63,9 @@ FROM data.scraped_general_permit_data_2025_10 gen
 LEFT JOIN data.scraped_detailed_permit_data_2025_10 det
 ON gen.ain = det.ain AND gen.permit_number = det.permit_number 
 LEFT JOIN data.scraped_workflow_permit_data_2025_10 wf
-ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;")
+ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number")
+
+table(permits_orig$gen_status, useNA="ifany")
 
 # look at permit numbers
 permits_substring <- permits_orig %>%
@@ -89,7 +91,9 @@ table(permits_substring$permit_sub)
 permits_filtered <- permits_orig %>%
   filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
   # filter out voided permits
-  filter(status != "Void")
+  filter(gen_status != "Void") # 33463
+
+table(permits_filtered$gen_status, useNA="ifany")
 
 # Minor clean up, filter, add helper columns
 # get parcel-level data for some and significant damage parcels
@@ -154,7 +158,7 @@ permits <- permits_filtered %>%
     # is this an FDR (Fire Debris Removal) permit
     b1_has_fdr=ifelse(grepl("^FDR", permit_number), 1, 0),
     # is this permit's status finaled - will use for other buckets too
-    b4_has_finaled = ifelse(status=="Finaled" | finalized_date != "", 1, 0)) %>% # expanding to include finalized date where some statuses are exempt
+    b4_has_finaled = ifelse(gen_status=="Finaled" | finalized_date != "", 1, 0)) %>% # expanding to include finalized date where some statuses are exempt
   # bucket 1 helper column: check is fdr is finaled
   mutate(
     b1_has_fdr_finaled = case_when(
@@ -198,7 +202,7 @@ permits <- permits_filtered %>%
                                     b4_has_finaled==1), 1, 0)) 
 
 # checks
-table(permits$status, useNA = "ifany") # should we drop Canceled and Denied? What does Exempt mean?
+table(permits$gen_status, useNA = "ifany") # should we drop Canceled and Denied? What does Exempt mean?
 table(permits$b1_has_fdr, useNA = "ifany")
 table(permits$b1_has_fdr_finaled, useNA = "ifany")
 table(permits$b2_has_build_permit, useNA = "ifany")
@@ -218,11 +222,11 @@ permits %>%
   filter(b4_has_finaled==1) %>%
   View()
 
-nrow(permits)  # 5397
+nrow(permits)  # 6653
 
 length(unique(permits$permit_number)) # multiple rows per permit 
 length(unique(permits$ain)) # multiple rows per ain
-n_distinct(permits$permit_number, permits$ain) # 5396 unique ain/permit pairs 
+n_distinct(permits$permit_number, permits$ain) # 6652 unique ain/permit pairs 
 permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 1 duplicate: 5840015019 
 
 # includes permits that apply to multiple parcels and 1 duplicate of ain/permit pair (one version has a project name)
@@ -236,22 +240,22 @@ permits_check <- permits %>%
 
 finaled_perm_check <- permits_check %>% 
   filter(b4_has_finaled_perm==1) %>% 
-  select (ain, main_parcel,permit_number, type, description, damage_category, 
+  select(ain, main_parcel,permit_number, type, description, damage_category, 
           damage_type_list, completed_percent, applied_date, issued_date, 
-          finalized_date, status,record_id ) 
+          finalized_date, gen_status,record_id ) 
 # check these in next step
 
 finaled_temp_check <- permits_check %>% 
   filter(b4_has_finaled_temp==1) %>% 
   select (ain, main_parcel,permit_number, type, description, damage_category, 
           damage_type_list, completed_percent, applied_date, issued_date, 
-          finalized_date, status,record_id )
+          finalized_date, gen_status,record_id )
 
 finaled_comm_check <- permits_check %>% 
   filter(b4_has_finaled_comm==1) %>% 
   select (ain, main_parcel,permit_number, type, description, damage_category, 
           damage_type_list, completed_percent, applied_date, issued_date, 
-          finalized_date, status,record_id )
+          finalized_date, gen_status,record_id )
 # empty
 
 # check recoding of main fields
@@ -369,12 +373,10 @@ length(unique(combined_parcels$ain)) # 12938
 nrow(combined_parcels) # 12938
 # no more dupes
 
-# different results in b4_has_finaled_
 dups <- combined_parcels %>%
   group_by(ain) %>%
   filter(n()>1) %>%
   ungroup()
-                   
 
 combined_parcels_qa <- combined_parcels_all %>%
   # summarize helper cols to the parcel level (bucket 1, 2, 3, and 4)
@@ -443,7 +445,7 @@ nrow(combined_parcels_qa)
 ##### Step 2: Apply Typology #####
 # create table to store final results
 final_types <- parcels %>%
-  left_join(combined_parcels_qa, by="ain") %>%
+  left_join(combined_parcels, by="ain") %>%
   # replace NAs that arise from parcels with no permits
   mutate(across(starts_with("b") & where(is.numeric), ~replace_na(., 0))) %>%
   mutate(across(starts_with("b") & where(is.character), ~na_if(., "NA"))) %>%
@@ -451,23 +453,23 @@ final_types <- parcels %>%
   # Bucket 1 status: Is fire debris cleared?
   mutate(
     bucket_1_status = case_when(
-      b1_has_ace_fso>=1 | b1_has_fdr_finaled>= 1 ~ "Fire Debris Cleared",
+      b1_has_ace_fso==1 | b1_has_fdr_finaled== 1 ~ "Fire Debris Cleared",
       # we infer properties with a build permit have Fire Debris Cleared 
-      b2_has_build_permit>=1 ~ "Fire Debris Cleared",
+      b2_has_build_permit==1 ~ "Fire Debris Cleared",
       b1_has_ace_fso==0 & b1_has_fdr_finaled == 0 & damage_category == "No Damage"  ~ "Fire Debris Removal Not Applicable",
       b1_has_ace_fso==0 & b1_has_fdr_finaled == 0 & damage_category !="No Damage" ~ "Fire Debris Removal Incomplete",
-      .default = "Something else")) %>%
+      .default = "Something else - please QA")) %>%
   # Bucket 2 status: Build Permit Application Received
   mutate(
     bucket_2_status = 
       case_when(
-        (bucket_1_status=="Fire Debris Cleared" & b2_has_build_permit>=1) ~ "Permit Application Received", 
+        (bucket_1_status=="Fire Debris Cleared" & b2_has_build_permit==1) ~ "Permit Application Received", 
         (bucket_1_status=="Fire Debris Cleared" & b2_has_build_permit==0) ~ "Permit Application Not Received",
         .default=bucket_1_status)) %>%
   # Bucket 3 status: Construction progress
   mutate(bucket_3_status = 
            case_when((
-             bucket_2_status == "Permit Application Received" & b3_has_inspection>=1) ~ "Construction In Progress",
+             bucket_2_status == "Permit Application Received" & b3_has_inspection==1) ~ "Construction In Progress",
              (bucket_2_status == "Permit Application Received" & b3_has_inspection==0) ~ "Construction Not Started",
              .default=bucket_2_status)) %>%
   # Bucket 4 Status: Rebuild complete
@@ -506,9 +508,9 @@ sig_dmg <- final_types %>% filter(damage_category=="Significant Damage")
 # table(sig_dmg$rebuild_status, useNA = "ifany")
 # 
 # Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
-# 344                            1484                             79                            3754
+# 296                            1508                             39                            3813
 # Rebuild Complete 
-# 15 
+# 20 
 
 # QA: See if the some damage/significant damage parcels have any NAs
 sum(is.na(check)) # 0 NAs
@@ -533,13 +535,13 @@ View(check_fdr_incomplete_permits)
 # these might be finaled https://epicla.lacounty.gov/energov_prod/SelfService/#/permit/48d0b250-3b50-451b-958a-25ff185643c3
 # if finaled date assumed finaled?
 # https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5833020004
-  # why didnt this one show permits 5833020004?
+  # why didnt this one show permits 5833020004? - typo in permit SQL query, now resolved
   
 rebuild_complete <- final_types %>%
   filter(damage_category=="Significant Damage" & rebuild_status=="Rebuild Complete")
 
 View(rebuild_complete)
-# missing CREC permit for this one?
+# missing CREC permit for this one? - this is a CREC plan, not permit - will have ECI advise
 # https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5829015003
   
 # 	5846021031 looks accurate
