@@ -108,9 +108,8 @@ extra_ains_list <- setdiff(jan_damage$ain, jan_parcels$ain)
 extra_ains_df <- jan_damage %>% filter(ain %in% extra_ains_list)
 
 debris <- debris_status %>%
-  # add bucket 1 helper columns 
   mutate(
-    # does the parcel have full sign off (fso) from army corps
+    # bucket 1 helper: does the parcel have full sign off (fso) from army corps
     b1_has_ace_fso = ifelse(!is.na(fso_pkg_approved), 1, 0))
 
 length(unique(debris$ain)) # 7004
@@ -134,14 +133,12 @@ workflow <- permits_filtered %>%
   group_by(ain, permit_number) %>%
   mutate(b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm = TRUE)>0, 1, 0)) %>%
   select(ain, permit_number, b3_has_inspection) %>%
-  unique() # 4791
+  unique() # 4669
 
 table(workflow$b3_has_inspection, useNA = "ifany")
 
 # permit level data
 permits <- permits_filtered %>%
-  # replace character cols with NA with 'None' for later filters
-  mutate(across(where(is.character), ~replace_na(., "None"))) %>%
   # remove workflow items to get a dataframe of just permit-level cols
   select(-c(workflow_item, wf_status, wf_status_date)) %>%
   unique() %>%
@@ -150,15 +147,16 @@ permits <- permits_filtered %>%
     # is this an FDR (Fire Debris Removal) permit
     b1_has_fdr=ifelse(grepl("^FDR", permit_number), 1, 0),
     # is this permit's status finaled - will use for other buckets too
-    b4_has_finaled = ifelse(status=="Finaled", 1, 0))
+    b4_has_finaled = ifelse(status=="Finaled" | finalized_date != "", 1, 0)) # expanding to include finalized date where some statuses are exempt
 
+table(permits$status, useNA = "ifany") # should we drop Canceled and Denied? What does Exempt mean?
 table(permits$b1_has_fdr, useNA = "ifany")
 table(permits$b4_has_finaled, useNA = "ifany")
 
 permits %>%
   filter(b1_has_fdr==1) %>%
   View()
-# some have finalized date but not finaled status
+# some have finalized date but not finaled status - HK: Other statuses with finalized date are Cancelled and Exempt
 # some have applied date but no issued date
 
 permits %>%
