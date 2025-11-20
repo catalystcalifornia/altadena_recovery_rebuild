@@ -87,7 +87,9 @@ table(permits_substring$permit_sub)
 
 # Filter permits for applied date after Jan 7, 2025
 permits_filtered <- permits_orig %>%
-  filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07"))
+  filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
+  # filter out voided permits
+  filter(status != "Void")
 
 # Minor clean up, filter, add helper columns
 # get parcel-level data for some and significant damage parcels
@@ -137,13 +139,9 @@ workflow <- permits_filtered %>%
 table(workflow$b3_has_inspection, useNA = "ifany")
 
 # permit level data
-permits <- permits_orig %>%
+permits <- permits_filtered %>%
   # replace character cols with NA with 'None' for later filters
   mutate(across(where(is.character), ~replace_na(., "None"))) %>%
-  # filter out permits from before 2025 (i.e., date ends with 2025 or 2026 for future scrapes)
-  filter(grepl("(2025|2026)$", applied_date)) %>% # filter for after jan 7
-  # filter out voided permits
-  filter(status != "Void") %>%
   # remove workflow items to get a dataframe of just permit-level cols
   select(-c(workflow_item, wf_status, wf_status_date)) %>%
   unique() %>%
