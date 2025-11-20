@@ -95,9 +95,12 @@ parcels <- jan_parcels %>%
   rename(xwalk_status = status)
 
 # check
-length(unique(jan_parcels$ain))
-length(unique(parcels$ain))
-length(unique(jan_damage$ain))
+length(unique(jan_parcels$ain)) # 12938
+length(unique(parcels$ain))     # 12938
+length(unique(jan_damage$ain))  # 12958 - 20 extra here; 5 are significant damage
+
+extra_ains_list <- setdiff(jan_damage$ain, jan_parcels$ain)
+extra_ains_df <- jan_damage %>% filter(ain %in% extra_ains_list)
 
 debris <- debris_status %>%
   # add bucket 1 helper columns 
