@@ -50,7 +50,7 @@ df <- df_ %>%
     filter(zone_count>=10) # filter out zones that are super low in count, like residential agricultural, open space, neighborhood business
 
 df <- df %>%
-  mutate("% (Count)"=paste0(comma(zone_count)," (",round(zone_prc,0),"%)"),
+  mutate("% (Count)"=paste0(round(zone_prc,0),"% (", comma(zone_count), " out of ", comma(area_total), ")"), 
          "Share of Damaged Properties"=zone_prc,
          "Zones" = paste0(z_category_label," (", z_category,")"),
          "Area" = str_to_title(area_name)) %>%

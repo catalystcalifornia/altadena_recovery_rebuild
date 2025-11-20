@@ -46,11 +46,12 @@ Given the low number of rental units in Altadena, we also examined what types of
 
 ```{r}
 #### VISUAL ####
-df_ <- st_read(con, query="Select res_type, area_name, rent_units_count, rent_units_prc from data.analysis_units_jan2025") 
+df_ <- st_read(con, query="Select res_type, area_name, rent_units_count, rent_units_prc, rent_units_total from data.analysis_units_jan2025") 
 
 df <- df_ %>%
   filter(res_type != "Boarding house") %>% 
-  mutate("% (Count)"=paste0(comma(rent_units_count)," (",round(rent_units_prc,0),"%)"),
+  mutate("% (Count)"=paste0(round(rent_units_prc,0),"% (", comma(rent_units_count)," out of ", 
+                            comma(rent_units_total), ")"),
          "Share of Rental Units"=rent_units_prc,
          "Residential Type" = res_type,
          "Area" = str_to_title(area_name)) %>%

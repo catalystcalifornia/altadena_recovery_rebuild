@@ -51,7 +51,8 @@ df_ <- st_read(con, query="Select * from data.analysis_restype_damage")
 df<- df_ %>%
   filter(res_type != "Boarding house",
          damage_category == "Significant Damage") %>% 
-  mutate("% (Count)"=paste0(comma(count)," (",round(prc,0),"%)"),        
+  mutate("% (Count)"=paste0(round(prc,0),"% (", comma(count)," out of ", 
+                            comma(total), ")"),      
          "Share of Housing Type Lost"=prc,
          "Residential Type" = res_type,
          "Area" = str_to_title(area_name)) %>%

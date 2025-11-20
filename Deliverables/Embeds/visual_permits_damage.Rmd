@@ -69,7 +69,8 @@ df$`Rebuild Status`<- factor(df$`Rebuild Status`, levels = c(
                                                              "Rebuild Complete"))
 
 df <- df %>%
-  mutate("% (Count)"=paste0(comma(count)," (",round(prc,0),"%)"),
+  mutate("% (Count)"=paste0(round(prc,0),"% (", comma(count)," out of ", 
+                            comma(total), ")"),
          "Share of Damaged Properties in Rebuild Status"=prc,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%

@@ -56,7 +56,8 @@ high_lead <- df_raw %>%
 
 df<- df_raw %>%
   filter(damage_category=="Significant Damage" & hi_lead_label=="High Lead Grid") %>%
-  mutate("% (Count)"=paste0(comma(count)," (",round(prc,0),"%)"),        
+  mutate("% (Count)"=paste0(round(prc,0),"% (", comma(count)," out of ", 
+                            comma(total), ")"),
          "Properties in Areas with High Lead Levels"=prc,
          "Residential Type" = res_type,
          "Area" = str_to_title(area_name)) %>%

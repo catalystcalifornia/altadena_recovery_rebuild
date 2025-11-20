@@ -65,8 +65,9 @@ df$`Ownership Type`<- factor(df$owner_renter_jan, levels = c("Owner occupied, ho
 
 
 df <- df %>%
-  select(-c(sold_after_eaton,owner_renter_total)) %>%
-  mutate("% (Count)"=paste0(comma(sold_count)," (",round(sold_prc,0),"%)"),
+  select(-c(sold_after_eaton)) %>%
+  mutate("% (Count)" =paste0(round(sold_prc,0),"% (", comma(sold_count)," out of ", 
+                            comma(owner_renter_total), ")"),
          "Share of Housing Type Sold"=sold_prc,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%

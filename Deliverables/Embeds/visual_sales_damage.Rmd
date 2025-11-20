@@ -52,8 +52,9 @@ df <- df_ %>%
     filter(sold_after_eaton == "Sold") 
 
 df <- df %>%
-  select(-c(sold_after_eaton,damage_level_total)) %>%
-  mutate("% (Count)"=paste0(comma(damage_level_count)," (",round(damage_level_prc,0),"%)"),
+  select(-c(sold_after_eaton)) %>%
+  mutate("% (Count)"=paste0(round(damage_level_prc,0),"% (", comma(damage_level_count)," out of ", 
+                            comma(damage_level_total), ")"),
          "Share of Damage Type Sold"=damage_level_prc,
          "Damage Level" = damage_category,
          "Area" = str_to_title(area_name)) %>%
