@@ -489,12 +489,12 @@ final_types <- parcels %>%
     (bucket_3_status == "Construction In Progress" & 
        b4_is_temp_only==1) ~ "Construction In Progress",
     (bucket_3_status == "Construction In Progress" & b4_has_temp==1 &
-       b4_is_housing==1 & b4_perm_finaled==1 & b4_temp_finaled==1)  ~ "Rebuild Complete",
+       b4_is_housing==1 & b4_perm_finaled==1 & b4_temp_finaled==1)  ~ "Repairs or Rebuild Complete",
     (bucket_3_status == "Construction In Progress" & b4_has_temp==0 &
-       b4_is_housing==1 & b4_perm_finaled==1)  ~ "Rebuild Complete",
+       b4_is_housing==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
     (bucket_3_status == "Construction In Progress" & 
        b4_is_misc_only==1 & 
-       b4_misc_finaled==1) ~ "Rebuild Complete",
+       b4_misc_finaled==1) ~ "Repairs or Rebuild Complete",
     .default = bucket_3_status)) %>%
   mutate(
     rebuild_status=bucket_4_status
