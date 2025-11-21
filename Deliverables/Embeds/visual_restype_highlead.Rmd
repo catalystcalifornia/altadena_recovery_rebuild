@@ -72,7 +72,7 @@ table<- df %>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and L.A. County Department of Public Health Soil Testing Program, March 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Properties in Areas with High Lead Levels', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Properties in Areas with High Lead Levels', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   opt_align_table_header("left")%>%
   opt_table_font(font=c("Inter", default_fonts())) %>% 
   tab_options(table.background.color=alabaster,

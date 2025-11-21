@@ -81,7 +81,7 @@ table<- df %>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table %>%
-  gt_plt_bar_pct(column= 'Share of Housing Type Sold', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Type Sold', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
