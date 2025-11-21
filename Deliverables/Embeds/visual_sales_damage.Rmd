@@ -52,8 +52,9 @@ df <- df_ %>%
     filter(sold_after_eaton == "Sold") 
 
 df <- df %>%
-  select(-c(sold_after_eaton,damage_level_total)) %>%
-  mutate("Count (%)"=paste0(comma(damage_level_count)," (",round(damage_level_prc,0),"%)"),
+  select(-c(sold_after_eaton)) %>%
+  mutate("% (Count)"=paste0(round(damage_level_prc,0),"% (", comma(damage_level_count)," out of ", 
+                            comma(damage_level_total), ")"),
          "Share of Damage Type Sold"=damage_level_prc,
          "Damage Level" = damage_category,
          "Area" = str_to_title(area_name)) %>%
@@ -62,13 +63,13 @@ df <- df %>%
 
 
 table<- df %>%
-  select("Area","Damage Level", "Share of Damage Type Sold", "Count (%)")%>%
+  select("Area","Damage Level", "Share of Damage Type Sold", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Damage Level") %>%
   tab_header(title= "Residential Properties Sold Within Each Damage Type")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table %>%
-  gt_plt_bar_pct(column= 'Share of Damage Type Sold', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Damage Type Sold', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%

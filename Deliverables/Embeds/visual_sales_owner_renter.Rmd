@@ -65,8 +65,9 @@ df$`Ownership Type`<- factor(df$owner_renter_jan, levels = c("Owner occupied, ho
 
 
 df <- df %>%
-  select(-c(sold_after_eaton,owner_renter_total)) %>%
-  mutate("Count (%)"=paste0(comma(sold_count)," (",round(sold_prc,0),"%)"),
+  select(-c(sold_after_eaton)) %>%
+  mutate("% (Count)" =paste0(round(sold_prc,0),"% (", comma(sold_count)," out of ", 
+                            comma(owner_renter_total), ")"),
          "Share of Housing Type Sold"=sold_prc,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
@@ -74,13 +75,13 @@ df <- df %>%
 
 
 table<- df %>%
-  select("Area","Ownership Type", "Share of Housing Type Sold", "Count (%)")%>%
+  select("Area","Ownership Type", "Share of Housing Type Sold", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Owner or Renter Occupied") %>%
   tab_header(title= "Share of Properties Sold After the Fire Within Each Ownership Type")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table %>%
-  gt_plt_bar_pct(column= 'Share of Housing Type Sold', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Type Sold', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
