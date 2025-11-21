@@ -103,7 +103,7 @@ analysis_permits_final <- analysis_permits_area_e_w
 # add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
-# Upload tables to postgres and add table/column comments
+# # Upload tables to postgres and add table/column comments
 # dbWriteTable(con, name = "analysis_damage_area_jan2025", value = analysis_damage_area, overwrite = FALSE)
 # schema <- "data"
 # table_name <- "analysis_damage_area_jan2025"
