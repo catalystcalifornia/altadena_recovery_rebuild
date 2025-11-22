@@ -40,9 +40,9 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Depending on the ownership type of the property, different strategies will be needed to jumpstart rebuilding. Across Altadena, most significantly damaged properties have not had any permit applications submitted regardless of ownership type. Renter-occupied properties are most likely to have not completed fire debris removal though these represent a small percentage of all renter-occupied properties. About 5% of significantly damaged, renter-occupied properties have not completed fire debris removal.
+Depending on the ownership type of the property, different strategies will be needed to jumpstart rebuilding. Across Altadena, most significantly damaged properties have not had any permit applications submitted regardless of ownership type. Renter-occupied properties are generally most likely to have not completed fire debris removal though these represent a small percentage of all renter-occupied properties. Across Altadena, about 3% of significantly damaged, renter-occupied properties have not completed fire debris removal, a total of 14 properties.
 
-Generally, zero to 3.2% of significantly damaged properties in Altadena are rebuilt across ownership types. More properties have at least applied for permits, but have not started construction. In Altadena, 23% of owner-occupied and 22% of renter-occupied properties alike have been issued permits, but have not started construction. A larger percentage of all ownership types have not applied for permits. This suggests across the board property owners in Altadena are slowly progressing toward building efforts. The few significantly damaged properties in Altadena that have been sold to state or are under other ownership are slightly further behind. About 78% of properties sold to state have not submitted permit applications and 100% of properties that are under other ownership have not submitted permit applications. Policymakers should further investigate how to tailor recovery supports for each ownership type and ensure all properties are progressing toward rebuilding. This can include holding government, corporate, or other owners accountable for rebuilding, and providing support to owner-occupied or renter-occupied properties to preserve the diversity of housing options in Altadena.
+Generally, less than one percent of significantly damaged properties in Altadena have completed their repairs or rebuilt across ownership types. More properties have at least applied for permits, but have not started construction. In Altadena, 27% of owner-occupied and 26% of renter-occupied properties alike have applied for and been issued permits, but have not started construction. However, a larger percentage of all ownership types have not applied for permits at all. This suggests across the board property owners in Altadena are slowly progressing toward building efforts. The few significantly damaged properties in Altadena that have been sold to state or are under other ownership are slightly further behind. About 77% of properties sold to state have not submitted permit applications and 100% of properties that are under other ownership have not submitted permit applications. Policymakers should further investigate how to tailor recovery supports for each ownership type and ensure all properties are progressing toward rebuilding. This can include holding government, corporate, or other owners accountable for rebuilding, and providing support to owner-occupied or renter-occupied properties to preserve the diversity of housing options in Altadena.
 
 ```{r}
 #### VISUAL: Permit statuses by area and owner type for significantly damaged properties  ####
@@ -83,7 +83,7 @@ df <- df %>% #
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   # reorder, dropping no evidence of progress given the small %
  select("Area","Ownership Type", "Total Properties",
-        "Fire Debris Removal Incomplete","Permit Application Not Received","Construction Not Started", "Construction In Progress", "Rebuild Complete")%>%
+        "Fire Debris Removal Incomplete","Permit Application Not Received","Construction Not Started", "Construction In Progress", "Repairs Or Rebuild Complete")%>%
   arrange(Area, `Ownership Type`)
 
 table<- df %>%
@@ -92,7 +92,7 @@ table<- df %>%
   gt_plt_bar_pct(column= 'Permit Application Not Received', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   gt_plt_bar_pct(column= 'Construction Not Started', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   gt_plt_bar_pct(column= 'Construction In Progress', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
-  gt_plt_bar_pct(column= 'Rebuild Complete', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
+  gt_plt_bar_pct(column= 'Repairs Or Rebuild Complete', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   tab_header(title= "Rebuild Status of Significantly Damaged Properties",
              subtitle = "By Ownership Type (as of October 2025)")%>%
   
