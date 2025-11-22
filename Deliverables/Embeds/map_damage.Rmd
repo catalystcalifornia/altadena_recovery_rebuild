@@ -170,7 +170,7 @@ sold_indices <- which(all_df$sold_after_eaton == TRUE)
 all_df <- all_df %>%
   mutate(rebuild_status_factor = factor(
     rebuild_status, 
-    levels=c("Fire Debris Removal Incomplete", "Permit Application Not Received", "Construction Not Started", "Construction In Progress", "Rebuild Complete"))) 
+    levels=c("Fire Debris Removal Incomplete", "Permit Application Not Received", "Construction Not Started", "Construction In Progress", "Repairs Or Rebuild Complete"))) 
 
 # Create a color palette based on the factor
 zoning_pal <- colorFactor(
