@@ -485,7 +485,7 @@ final_types <- parcels %>%
        b4_is_temp_only==1) ~ "Construction In Progress",
     ##### QA Note - this would ignore any misc permits still open, e.g., plumbing or electrical, might want to say that all permits have to be completed? but per your exception above here, we don't count completed temp housing as completed #####
     (bucket_3_status == "Construction In Progress" & b4_has_temp==1 &
-       b4_is_housing==1 & b4_perm_finaled==1 & b4_temp_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
+       b4_is_housing==1 & b4_perm_finaled==1 & b4_temp_finaled==1)  ~ "Repairs or Rebuild Complete",
     (bucket_3_status == "Construction In Progress" & b4_has_temp==0 &
        b4_is_housing==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
     (bucket_3_status == "Construction In Progress" & 
