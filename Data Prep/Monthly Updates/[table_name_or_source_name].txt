@@ -1,0 +1,5 @@
+# Scripts should be named after the table they create (not date specific) or data source if importing data for use in subsequent scripts
+# Some updates that all scrips will need: 
+###### move from naming columns ain_[month] to ain_curr, ain_prev 
+###### all tables exported to "dashboard" schema
+###### all tables exported should have the prefix _YYYY_MM - (can use Sys.Date() to extract these values programmatically)
