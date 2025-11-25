@@ -55,5 +55,8 @@ parcels_curr <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stat
   mutate(area = st_area(geom))
 
 # double check CRS of both of parcel shapes
-st_crs(parcels_prev)$epsg #3310 good
-st_crs(parcels_curr)$epsg #3310 good
+cat(paste("Confirm EPSG of prev parcel shapes are 3310:", 
+          ifelse(st_crs(parcels_prev)$epsg=="3310", "TRUE", paste("FALSE - EPSG is", st_crs(parcels_prev)$epsg))))
+cat(paste("Confirm EPSG of curr parcel shapes are 3310:", 
+          ifelse(st_crs(parcels_prev)$epsg=="3310", "TRUE", paste("FALSE - EPSG is", st_crs(parcels_prev)$epsg))))
+
