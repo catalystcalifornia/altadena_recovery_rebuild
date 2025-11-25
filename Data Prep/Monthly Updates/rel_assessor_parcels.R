@@ -1,5 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_parcels table for the Monthly Dashboard Updates ##
-## QA DOC: [INSERT HERE] ##
+## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_assessor_parcels.docx ##
 ## SCRIPT OUTPUT: rel_assessor_parcels_YYYY_MM
 
 #### STEP 1: SET UP (Update year and month) ####
@@ -26,8 +26,6 @@ month <- "09"
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
 xwalk <- st_read(con_alt, query="SELECT * FROM data.crosswalk_assessor_jan_sept_2025")
-# get assessor data for CURRENT MONTH
-assessor_data <- st_read(con_alt, query="Select * from data.assessor_data_universe_sept2025")
 # get assessor parcels for CURRENT MONTH
 assessor_parcels <- st_read(con_alt, query="Select * from data.assessor_parcels_universe_sept2025", geom="geom")
 # get relational tables from PREVIOUS MONTH
