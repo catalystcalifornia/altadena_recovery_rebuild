@@ -3,7 +3,7 @@
 # Or other issues worth additional review.
 
 ##### Step 0: Set up, initial prep #####
-# Library and environment set up ----
+# Library and environment set up
 source("W:\\RDA Team\\R\\credentials_source.R")
 library(sf)
 library(mapview)
@@ -18,11 +18,11 @@ curr_year <- "2025" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
 curr_month <- "09" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
 prev_month <- "01" # ifelse(curr_month == "01", "12", sprintf("%02d", as.numeric(curr_month) - 1))
 prev_year <- "2025" # ifelse(curr_month == "01", as.character(as.numeric(curr_year) - 1),  curr_year)
-prev_prev_month <- ifelse(prev_month == "01", "12", 
-                          sprintf("%02d", as.numeric(prev_month) - 1))
-prev_prev_year <- ifelse(prev_month == "01", 
-                         as.character(as.numeric(curr_year) - 1), 
-                         prev_year)
+# prev_prev_month <- ifelse(prev_month == "01", "12", 
+#                           sprintf("%02d", as.numeric(prev_month) - 1))
+# prev_prev_year <- ifelse(prev_month == "01", 
+#                          as.character(as.numeric(curr_year) - 1), 
+#                          prev_year)
 
 # Key variables - current and previous tables needed for script
 curr_parcels_table <- paste("dashboard.assessor_parcels_universe", curr_year, curr_month, sep="_")
