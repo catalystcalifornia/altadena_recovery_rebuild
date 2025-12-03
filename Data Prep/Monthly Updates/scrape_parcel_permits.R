@@ -5,18 +5,36 @@
 library(dplyr) 
 
 source("W:\\RDA Team\\R\\credentials_source.R")
-source("Data Prep\\scraping_functions.R")
+source("Data Prep\\Monthly Updates\\scraping_functions.R")
 
 con <- connect_to_db("altadena_recovery_rebuild")
+schema <- "dashboard"
+
+# set some metadata for exporting results
+date_ran <- as.character(Sys.Date())
+curr_year <- strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
+curr_month <- strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+table_name <- paste("scraped_general_permit_data", 
+                    curr_year, # year
+                    curr_month, # month
+                    sep="_") 
+
+curr_xwalk_table <- "dashboard.crosswalk_assessor_01_09_2025_test" ### MUST UPDATE
+
 
 # EPIC LA - LA County building permits (unincorporated cities only)
 lac_permits_url <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st="
 
 
-jan_parcels <- dbGetQuery(con, 
-                          "SELECT DISTINCT dmgs.ain, dmgs.damage_category, xwalk.site_address_parcel FROM data.rel_assessor_damage_level as dmgs LEFT JOIN data.crosswalk_dins_assessor_jan2025 as xwalk ON dmgs.ain = xwalk.ain WHERE dmgs.damage_category = 'Significant Damage' OR dmgs.damage_category = 'Some Damage' ORDER BY dmgs.ain")
+# jan_parcels <- dbGetQuery(con, 
+#                           "SELECT DISTINCT dmgs.ain, dmgs.damage_category, xwalk.site_address_parcel FROM data.rel_assessor_damage_level as dmgs LEFT JOIN data.crosswalk_dins_assessor_jan2025 as xwalk ON dmgs.ain = xwalk.ain WHERE dmgs.damage_category = 'Significant Damage' OR dmgs.damage_category = 'Some Damage' ORDER BY dmgs.ain")
 
+xwalk <- dbGetQuery(con, paste("SELECT * FROM", curr_xwalk_table, ";"))
+ains <- xwalk %>% select(starts_with("ain_"))
+ains_list <- unlist(ains) %>% unique() 
+cat(paste("Unique number of AINS:", length(ains_list))) #5733
 dbDisconnect(con)
+
 ##### Establish scraping process #####
 # 1. Confirm chromote is working properly with simple site like google.com
 test_chromote()
@@ -26,26 +44,7 @@ url_ <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=10
 message(paste("Current search URL:", url_))
 permits <- scrape_permits_chromote(url=url_, wait_time = 30)
 
-# 3. If above works, scale it up to loop through a list of addresses and return all permits (with general data fields)
-# using 10 Jan parcels (Altadena Only)
-altadena_parcels <- jan_parcels %>%
-  mutate(city = case_when(grepl("ALTADENA, CA", site_address_parcel)~"Altadena",
-                          grepl("PASADENA, CA", site_address_parcel)~"Pasadena",
-                          .default="something else!")) %>%
-  filter(city=='Altadena') 
-
-unique_ains <- altadena_parcels %>%
-  select(ain) %>%
-  unique
-
-# set some metadata for exporting results
-table_name <- paste("scraped_general_permit_data", 
-                    strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
-                    strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
-                    sep="_") 
-
-date_ran <- as.character(Sys.Date())
-
+# 3. If above works, scale it up to loop through a list of AINS and return all permits (with general data fields)
 csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", table_name, ".csv")
 
 ##### Start scraping #####
@@ -57,18 +56,18 @@ if (file.exists(csv_filepath)) {
                         colClasses = c("character"))
   
   scraped_ains <- prev_data %>%
-    select(ain) %>%
+    pull(ain) %>%
     unique()
   
-  remaining <- data.frame(ain=setdiff(unique_ains, scraped_ains))
+  remaining <- data.frame(ain=setdiff(ains_list, scraped_ains))
   
   include_headers <- FALSE
   append_value <- TRUE
   
 } else {
-  print("boo")
+  print("there's no csv with that name - starting scrape from the beginning")
   
-  remaining <- unique_ains
+  remaining <- data.frame(ain=ains_list)
   include_headers <- TRUE
   append_value <- FALSE
 }
@@ -100,8 +99,7 @@ for (row_ in 1:nrow(remaining)) {
                 quote = TRUE,
                 qmethod = "double")
   
-  include_headers <- FALSE
-  append_value <- TRUE
+  
   
   Sys.sleep(3)
 }
@@ -114,16 +112,21 @@ final_data <- read.csv(csv_filepath,
 
 con <- connect_to_db("altadena_recovery_rebuild")
 
-dbWriteTable(con, Id(schema="data", table_name=table_name), final_data,
+dbWriteTable(con, Id(schema=schema, table_name=table_name), final_data,
              overwrite = FALSE, row.names = FALSE)
 
-dbSendQuery(con, paste0("COMMENT ON TABLE data.", table_name, " IS
+dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", table_name, " IS
             'General permit data for Altadena parcels with some or significant damage,
             Data imported on ",date_ran, "
-            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
+            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
             Source: https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=[ain]'"))
 
 dbDisconnect(con)
+
+# QA Checks
+# read in pg table and check
+# 1. if any retried failed
+# 2. if any ains are associated with 100 permits
 
 # end of script - rest is old code that may be better for scraping permit details
 
