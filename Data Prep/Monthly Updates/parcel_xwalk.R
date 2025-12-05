@@ -50,7 +50,7 @@ parcels_prev <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stat
                        LEFT JOIN", prev_stats_table, "stats
                        ON parcels.ain=stats.ain")) %>%
   mutate(flag="prev") %>%
-  filter(ain %in% prev_walk$ain_prev) %>%
+  filter(ain %in% prev_xwalk$ain_prev) %>%
   mutate(area = st_area(geom))
 
 parcels_curr <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
@@ -64,7 +64,7 @@ parcels_curr <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stat
 cat(paste("Confirm EPSG of prev parcel shapes is 3310:", 
           ifelse(st_crs(parcels_prev)$epsg=="3310", "TRUE", paste("FALSE - EPSG is", st_crs(parcels_prev)$epsg))))
 cat(paste("Confirm EPSG of curr parcel shapes is 3310:", 
-          ifelse(st_crs(parcels_prev)$epsg=="3310", "TRUE", paste("FALSE - EPSG is", st_crs(parcels_prev)$epsg))))
+          ifelse(st_crs(parcels_curr)$epsg=="3310", "TRUE", paste("FALSE - EPSG is", st_crs(parcels_curr)$epsg))))
 
 
 ##### Step 1: find out which shapes are the same in prev and curr parcels #####
@@ -85,11 +85,12 @@ match_parcels <- all_parcels %>%
   ungroup() 
 
 # QA Checks
-cat(paste("Total number of parcels:", nrow(all_parcels)))
+cat(paste("Total number of curr and prev parcels:", nrow(all_parcels)))
 check <- data.frame(table(match_parcels$dupe_id, useNA = "always"))
 cat(paste("Number of duplicated shapes:", nrow(check)-1))
 cat(paste("Number of unduplicated shapes:", check$Freq[is.na(check$Var1)]))
 cat(paste("Number of shapes accounted for is the same as number of all parcels:", sum(check$Freq)==nrow(all_parcels)))
+cat(paste("Number of curr parcels shapes not accounted for by the same prev parcel shapes:", nrow(parcels_curr)-check$Freq[is.na(check$Var1)]), " out of ", nrow(parcels_curr))
 
 
 # Make wider, to see if AINs match across the same shape (or something else)
