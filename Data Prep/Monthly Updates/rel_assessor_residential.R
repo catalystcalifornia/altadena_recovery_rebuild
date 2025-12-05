@@ -29,6 +29,27 @@ xwalk <- st_read(con_alt, query="SELECT * FROM data.crosswalk_assessor_jan_sept_
 # get assessor data for CURRENT MONTH
 assessor_data <- st_read(con_alt, query="Select * from data.assessor_data_universe_sept2025")
 
+# JZ QA notes: 
+# Do we not need the step of looking at which AINs in the most recent month's assessor data were also in the January 2025 assessor data?
+# See commented out code beow:
+
+# filter jan sept crosswalk for residential parcels in Altadena
+# jan_sept_xwalk_alt <- jan_sept_xwalk %>%
+#   filter(ain_jan %in% res$ain)
+# 
+# nrow(jan_sept_xwalk_alt)
+# length(unique(jan_sept_xwalk_alt$ain_jan))
+# length(unique(jan_sept_xwalk_alt$ain_sept))
+# one duplicate september ain
+# jan_sept_xwalk_alt$ain_sept[duplicated(jan_sept_xwalk_alt$ain_sept)]
+# 
+# View(jan_sept_xwalk_alt)
+
+# filter MOST RECENT MONTH assessor data for same ains
+# sept_data_altadena <- assessor_data %>%
+#   filter(ain %in% jan_sept_xwalk_alt$ain_sept)
+
+
 #### STEP 3:GETTING TOTAL UNITS (NO UPDATES) ####
 
 data_total_units <- assessor_data %>%
@@ -95,7 +116,13 @@ data_altadena_owner <- data_altadena_res %>%
     num_howmowner_exemption>=1 & landlord_units==0 ~ "Owner occupied",
     num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner & Renter occupied",
     num_howmowner_exemption==0 & landlord_units>=1 ~ "Renter occupied",
-    TRUE ~ NA)) %>%
+    TRUE ~ "Other")) 
+
+# check
+table(data_altadena_owner$owner_renter)
+
+
+data_altadena_owner<-data_altadena_owner%>%
   mutate(
     owner_renter = case_when(
       exemption_type %in% "1" & owner_renter == "Other" ~ "Owner occupied",
@@ -105,8 +132,8 @@ data_altadena_owner <- data_altadena_res %>%
   mutate(
     owner_renter = ifelse(
       (grepl("LLC| LP| Inc | Investment", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC| LP| Inc| Investment", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC| LP| Inc| Investment", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+        (grepl("LLC| LP| Inc | Investment", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc | Investment", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "LLC owned",owner_renter))%>%
   mutate(
     owner_renter = ifelse(
