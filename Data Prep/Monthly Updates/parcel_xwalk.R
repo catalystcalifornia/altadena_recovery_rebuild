@@ -38,6 +38,7 @@ table_name <- paste("crosswalk_assessor", prev_month, curr_month, curr_year, sep
 
 # Prep: get the universe of shapes (jan res + sig dmg) and filter the prev crosswalk
 parcel_universe <- dbGetQuery(con, paste("SELECT ain_2025_01 FROM", jan_parcel_universe))
+
 prev_xwalk <- dbGetQuery(con, paste("SELECT ain_2025_01,", paste("ain", prev_year, prev_month, sep="_"), "AS ain_prev FROM", prev_xwalk_table)) %>%
   filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
 xwalk_cols <- dbGetQuery(con, paste("SELECT * FROM", prev_xwalk_table)) %>%
@@ -50,7 +51,7 @@ parcels_prev <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stat
                        LEFT JOIN", prev_stats_table, "stats
                        ON parcels.ain=stats.ain")) %>%
   mutate(flag="prev") %>%
-  filter(ain %in% prev_xwalk$ain_prev) %>%
+  filter(ain %in% parcel_universe$ain_2025_01) %>%
   mutate(area = st_area(geom))
 
 parcels_curr <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
@@ -72,13 +73,15 @@ all_parcels <- rbind(parcels_prev, parcels_curr) %>%
   # create address field - can use to match changing parcels later
   mutate(address=paste(situs_house_no, direction, street_name, unit, city_state)) %>%
   mutate(address=gsub("\\s+", " ", address)) %>% 
-  select(-c(situs_house_no, direction, street_name, unit, city_state)) %>%
-  # group by shape using WKT - note: this takes a couple mins
-  mutate(geom_wkt = st_as_text(geom)) %>%
-  st_drop_geometry()
+  select(-c(situs_house_no, direction, street_name, unit, city_state)) 
 
+# group by geom to get number of duplicate shapes
 match_parcels <- all_parcels %>%
+  # add geom in text using WKT - note: this takes a couple mins
+  mutate(geom_wkt = st_as_text(geom)) %>%
+  st_drop_geometry() %>%
   group_by(geom_wkt) %>%
+  # number of times shape of parcel is duplicated
   mutate(group_count = n()) %>%
   # shapes appearing more than once get a group id (dupe_id), if it's unique then NA
   mutate(dupe_id = ifelse(group_count>1,cur_group_id(), NA)) %>%
@@ -90,7 +93,6 @@ check <- data.frame(table(match_parcels$dupe_id, useNA = "always"))
 cat(paste("Number of duplicated shapes:", nrow(check)-1))
 cat(paste("Number of unduplicated shapes:", check$Freq[is.na(check$Var1)]))
 cat(paste("Number of shapes accounted for is the same as number of all parcels:", sum(check$Freq)==nrow(all_parcels)))
-cat(paste("Number of curr parcels shapes not accounted for by the same prev parcel shapes:", nrow(parcels_curr)-check$Freq[is.na(check$Var1)]), " out of ", nrow(parcels_curr))
 
 
 # Make wider, to see if AINs match across the same shape (or something else)
@@ -123,22 +125,21 @@ match_parcels_wide <- match_parcels %>%
       shape_match==1 & same_ain == 0 & same_counts==1 & group_count>2 ~ "ambiguous matches, needs closer look",
       shape_match==1 & same_ain == 0 & same_counts==0 & group_count>2 ~ "uneven matches, needs closer look",
       shape_match==1 & same_ain == 1 & same_counts==1 ~ "same ains, simple xwalk",
-      shape_match==1 & same_ain == 1 & same_counts==0 ~ "likely condominiums - confirm use codes",
       .default = NA))
 
 check <- as.data.frame(table(match_parcels_wide$status, useNA="always"))
 cat(paste("Number of undefined relationships between prev and curr parcel shapes (0 is good):", check$Freq[is.na(check$Var1)]))
 
 
-##### Step 2: Compile crosswalk based on matching shapes #####
-### Same Shapes
-same_shape <- match_parcels_wide %>%
-  filter(shape_match == 1) 
+##### Step 2: Compile crosswalk based on matching shapes and ains #####
+########### Same Shapes and AINs -----
+same_shape_ain <- match_parcels_wide %>%
+  filter(status=="same ains, simple xwalk")
 
-same_shape_xwalk <- same_shape %>%
+same_shape_ain_xwalk <- same_shape_ain %>%
   select(ain, dupe_id, status, same_ain, same_counts, group_count) %>%
   mutate(ain_prev = ain,
-         ain_curr = ain) %>%
+         ain_curr = ain) %>% 
   select(-ain) %>%
   left_join(all_parcels %>% 
               filter(flag == "prev") %>% 
@@ -153,17 +154,11 @@ same_shape_xwalk <- same_shape %>%
   mutate(
     source = case_when(
       same_ain == 1 & same_counts == 1 ~ "same shape, same ain",
-      same_ain == 0 & same_counts == 1 & group_count == 2 ~ "same shape, different ain",
-      same_ain == 0 & same_counts == 1 & group_count > 2 ~ "same shape, different, ambiguous ain",
-      same_ain == 0 & same_counts == 0 & group_count > 2 ~ "same shape, different, multiple ains",
       same_ain == 1 & same_counts == 0 ~ "same shape, same ain, condo",
       .default = NA
     ),
     status = case_when(
       same_ain == 1 & same_counts == 1 ~ "no change",
-      same_ain == 0 & same_counts == 1 & group_count == 2 ~ "same shape, ain renamed or deleted",
-      same_ain == 0 & same_counts == 1 & group_count > 2 ~ "same shape, prev ain deleted",
-      same_ain == 0 & same_counts == 0 & group_count > 2 ~ "same shape, ain changed, multiple ains split on same shape",
       same_ain == 1 & same_counts == 0 ~ "same ain, condo units",
       .default = NA
     )
@@ -172,6 +167,50 @@ same_shape_xwalk <- same_shape %>%
          use_code_curr = use_code.y,
          address_prev = address.x,
          address_curr = address.y)
+
+# Check for NAs and unique AINs
+cat(paste("Number of rows matches unique number of current ains:", nrow(same_shape_ain_xwalk)==length(unique(same_shape_ain_xwalk$ain_curr))))
+cat(paste("Number of rows matches unique number of previous ains:", nrow(same_shape_ain_xwalk)==length(unique(same_shape_ain_xwalk$ain_prev))))
+cat(paste("No null use codes in current or previous file: ", "Prev - ", sum(is.na(same_shape_ain_xwalk$use_code_prev)), " Current -", sum(is.na(same_shape_ain_xwalk$use_code_curr))))
+
+########### Same Shapes, different AINs -----
+same_shape_diff_ain <- match_parcels_wide %>%
+  filter(shape_match==1 & same_ain==0) 
+
+same_shape_diff_ain_xwalk <- same_shape_diff_ain  %>%
+  group_by(dupe_id) %>%
+  summarise(
+  ain_prev = ain[flag_prev == 1],
+  ain_curr = ain[flag_curr == 1]) %>%
+  left_join(all_parcels %>% 
+              filter(flag == "prev") %>% 
+              select(ain, use_code, address) %>% 
+              st_drop_geometry(), 
+            by = c("ain_prev" = "ain")) %>%
+  left_join(all_parcels %>% 
+              filter(flag == "curr") %>% 
+              select(ain, use_code, address) %>% 
+              st_drop_geometry(), 
+            by = c("ain_curr" = "ain")) %>%
+  mutate(
+    source = case_when(
+      same_ain == 0 & same_counts == 1 & group_count == 2 ~ "same shape, different ain",
+      same_ain == 0 & same_counts == 1 & group_count > 2 ~ "same shape, different, ambiguous ain",
+      same_ain == 0 & same_counts == 0 & group_count > 2 ~ "same shape, different, multiple ains",
+      .default = NA
+    ),
+    status = case_when(
+      same_ain == 0 & same_counts == 1 & group_count == 2 ~ "same shape, ain renamed or deleted",
+      same_ain == 0 & same_counts == 1 & group_count > 2 ~ "same shape, prev ain deleted",
+      same_ain == 0 & same_counts == 0 & group_count > 2 ~ "same shape, ain changed, multiple ains split on same shape",
+      .default = NA
+    )
+  ) %>%
+  rename(use_code_prev = use_code.x,
+         use_code_curr = use_code.y,
+         address_prev = address.x,
+         address_curr = address.y)
+
 
 ### Different shapes - needs intersect
 diff_shape <- match_parcels_wide %>%
