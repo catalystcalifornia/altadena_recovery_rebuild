@@ -335,5 +335,17 @@ missing_sept <- new_xwalk %>% anti_join(old_xwalk, by=c("ain_2025_09"="ain_sept"
 # na use codes?
 test <- old_xwalk_all %>% filter(ain_sept=="5844003040" | ain_jan=="5844003040")
 
+test_xwalk_result <- new_xwalk %>% left_join(old_xwalk_all %>% mutate(old=TRUE), by=c("ain_2025_01"="ain_jan","ain_2025_09"="ain_sept"))
+
+table(test_xwalk_result$old,useNA='always')
+
+mismatch <- filter(test_xwalk_result, is.na(old))
+
+# changed parcels
+test_xwalk_result_2 <- mismatch %>% left_join(old_xwalk_all %>% mutate(old=TRUE), by=c("ain_2025_01"="ain_jan")) %>%
+  select("ain_2025_01","ain_2025_09","ain_sept", everything())
+
+
+
 
 
