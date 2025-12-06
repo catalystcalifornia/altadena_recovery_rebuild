@@ -313,4 +313,27 @@ add_table_comments(con=con, schema=schema,table_name=table_name,indicator = indi
 
 
 ##### QA Checks #####
-# Flag new ains
+old_xwalk_all <- st_read(con, query="SELECT * from data.crosswalk_assessor_jan_sept_2025")
+new_xwalk <- st_read(con, query="SELECT * from dashboard.crosswalk_assessor_01_09_2025_test")
+
+old_xwalk <- old_xwalk_all %>% filter(ain_jan %in% parcel_universe$ain_2025_01)
+
+missing_jan <- old_xwalk %>% anti_join(new_xwalk, by=c("ain_jan"="ain_2025_01"))
+missing_sept <- old_xwalk %>% anti_join(new_xwalk, by=c("ain_sept"="ain_2025_09"))
+
+nrow(new_xwalk)
+length(unique(new_xwalk$ain_2025_01))
+nrow(old_xwalk)
+length(unique(old_xwalk$ain_jan))
+length(unique(old_xwalk$ain_jan))-length(unique(new_xwalk$ain_2025_01))
+# gap of 53 added to xwalk test?
+
+
+missing_jan <- new_xwalk %>% anti_join(old_xwalk, by=c("ain_2025_01"="ain_jan"))
+missing_sept <- new_xwalk %>% anti_join(old_xwalk, by=c("ain_2025_09"="ain_sept"))
+
+# na use codes?
+test <- old_xwalk_all %>% filter(ain_sept=="5844003040" | ain_jan=="5844003040")
+
+
+
