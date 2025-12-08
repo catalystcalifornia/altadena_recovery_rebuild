@@ -2,7 +2,7 @@
 # Should include QA steps for key stages of analysis to flag irregularities
 # Or other issues worth additional review.
 
-##### Step 0: Set up, initial prep #####
+# Step 0: Set up, initial prep ------
 # Library and environment set up
 source("W:\\RDA Team\\R\\credentials_source.R")
 library(sf)
@@ -12,7 +12,9 @@ options(scipen=999)
 
 con <- connect_to_db("altadena_recovery_rebuild")
 
+#### MONTHLY UPDATE: Variables to update each time ------------------
 # Key variables - tracking current and previous months and years
+# update with current year and month and previous time crosswalk was run
 date_ran <- as.character(Sys.Date())
 curr_year <- "2025" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
 curr_month <- "09" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
@@ -23,27 +25,32 @@ prev_year <- "2025" # ifelse(curr_month == "01", as.character(as.numeric(curr_ye
 # prev_prev_year <- ifelse(prev_month == "01", 
 #                          as.character(as.numeric(curr_year) - 1), 
 #                          prev_year)
+##### STOP UPDATE 
 
-# Key variables - current and previous tables needed for script
+
+
+#### Pull in tables and universe needed for script ----
+# This defines variables for current and previous tables needed for script
 curr_parcels_table <- paste("dashboard.assessor_parcels_universe", curr_year, curr_month, sep="_")
 curr_stats_table <- paste("dashboard.assessor_data_universe", curr_year, curr_month, sep="_")
 prev_parcels_table <- paste("dashboard.assessor_parcels_universe", prev_year, prev_month, sep="_")
 prev_stats_table <- paste("dashboard.assessor_data_universe", prev_year, prev_month, sep="_")
 prev_xwalk_table <-  "dashboard.crosswalk_assessor_01_09_2025" # paste("dashboard.crosswalk_assessor", prev_prev_month, prev_month, prev_year, sep="_")
-jan_parcel_universe <- "dashboard.jan_parcel_universe" # all significantly damaged, residential Jan parcels
+parcel_universe <- dbGetQuery(con, "SELECT * from dashboard.parcel_universe_2025_01") # all significantly damaged, residential Jan parcels
 
-# Key variables - export variables
-schema <- 'dashboard'
-table_name <- paste("crosswalk_assessor", prev_month, curr_month, curr_year, sep = "_")
+###### MONTHLY UPDATE - Get universe of parcels ----
+## Revisit once new data comes in for now starting with january parcels - no script to QA crosswalk_assessor_01_09_2025 that's being pulled for now just using the parcel universe
+# # # Prep: get the universe of shapes (jan res + sig dmg) and filter the prev crosswalk
+# prev_xwalk <- dbGetQuery(con, paste("SELECT ain_2025_01,", paste("ain", prev_year, prev_month, sep="_"), "AS ain_prev FROM", prev_xwalk_table)) %>%
+#   filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
+# xwalk_cols <- dbGetQuery(con, paste("SELECT * FROM", prev_xwalk_table)) %>%
+#   colnames()
 
-# Prep: get the universe of shapes (jan res + sig dmg) and filter the prev crosswalk
-parcel_universe <- dbGetQuery(con, paste("SELECT ain_2025_01 FROM", jan_parcel_universe))
+prev_xwalk <- parcel_universe %>%
+  mutate(ain_prev=ain_2025_01)
+###### STOP UPDATE
 
-prev_xwalk <- dbGetQuery(con, paste("SELECT ain_2025_01,", paste("ain", prev_year, prev_month, sep="_"), "AS ain_prev FROM", prev_xwalk_table)) %>%
-  filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
-xwalk_cols <- dbGetQuery(con, paste("SELECT * FROM", prev_xwalk_table)) %>%
-  colnames()
-
+# This pulls in the previous and current assessor parcels and data
 # get previous assessor parcels and add an identifier column
 # prev parcels should be based on the crosswalk filtered for residential and significantly damaged parcels
 parcels_prev <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
@@ -51,7 +58,9 @@ parcels_prev <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stat
                        LEFT JOIN", prev_stats_table, "stats
                        ON parcels.ain=stats.ain")) %>%
   mutate(flag="prev") %>%
-  filter(ain %in% parcel_universe$ain_2025_01) %>%
+# ##### Monthly Update: Make sure to update this with the previous xwalk ain- In December update to ain_2025_09
+#   filter(ain %in% prev_xwalk$ain_2025_01) %>%
+  ###### STOP UPDATE
   mutate(area = st_area(geom))
 
 parcels_curr <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
@@ -68,18 +77,19 @@ cat(paste("Confirm EPSG of curr parcel shapes is 3310:",
           ifelse(st_crs(parcels_curr)$epsg=="3310", "TRUE", paste("FALSE - EPSG is", st_crs(parcels_curr)$epsg))))
 
 
-##### Step 1: find out which shapes are the same in prev and curr parcels #####
+# Step 1: Bind previous and current parcels and flag parcels with same shape, ains, and counts -------
+# Bind together prev and current and add field for the geom
 all_parcels <- rbind(parcels_prev, parcels_curr) %>% 
   # create address field - can use to match changing parcels later
   mutate(address=paste(situs_house_no, direction, street_name, unit, city_state)) %>%
   mutate(address=gsub("\\s+", " ", address)) %>% 
-  select(-c(situs_house_no, direction, street_name, unit, city_state)) 
-
-# group by geom to get number of duplicate shapes
-match_parcels <- all_parcels %>%
+  select(-c(situs_house_no, direction, street_name, unit, city_state)) %>%
   # add geom in text using WKT - note: this takes a couple mins
   mutate(geom_wkt = st_as_text(geom)) %>%
-  st_drop_geometry() %>%
+  st_drop_geometry()
+
+# group by geom text to get number of duplicate shapes
+match_parcels <- all_parcels %>%
   group_by(geom_wkt) %>%
   # number of times shape of parcel is duplicated
   mutate(group_count = n()) %>%
@@ -119,25 +129,25 @@ match_parcels_wide <- match_parcels %>%
   ungroup() %>%
   select(dupe_id, ain, shape_match, same_ain, same_counts, everything()) %>%
   mutate(
-    status = case_when(
+    xwalk_type = case_when(
       shape_match==0 ~ "run intersect by month", # no shape or ain match
-      shape_match==1 & same_ain == 0 & same_counts==1 & group_count==2 ~ "diff ain pair, simple xwalk",
-      shape_match==1 & same_ain == 0 & same_counts==1 & group_count>2 ~ "ambiguous matches, needs closer look",
-      shape_match==1 & same_ain == 0 & same_counts==0 & group_count>2 ~ "uneven matches, needs closer look",
-      shape_match==1 & same_ain == 1 & same_counts==1 ~ "same ains, simple xwalk",
+      shape_match==1 & same_ain == 0 & same_counts==1 & group_count==2 ~ "same shape, diff ains, same counts",
+      shape_match==1 & same_ain == 0 & same_counts==1 & group_count>2 ~ "same shape, diff ains, needs closer look",
+      shape_match==1 & same_ain == 0 & same_counts==0 & group_count>2 ~ "same shape, diff ains, needs closer look",
+      shape_match==1 & same_ain == 1 & same_counts==1 ~ "same shape, same ains, same counts",
       .default = NA))
 
-check <- as.data.frame(table(match_parcels_wide$status, useNA="always"))
+check <- as.data.frame(table(match_parcels_wide$xwalk_type , useNA="always"))
 cat(paste("Number of undefined relationships between prev and curr parcel shapes (0 is good):", check$Freq[is.na(check$Var1)]))
+##### Monthly Update if you update the status fields, you'll need to update the filters in following steps #######
 
-
-##### Step 2: Compile crosswalk based on matching shapes and ains #####
+# Step 2: Compile crosswalk based on matching shapes and ains -----------
 ########### Same Shapes and AINs -----
 same_shape_ain <- match_parcels_wide %>%
-  filter(status=="same ains, simple xwalk")
+  filter(xwalk_type  %in% c("same shape, same ains, same counts"))
 
-same_shape_ain_xwalk <- same_shape_ain %>%
-  select(ain, dupe_id, status, same_ain, same_counts, group_count) %>%
+xwalk_same_shape_ain <- same_shape_ain %>%
+  select(ain, dupe_id, xwalk_type, same_ain, same_counts, group_count) %>%
   mutate(ain_prev = ain,
          ain_curr = ain) %>% 
   select(-ain) %>%
@@ -152,17 +162,8 @@ same_shape_ain_xwalk <- same_shape_ain %>%
               st_drop_geometry(), 
             by = c("ain_curr" = "ain")) %>%
   mutate(
-    source = case_when(
-      same_ain == 1 & same_counts == 1 ~ "same shape, same ain",
-      same_ain == 1 & same_counts == 0 ~ "same shape, same ain, condo",
-      .default = NA
-    ),
-    status = case_when(
-      same_ain == 1 & same_counts == 1 ~ "no change",
-      same_ain == 1 & same_counts == 0 ~ "same ain, condo units",
-      .default = NA
-    )
-  ) %>%
+    xwalk_type = "same shape, same ains, same counts" ,
+    status = "no change") %>%
   rename(use_code_prev = use_code.x,
          use_code_curr = use_code.y,
          address_prev = address.x,
@@ -171,14 +172,13 @@ same_shape_ain_xwalk <- same_shape_ain %>%
 # Check for NAs and unique AINs
 cat(paste("Number of rows matches unique number of current ains:", nrow(same_shape_ain_xwalk)==length(unique(same_shape_ain_xwalk$ain_curr))))
 cat(paste("Number of rows matches unique number of previous ains:", nrow(same_shape_ain_xwalk)==length(unique(same_shape_ain_xwalk$ain_prev))))
-cat(paste("No null use codes in current or previous file: ", "Prev - ", sum(is.na(same_shape_ain_xwalk$use_code_prev)), " Current -", sum(is.na(same_shape_ain_xwalk$use_code_curr))))
 
-########### Same Shapes, different AINs -----
+# Step 2: Compile crosswalk based on matching shapes, but different ains -----------
 same_shape_diff_ain <- match_parcels_wide %>%
-  filter(shape_match==1 & same_ain==0) 
+  filter(xwalk_type %in% c("same shape, diff ains, same counts"))
 
-same_shape_diff_ain_xwalk <- same_shape_diff_ain  %>%
-  group_by(dupe_id) %>%
+xwalk_same_shape_diff_ain <- same_shape_diff_ain  %>%
+  group_by(dupe_id,xwalk_type) %>%
   summarise(
   ain_prev = ain[flag_prev == 1],
   ain_curr = ain[flag_curr == 1]) %>%
@@ -192,19 +192,33 @@ same_shape_diff_ain_xwalk <- same_shape_diff_ain  %>%
               select(ain, use_code, address) %>% 
               st_drop_geometry(), 
             by = c("ain_curr" = "ain")) %>%
-  mutate(
-    source = case_when(
-      same_ain == 0 & same_counts == 1 & group_count == 2 ~ "same shape, different ain",
-      same_ain == 0 & same_counts == 1 & group_count > 2 ~ "same shape, different, ambiguous ain",
-      same_ain == 0 & same_counts == 0 & group_count > 2 ~ "same shape, different, multiple ains",
-      .default = NA
-    ),
-    status = case_when(
-      same_ain == 0 & same_counts == 1 & group_count == 2 ~ "same shape, ain renamed or deleted",
-      same_ain == 0 & same_counts == 1 & group_count > 2 ~ "same shape, prev ain deleted",
-      same_ain == 0 & same_counts == 0 & group_count > 2 ~ "same shape, ain changed, multiple ains split on same shape",
-      .default = NA
-    )
+    mutate(status =  "same shape, ain renamed or deleted"
+        ) %>%
+  rename(use_code_prev = use_code.x,
+         use_code_curr = use_code.y,
+         address_prev = address.x,
+         address_curr = address.y)
+
+# Step 3: Compile crosswalk based on matching shapes, but different ains and counts -----------
+same_shape_diff_count_ain <- match_parcels_wide %>%
+  filter(xwalk_type %in% c("same shape, diff ains, needs closer look"))
+
+xwalk_same_shape_diff_count_ain <- same_shape_diff_ain  %>%
+  group_by(dupe_id,xwalk_type) %>%
+  summarise(
+    ain_prev = ain[flag_prev == 1],
+    ain_curr = ain[flag_curr == 1]) %>%
+  left_join(all_parcels %>% 
+              filter(flag == "prev") %>% 
+              select(ain, use_code, address) %>% 
+              st_drop_geometry(), 
+            by = c("ain_prev" = "ain")) %>%
+  left_join(all_parcels %>% 
+              filter(flag == "curr") %>% 
+              select(ain, use_code, address) %>% 
+              st_drop_geometry(), 
+            by = c("ain_curr" = "ain")) %>%
+  mutate(status =  "same shape, ain renamed, deleted, or split"
   ) %>%
   rename(use_code_prev = use_code.x,
          use_code_curr = use_code.y,
@@ -212,9 +226,9 @@ same_shape_diff_ain_xwalk <- same_shape_diff_ain  %>%
          address_curr = address.y)
 
 
-### Different shapes - needs intersect
+# Step 4: Compile crosswalk based on spatial intersect -----------
 diff_shape <- match_parcels_wide %>%
-  filter(shape_match==0)
+  filter(xwalk_type=="run intersect by month")
 
 prev_parcels_filtered_ains <- diff_shape %>% filter(flag_prev==1) %>% select(ain)
 curr_parcels_filtered_ains <- diff_shape %>% filter(flag_curr==1)%>% select(ain)
@@ -243,26 +257,18 @@ intersection <- st_intersection(prev_parcels_filtered, curr_parcels_filtered) %>
          ain_match = ifelse(ain==ain.1, 1 ,0)) %>%
   filter(pct_overlap_prev>0)
 
-# Create crosswalk with case_when for status and source
-diff_shape_xwalk <- intersection %>%
+# Keep matching AINs first
+xwalk_diff_shape_same_ain <- intersection %>%
   # Filter for relevant records
-  filter((ain_match == 1 | pct_overlap_prev > 10)) %>%
+  filter(ain_match == 1) %>%
   st_drop_geometry() %>%
   mutate(
-    status = case_when(
-      ain_match == 1 ~ "same ain, slight parcel change",
-      TRUE ~ "prev parcel merged or split"
-    ),
-    source = case_when(
-      ain_match == 1 ~ "spatial intersect, ain match",
-      pct_overlap_prev >= 100 ~ "spatial intersect, 100% overlap",
-      pct_overlap_prev >= 90 ~ "spatial intersect, over 90% overlap",
-      TRUE ~ "spatial intersect, manual match"
-    )
-  ) %>%
+    xwalk_type="spatial intersect, ain match",
+    status="same ain, slight parcel change"
+    ) %>%
   select(ain, ain.1, pct_overlap_prev, pct_overlap_curr, 
          use_code, address_prev, use_code.1, address_curr, 
-         status, source) %>%
+         status, xwalk_type) %>%
   rename(
     ain_prev = ain,
     ain_curr = ain.1,
@@ -270,30 +276,79 @@ diff_shape_xwalk <- intersection %>%
     use_code_curr = use_code.1
   )
 
-final_xwalk <- bind_rows(
-  same_shape_xwalk %>% 
+# Keep remaining where overlap is greater than 90%
+xwalk_diff_shape_overlap <- intersection %>%
+  # Filter for relevant records 
+  filter(pct_overlap_prev >= 90) %>%
+  st_drop_geometry() %>%
+  mutate(
+    xwalk_type="spatial intersect, 90% match",
+    status="jan parcel merged or split"
+  ) %>%
+  select(ain, ain.1, pct_overlap_prev, pct_overlap_curr, 
+         use_code, address_prev, use_code.1, address_curr, 
+         status, xwalk_type) %>%
+  rename(
+    ain_prev = ain,
+    ain_curr = ain.1,
+    use_code_prev = use_code,
+    use_code_curr = use_code.1
+  ) %>%
+  # drop records in the spatial intersect ain match
+  filter(!ain_prev %in% xwalk_diff_shape_same_ain$ain_prev)
+
+##### Monthly Update: Make sure to pull in any xwalk tables you added to script ------
+xwalk_df <- bind_rows(
+  xwalk_same_shape_ain %>% 
     select(ain_prev, ain_curr, use_code_prev, use_code_curr, 
-           address_prev, address_curr, source, status, dupe_id),
-  diff_shape_xwalk %>% 
+           address_prev, address_curr, xwalk_type, status, dupe_id),
+  xwalk_same_shape_diff_ain %>% 
+    select(ain_prev, ain_curr, use_code_prev, use_code_curr, 
+           address_prev, address_curr, xwalk_type, status, dupe_id),
+  xwalk_same_shape_diff_count_ain %>% 
+    select(ain_prev, ain_curr, use_code_prev, use_code_curr, 
+           address_prev, address_curr, xwalk_type, status, dupe_id),
+  xwalk_diff_shape_same_ain %>% 
     select(ain_prev, ain_curr, pct_overlap_prev, pct_overlap_curr,
            use_code_prev, use_code_curr, address_prev, address_curr, 
-           source, status))  %>%
+           xwalk_type, status),
+  xwalk_diff_shape_overlap %>% 
+  select(ain_prev, ain_curr, pct_overlap_prev, pct_overlap_curr,
+         use_code_prev, use_code_curr, address_prev, address_curr, 
+         xwalk_type, status))  %>%
   # rename columns for export
   rename_with(~ gsub("_prev$", paste("", prev_year, prev_month, sep="_"), .x)) %>%
   rename_with(~ gsub("_curr$", paste("",curr_year, curr_month, sep="_"), .x))
 
+##### Monthly Update: Filter for universe ------
+#### Will need to update and pull in the previous xwalk that has been filtered overtime for the january universe
+# filter just for the parcel universe
+final_xwalk <- xwalk_df %>% 
+  filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
+
+# check that all january ains are accounted for
+missing_jan_parcels <- parcel_universe %>% anti_join(final_xwalk, by=c("ain_2025_01"))
+nrow(missing_jan_parcels)
+##### SHOULD BE ZERO #####
+
+# QA CHECK DUPLICATES and review them--multiple of the previous ains matching
+dup_matches_prev <- final_xwalk[final_xwalk$ain_2025_01 %in% final_xwalk$ain_2025_01[duplicated(final_xwalk$ain_2025_01)], ]
+dup_matches_curr <- final_xwalk[final_xwalk$ain_2025_09 %in% final_xwalk$ain_2025_09[duplicated(final_xwalk$ain_2025_09)], ]
+# We know this parcel has been merged though the data seems to be delayed https://portal.assessor.lacounty.gov/parceldetail/5841023009
+  
+
 ##### Step 3: Export #####
+# Key variables - export variables
+schema <- 'dashboard'
+table_name <- paste("crosswalk_assessor", curr_year, prev_month, curr_month, sep = "_")
 indicator <- "Updated Crosswalk of Assessor AINs from prev(ious) to curr(ent) shapes based on significantly damaged residential parcels from January"
 qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\monthly_updates\\QA_parcel_xwalk.docx"
 
-table_name <- paste(table_name, "test", sep="_")# remove once this looks good (just use normal table_name set at top of script)
+table_name <- paste(table_name, "emg", sep="_")# remove once this looks good (just use normal table_name set at top of script)
 source <- "Data Prep\\Monthly Updates\\parcel_xwalk.R"
 dbWriteTable(con, Id(schema, table_name), final_xwalk,
              overwrite = FALSE, row.names = FALSE)
-dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", table_name, " IS '", indicator, "
-            Data imported on ", date_ran, ". ",
-                            "QA DOC: ", qa_filepath,
-                            " Source: ", source, "'"))
+
 colnames(final_xwalk)
 col_comments <- c("ain, suffix denotes respective assessor data version",
                   "ain, suffix denotes respective assessor data version",
@@ -313,37 +368,108 @@ add_table_comments(con=con, schema=schema,table_name=table_name,indicator = indi
 
 
 ##### QA Checks #####
+# compare changes in old and new xwalk
+# all of old xwalk records
 old_xwalk_all <- st_read(con, query="SELECT * from data.crosswalk_assessor_jan_sept_2025")
+
+# new xwalk
 new_xwalk <- st_read(con, query="SELECT * from dashboard.crosswalk_assessor_01_09_2025_test")
 
+# just old xwalk for the univerise
 old_xwalk <- old_xwalk_all %>% filter(ain_jan %in% parcel_universe$ain_2025_01)
 
+# what's in the old xwalk but missing in the new one by jan ains
 missing_jan <- old_xwalk %>% anti_join(new_xwalk, by=c("ain_jan"="ain_2025_01"))
+# none
+
+# what's in the old xwalk but missing in the new one by sept ains
 missing_sept <- old_xwalk %>% anti_join(new_xwalk, by=c("ain_sept"="ain_2025_09"))
+# none
 
 nrow(new_xwalk)
 length(unique(new_xwalk$ain_2025_01))
 nrow(old_xwalk)
 length(unique(old_xwalk$ain_jan))
 length(unique(old_xwalk$ain_jan))-length(unique(new_xwalk$ain_2025_01))
-# gap of 53 added to xwalk test?
+# gap of 53 added to new xwalk?
 
-
+# what's in the new xwalk but missing in the old one by jan ains
 missing_jan <- new_xwalk %>% anti_join(old_xwalk, by=c("ain_2025_01"="ain_jan"))
+
+# what's in the new xwalk but missing in the old one by sept ains
 missing_sept <- new_xwalk %>% anti_join(old_xwalk, by=c("ain_2025_09"="ain_sept"))
 
-# na use codes?
-test <- old_xwalk_all %>% filter(ain_sept=="5844003040" | ain_jan=="5844003040")
+# did these get filtered out with the newly added filter?
+test <- old_xwalk_all %>% filter(ain_sept %in% missing_sept$ain_2025_09)
+# these are condos that are in the full old xwalk but not in the xwalk filtered for residential, etc.
 
+test_not_in_universe <- test %>% filter(!ain_jan %in% parcel_universe$ain_2025_01)
+      
+res<- st_read(con, query="SELECT * from data.rel_assessor_residential_jan2025")
+
+test_not_in_universe <- test_not_in_universe %>% left_join(res, by=c("ain_jan"="ain"))
+
+table(test_not_in_universe$residential,useNA='always')
+
+dmg <- st_read(con, query="SELECT * from data.rel_assessor_damage_level")
+
+test_not_in_universe <- test_not_in_universe %>% left_join(dmg, by=c("ain_jan"="ain"))
+
+table(test_not_in_universe$damage_category,useNA='always')
+# no damage and some damage categories
+
+# test for instances where the new xwalk jan and sept ain don't match the old xwalk
 test_xwalk_result <- new_xwalk %>% left_join(old_xwalk_all %>% mutate(old=TRUE), by=c("ain_2025_01"="ain_jan","ain_2025_09"="ain_sept"))
 
+# not a match records -- 11 NA
 table(test_xwalk_result$old,useNA='always')
 
+# filter for NA
 mismatch <- filter(test_xwalk_result, is.na(old))
 
-# changed parcels
+# pull out changed parcels
 test_xwalk_result_2 <- mismatch %>% left_join(old_xwalk_all %>% mutate(old=TRUE), by=c("ain_2025_01"="ain_jan")) %>%
   select("ain_2025_01","ain_2025_09","ain_sept", everything())
+
+# pull out records in the original xwalk for mismatched records
+original_xwalk_records <- old_xwalk_all %>% filter(ain_sept %in% test_xwalk_result_2$ain_sept)
+
+# method has changed for many parcels
+table(old_xwalk$source,useNA='always')
+table(new_xwalk$source,useNA='always')
+
+
+# compare changes in old and EMG xwalk
+# emg xwalk
+emg_xwalk <- st_read(con, query="SELECT * from dashboard.crosswalk_assessor_2025_01_09_emg")
+# what's in the old xwalk but missing in the new one by jan ains
+missing_jan <- old_xwalk %>% anti_join(emg_xwalk, by=c("ain_jan"="ain_2025_01"))
+# none
+
+# what's in the old xwalk but missing in the new one by sept ains
+missing_sept <- old_xwalk %>% anti_join(emg_xwalk, by=c("ain_sept"="ain_2025_09"))
+# none
+
+nrow(emg_xwalk)
+length(unique(emg_xwalk$ain_2025_01))
+nrow(old_xwalk)
+length(unique(old_xwalk$ain_jan))
+length(unique(old_xwalk$ain_jan))-length(unique(emg_xwalk$ain_2025_01))
+# gap of 0
+
+# what's in the new xwalk but missing in the old one by jan ains
+missing_jan <- emg_xwalk %>% anti_join(old_xwalk, by=c("ain_2025_01"="ain_jan"))
+# none
+
+# what's in the new xwalk but missing in the old one by sept ains
+missing_sept <- emg_xwalk %>% anti_join(old_xwalk, by=c("ain_2025_09"="ain_sept"))
+# none
+
+# method has changed for many parcels
+table(old_xwalk$source,useNA='always')
+table(emg_xwalk$xwalk_type,useNA='always')
+# looks good
+
 
 
 
