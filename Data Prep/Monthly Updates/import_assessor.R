@@ -305,6 +305,8 @@ mismatch_2 <- mismatch_2 %>%
   mutate(shp_match = ifelse(ain %in% check_$AIN, 1,0)) %>%
   filter(shp_match==0) # 13 with relevant use codes
 
+# 5827014022 5830015015 5831016032 5831016033 5839016004 5839016012 5841023009 5841023010 5842008010 5842013003 5843023016 5843023037 5847020011
+
 table(mismatch_2$use_code, useNA = "ifany")
 
 # Note some of these look to overlap with some addresses that matched to Calfire data in mismatch_1
