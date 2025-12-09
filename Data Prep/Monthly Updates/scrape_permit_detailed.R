@@ -4,25 +4,34 @@
 library(dplyr) 
 
 source("W:\\RDA Team\\R\\credentials_source.R")
-source("Data Prep\\scraping_functions.R")
+source("Data Prep\\Monthly Updates\\scraping_functions.R")
+
+con <- connect_to_db("altadena_recovery_rebuild")
+schema <- "dashboard"
 
 # set some metadata for exporting results
+date_ran <- as.character(Sys.Date())
+curr_year <- strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
+curr_month <- strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+
 general_table_name <- paste("scraped_general_permit_data", 
-                            strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
-                            strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
+                            curr_year, # year
+                            curr_month, # month
                             sep="_") 
 
 detailed_table_name <- paste("scraped_detailed_permit_data", 
-                             strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
-                             strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
+                             curr_year, # year
+                             curr_month, # month
                              sep="_") 
 
 workflow_table_name <- paste("scraped_workflow_permit_data", 
-                             strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][1], # year
-                             strsplit(as.character(Sys.Date()), "-", fixed=TRUE)[[1]][2], # month
+                             curr_year, # year
+                             curr_month, # month
                              sep="_") 
 
-date_ran <- as.character(Sys.Date())
+general_table_name <- paste0(general_table_name,"_backup") # note REMOVE for future updates
+detailed_table_name <- paste0(detailed_table_name,"_backup") # note REMOVE for future updates
+workflow_table_name <- paste0(workflow_table_name,"_backup") # note REMOVE for future updates
 
 detailed_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", detailed_table_name, ".csv")
 workflow_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", workflow_table_name, ".csv")
@@ -33,14 +42,12 @@ workflow_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Re
 # with wide net will get permits other than rebuild like ELEC, Construction and Demolition
 # Get this month's permits
 con <- connect_to_db("altadena_recovery_rebuild")
-general_permits <- dbGetQuery(con, statement=paste0("SELECT * FROM data.", general_table_name))
+general_permits <- dbGetQuery(con, statement=paste0("SELECT * FROM ", schema, ".", general_table_name))
 dbDisconnect(con)
 
 permits_filtered <- general_permits %>%
-  filter(grepl("2025$", applied_date)) %>%
-  filter(grepl("eaton|fire", project_name, ignore.case = TRUE) | 
-           grepl("eaton|fire", description, ignore.case = TRUE) |
-           grepl("UNC-BLDR|CREB", permit_number, ignore.case=TRUE))
+  # filter out permits applied for before Eaton Fire
+  filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) 
 
 base_url <- "https://epicla.lacounty.gov/energov_prod/SelfService/"
 
@@ -56,6 +63,11 @@ if (file.exists(detailed_csv_filepath)) {
                         encoding = "UTF-8",
                         colClasses = c("character"))
   
+  # we want unsuccessful scrapes to get scraped again so only include 
+  # successful scrapes as prev_data
+  prev_data_filtered <- prev_data %>%
+    filter(response_status == "success")
+  
   scraped_permits <- prev_data %>%
     select(permit_number, ain) %>%
     mutate(id = paste(permit_number, ain, sep = "_")) %>%
@@ -68,7 +80,7 @@ if (file.exists(detailed_csv_filepath)) {
   append_value <- TRUE
   
 } else {
-  print("boo")
+  print("there's no csv with that name - starting scrape from the beginning")
   
   remaining <- permits_to_scrape
   include_headers <- TRUE
@@ -77,6 +89,7 @@ if (file.exists(detailed_csv_filepath)) {
 
 closeAllConnections()
 gc() 
+
 
 for (row_ in 1:nrow(remaining)) {   
   row_ain <- remaining[row_, "ain"]
@@ -140,22 +153,22 @@ final_workflow_data <- read.csv(workflow_csv_filepath,
 
 # con <- connect_to_db("altadena_recovery_rebuild")
 # 
-# dbWriteTable(con, Id(schema="data", table_name=detailed_table_name), final_detailed_data,
+# dbWriteTable(con, Id(schema=schema, table_name=detailed_table_name), final_detailed_data,
 #              overwrite = FALSE, row.names = FALSE)
 # 
-# dbSendQuery(con, paste0("COMMENT ON TABLE data.", detailed_table_name, " IS
+# dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", table_name, " IS
 #             'Detailed permit data for Altadena parcels with some or significant damage,
 #             Data imported on ",date_ran, "
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
+#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
 #             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
 # 
-# dbWriteTable(con, Id(schema="data", table_name=workflow_table_name), final_workflow_data,
+# dbWriteTable(con, Id(schema=schema, table_name=workflow_table_name), final_workflow_data,
 #              overwrite = FALSE, row.names = FALSE)
 # 
-# dbSendQuery(con, paste0("COMMENT ON TABLE data.", workflow_table_name, " IS
+# dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", table_name, " IS
 #             'Extended detailed permit data that includes workflow items for Altadena parcels with some or significant damage,
 #             Data imported on ",date_ran, "
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_scrape_permit_data.docx
+#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
 #             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
 # 
 # dbDisconnect(con)
