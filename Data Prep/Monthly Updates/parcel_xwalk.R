@@ -179,12 +179,18 @@ xwalk_same_shape_ain <- same_shape_ain %>%
          address_curr = address.y)
 
 # Check for NAs and unique AINs
-cat(paste("Number of rows matches unique number of current ains:", nrow(same_shape_ain_xwalk)==length(unique(same_shape_ain_xwalk$ain_curr))))
-cat(paste("Number of rows matches unique number of previous ains:", nrow(same_shape_ain_xwalk)==length(unique(same_shape_ain_xwalk$ain_prev))))
+cat(paste("Number of rows matches unique number of current ains:", nrow(xwalk_same_shape_ain)==length(unique(xwalk_same_shape_ain$ain_curr))))
+cat(paste("Number of rows matches unique number of previous ains:", nrow(xwalk_same_shape_ain)==length(unique(xwalk_same_shape_ain$ain_prev))))
 
 # Step 2: Compile crosswalk based on matching shapes, but different ains -----------
 same_shape_diff_ain <- match_parcels_wide %>%
   filter(xwalk_type %in% c("same shape, diff ains, same counts"))
+
+# qa flag on below: `summarise()` has grouped output by 'dupe_id', 'xwalk_type'. You can override using the `.groups` argument.
+# Warning message:
+#   Returning more (or less) than 1 row per `summarise()` group was deprecated in dplyr 1.1.0.
+# i Please use `reframe()` instead.
+# i When switching from `summarise()` to `reframe()`, remember that `reframe()` always returns an ungrouped data frame and adjust accordingly.
 
 xwalk_same_shape_diff_ain <- same_shape_diff_ain  %>%
   group_by(dupe_id,xwalk_type) %>%
@@ -211,6 +217,8 @@ xwalk_same_shape_diff_ain <- same_shape_diff_ain  %>%
 # Step 3: Compile crosswalk based on matching shapes, but different ains and counts -----------
 same_shape_diff_count_ain <- match_parcels_wide %>%
   filter(xwalk_type %in% c("same shape, diff ains, needs closer look"))
+
+# same warning as above is here too
 
 xwalk_same_shape_diff_count_ain <- same_shape_diff_ain  %>%
   group_by(dupe_id,xwalk_type) %>%
