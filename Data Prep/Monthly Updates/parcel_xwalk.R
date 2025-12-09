@@ -135,11 +135,19 @@ match_parcels_wide <- match_parcels %>%
       shape_match==1 & same_ain == 0 & same_counts==1 & group_count==2 ~ "same shape, diff ains, same counts",
       shape_match==1 & same_ain == 0 & same_counts==1 & group_count>2 ~ "same shape, diff ains, needs closer look",
       shape_match==1 & same_ain == 0 & same_counts==0 & group_count>2 ~ "same shape, diff ains, needs closer look",
+      shape_match==1 & same_ain == 1 & same_counts==0 ~ "same shape, same ains, different counts"
       shape_match==1 & same_ain == 1 & same_counts==1 ~ "same shape, same ains, same counts",
       .default = NA))
 
 check <- as.data.frame(table(match_parcels_wide$xwalk_type , useNA="always"))
 cat(paste("Number of undefined relationships between prev and curr parcel shapes (0 is good):", check$Freq[is.na(check$Var1)]))
+
+# QA 12/9/25 - 21 shapes with an undefined relationship
+# new category to account for: shape_match==1 & same_ain == 1 & same_counts==0 - 
+# based on assessor portal various types of condos (incl. condo conversions, on-your-owns) and one is a planned unit development
+qa_1 <- match_parcels_wide %>% filter(is.na(xwalk_type))
+
+
 ##### Monthly Update if you update the status fields, you'll need to update the filters in following steps #######
 
 # Step 2: Compile crosswalk based on matching shapes and ains -----------
