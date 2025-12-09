@@ -17,8 +17,8 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # update with current year and month and previous time crosswalk was run
 date_ran <- as.character(Sys.Date())
 curr_year <- "2025" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
-curr_month <- "09" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
-prev_month <- "01" # ifelse(curr_month == "01", "12", sprintf("%02d", as.numeric(curr_month) - 1))
+curr_month <- "12" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+prev_month <- "09" # ifelse(curr_month == "01", "12", sprintf("%02d", as.numeric(curr_month) - 1))
 prev_year <- "2025" # ifelse(curr_month == "01", as.character(as.numeric(curr_year) - 1),  curr_year)
 # prev_prev_month <- ifelse(prev_month == "01", "12", 
 #                           sprintf("%02d", as.numeric(prev_month) - 1))
@@ -46,8 +46,8 @@ parcel_universe <- dbGetQuery(con, "SELECT * from dashboard.parcel_universe_2025
 # xwalk_cols <- dbGetQuery(con, paste("SELECT * FROM", prev_xwalk_table)) %>%
 #   colnames()
 
-prev_xwalk <- parcel_universe %>%
-  mutate(ain_prev=ain_2025_01)
+prev_xwalk <- dbGetQuery(con, paste("SELECT ain_2025_01,", paste("ain", prev_year, prev_month, sep="_"), "AS ain_prev FROM", prev_xwalk_table)) 
+
 ###### STOP UPDATE
 
 # This pulls in the previous and current assessor parcels and data
@@ -57,11 +57,10 @@ parcels_prev <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stat
                        FROM", prev_parcels_table, "parcels
                        LEFT JOIN", prev_stats_table, "stats
                        ON parcels.ain=stats.ain")) %>%
-  filter(ain %in% prev_xwalk$ain_prev) %>%
   mutate(flag="prev") %>%
 # ##### Monthly Update: Make sure to update this with the previous xwalk ain- In December update to ain_2025_09
 #   filter(ain %in% prev_xwalk$ain_2025_01) %>%
-  ###### STOP UPDATE
+  ###### STOP UPDATE - HK: I dont think this is needed?
   mutate(area = st_area(geom))
 
 parcels_curr <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
@@ -135,7 +134,7 @@ match_parcels_wide <- match_parcels %>%
       shape_match==1 & same_ain == 0 & same_counts==1 & group_count==2 ~ "same shape, diff ains, same counts",
       shape_match==1 & same_ain == 0 & same_counts==1 & group_count>2 ~ "same shape, diff ains, needs closer look",
       shape_match==1 & same_ain == 0 & same_counts==0 & group_count>2 ~ "same shape, diff ains, needs closer look",
-      shape_match==1 & same_ain == 1 & same_counts==0 ~ "same shape, same ains, different counts"
+      shape_match==1 & same_ain == 1 & same_counts==0 ~ "same shape, same ains, different counts",
       shape_match==1 & same_ain == 1 & same_counts==1 ~ "same shape, same ains, same counts",
       .default = NA))
 
@@ -337,15 +336,17 @@ xwalk_df <- bind_rows(
   rename_with(~ gsub("_prev$", paste("", prev_year, prev_month, sep="_"), .x)) %>%
   rename_with(~ gsub("_curr$", paste("",curr_year, curr_month, sep="_"), .x))
 
-##### Monthly Update: Filter for universe ------
-#### Will need to update and pull in the previous xwalk that has been filtered overtime for the january universe
-# filter just for the parcel universe
-final_xwalk <- xwalk_df %>% 
-  filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
+# ##### Monthly Update: Filter for universe ------
+# #### Will need to update and pull in the previous xwalk that has been filtered overtime for the january universe
+# # filter just for the parcel universe
+# final_xwalk <- xwalk_df %>% 
+#   filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
+# 
+# # check that all january ains are accounted for
+# missing_jan_parcels <- parcel_universe %>% anti_join(xwalk_df, by=c("ain_2025_01"))
+# nrow(missing_jan_parcels)
 
-# check that all january ains are accounted for
-missing_jan_parcels <- parcel_universe %>% anti_join(final_xwalk, by=c("ain_2025_01"))
-nrow(missing_jan_parcels)
+final_xwalk <- xwalk_df
 ##### SHOULD BE ZERO #####
 
 # QA CHECK DUPLICATES and review them--multiple of the previous ains matching
