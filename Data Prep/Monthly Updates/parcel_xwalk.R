@@ -57,6 +57,7 @@ parcels_prev <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stat
                        FROM", prev_parcels_table, "parcels
                        LEFT JOIN", prev_stats_table, "stats
                        ON parcels.ain=stats.ain")) %>%
+  filter(ain %in% prev_xwalk$ain_prev) %>%
   mutate(flag="prev") %>%
 # ##### Monthly Update: Make sure to update this with the previous xwalk ain- In December update to ain_2025_09
 #   filter(ain %in% prev_xwalk$ain_2025_01) %>%
