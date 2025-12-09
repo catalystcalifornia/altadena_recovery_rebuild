@@ -55,6 +55,11 @@ if (file.exists(csv_filepath)) {
                         encoding = "UTF-8",
                         colClasses = c("character"))
   
+  # we want unsuccessful scrapes to get scraped again so only include 
+  # successful scrapes as prev_data
+  prev_data_filtered <- prev_data %>%
+    filter(response_status == "success")
+  
   scraped_ains <- prev_data %>%
     pull(ain) %>%
     unique()
@@ -125,7 +130,7 @@ dbDisconnect(con)
 
 # QA Checks
 # read in pg table and check
-# 1. if any retried failed
+# 1. if any retried failed (error, timeout) - if not too many manually confirm if these had no results (fine) or we missed their permits (bad)
 # 2. if any ains are associated with 100 permits
 
 # end of script - rest is old code that may be better for scraping permit details
