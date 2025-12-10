@@ -40,15 +40,15 @@ gainsboro <- "#DEDEDE"
 
 ```
 
-Meanwhile, owners of significantly damaged properties are facing slow progress toward rebuilding. For many homeowners, the choice to rebuild is not straightforward. Insurance pay outs may not be enough to cover temporary housing costs and rebuilding. Even if costs were not an issue, the process of hiring architects and contractors for permitting and rebuilding can be stressful. Based on permit data we scraped and cleaned in October 2025, less than one in three significantly damaged properties in Altadena have at least applied for a permit to begin construction.^[This includes properties in the Construction Not Started, Construction in Progress, and Rebuild Complete phases, meaning they have completed fire debris removal and applied and been approved for a permit.] We classified properties according to five rebuild categories:
+Meanwhile, owners of significantly damaged properties are facing slow progress toward rebuilding. For many homeowners, the choice to rebuild is not straightforward. Insurance pay outs may not be enough to cover temporary housing costs and rebuilding. Even if costs were not an issue, the process of hiring architects and contractors for permitting and rebuilding can be stressful. Based on permit data we scraped and cleaned in October 2025, less than one in three significantly damaged properties in Altadena have at least applied for and/or been issued a permit to begin construction.^[This includes properties in the Construction Not Started, Construction in Progress, and Repairs or Rebuild Complete phases, meaning they have at least completed fire debris removal and applied and been approved for a permit.] We classified properties according to five rebuild categories:
 
 * Fire Debris Removal Incomplete: There is no indication, either by Army Corps of Engineers or property owner, that fire debris has been removed.
 * Permit Application Not Received: Fire debris has been removed, either by Army Corps of Engineers or by property owner, but the owner has not applied for a building permit.
-* Construction Not Started: A building permit application has been issued, but there is no indication that construction has started.
+* Construction Not Started: A building permit application has been filed and/or issued, but there is no indication that construction has started.
 * Construction In Progress: A building permit application has been issued, and at least one inspection has been scheduled, indicating construction has started.
-* Rebuild Complete: All building permits for temporary and permanent housing have been marked "finaled".
+* Repairs or Rebuild Complete: All building permits related to permanent, temporary, and miscellaneous structures have been marked "finaled", excluding properties that only have temporary housing permits which are not regarded as a completed project.
 
-Significantly damaged properties in West and East Altadena are similar in their rebuild progress. About 70% of properties in each area have completed fire debris removal, but have not applied for a permit to rebuild--68% in West Altadena and 71% in East Altadena. This suggests that many property owners have not made progress toward rebuilding and returning to the community--demonstrating the difficult journey property owners are facing toward being able to finance and manage construction. Policymakers must take additional steps toward supporting owners in acquiring permits to rebuild before more properties are sold.
+Significantly damaged properties in West and East Altadena are similar in their rebuild progress. About two in three properties in each area have completed fire debris removal, but have not applied for a permit to rebuild--67% in West Altadena and 68% in East Altadena. This suggests that many property owners have not made progress toward rebuilding and returning to the community--demonstrating the difficult journey property owners are facing toward being able to finance and manage construction. Policymakers must take additional steps toward supporting owners in acquiring permits to rebuild before more properties are sold.
 
 ```{r}
 #### VISUAL: Permit statuses by area for significantly damaged properties  ####
@@ -66,25 +66,26 @@ df$`Rebuild Status`<- factor(df$`Rebuild Status`, levels = c(
                                                              "Permit Application Not Received",
                                                              "Construction Not Started",
                                                              "Construction In Progress",
-                                                             "Rebuild Complete"))
+                                                             "Repairs Or Rebuild Complete"))
 
 df <- df %>%
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),
-         "Share of Damaged Properties in Rebuild Status"=prc,
+  mutate("% (Count)"=paste0(round(prc,0),"% (", comma(count)," out of ", 
+                            comma(total), ")"),
+         "Share of Damaged Properties in Each Status"=prc,
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>%
   arrange(Area,`Rebuild Status`)
 
 
 table<- df %>%
-  select("Area","Rebuild Status", "Share of Damaged Properties in Rebuild Status", "Count (%)")%>%
+  select("Area","Rebuild Status", "Share of Damaged Properties in Each Status", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Rebuild Status") %>%
   tab_header(title= "Rebuild Status of Significantly Damaged Properties",
              subtitle = "By Area (as of October 2025)")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and L.A. County Public Works, October 2025."),placement="left") 
 
  table %>%
-  gt_plt_bar_pct(column= 'Share of Damaged Properties in Rebuild Status', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Damaged Properties in Each Status', scaled=TRUE, fill=meteorite, background="transparent")%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%

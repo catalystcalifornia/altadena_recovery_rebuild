@@ -71,7 +71,8 @@ df$`Ownership Type`<- factor(df$owner_renter, levels = c("Owner occupied, homeow
                                                              ))
 
 df <- df %>%
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),        
+  mutate("% (Count)"=paste0(round(prc,0),"% (", comma(count)," out of ", 
+                            comma(total), ")"),        
          "Properties in Areas with High Lead Levels"=prc,         
          "Area" = str_to_title(area_name)) %>%
   mutate("Area" = factor(Area, levels = c("Altadena", "West", "East"))) %>% 
@@ -79,13 +80,13 @@ df <- df %>%
 
 
 table<- df %>%
-  select("Area","Ownership Type", "Properties in Areas with High Lead Levels", "Count (%)")%>%
+  select("Area","Ownership Type", "Properties in Areas with High Lead Levels", "% (Count)")%>%
   gt(groupname_col = c("Area"), rowname_col = "Ownership Type") %>%
     tab_header(title= "Significantly Damaged Properties in Areas with Average Lead Levels Above Protective Screening Levels (>=80 mg/kg) by Ownership Type")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, September 2025 and L.A. County Department of Public Health Soil Testing Program, March 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= "Properties in Areas with High Lead Levels", scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= "Properties in Areas with High Lead Levels", scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   opt_align_table_header("left")%>%
          cols_align(align="left",
               columns=`Ownership Type`) %>%

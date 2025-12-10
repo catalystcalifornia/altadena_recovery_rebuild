@@ -86,7 +86,7 @@ sept_fhsz <- st_read(con, query="SELECT * FROM data.rel_assessor_fhsz_sept2025")
 sept_lead <- st_read(con, query="SELECT * FROM data.rel_assessor_lead_sept2025")
 sept_sales <- dbGetQuery(con, statement = "SELECT ain_sept, sold_after_eaton, first_owner_name, first_owner_name_overflow, second_owner_name FROM data.rel_assessor_sales_sept2025;") %>%
   mutate(owner_names = str_squish(paste(first_owner_name, first_owner_name_overflow, second_owner_name))) %>%
-  select(ain_sept, sold_after_eaton, owner_names)
+  select(ain_sept, sold_after_eaton, owner_names) 
 sept_rebuild <- dbGetQuery(con, statement="SELECT ain as ain_jan, ain_sept, address_sept, rebuild_status
 FROM data.rel_parcel_rebuild_status_2025_10
 WHERE damage_category='Significant Damage';") %>%
@@ -103,6 +103,7 @@ sept_contact <- dbGetQuery(con, "SELECT ain as ain_sept, mail_house_no, m_fracti
   select(ain_sept, contact_address) %>% 
   filter(ain_sept %in% parcels_res_damaged$ain_sept)
 
+# combine all parcel level data into one dataframe
 all_df <- parcels_res_damaged %>% 
   left_join(sept_zoning, by = "ain_sept") %>% 
   left_join(sept_fhsz, by = "ain_sept") %>% 
@@ -163,15 +164,13 @@ df_zoning_lac$zone_label<- factor(
       levels = c("Single-Family Residence","Two-Family Residence","Multiple Residence","Other Residential","Mixed Use Development","Commercial","Manufacturing","Agricultural","Open Space/Water Shed","Other"))
 
 # parcels sold after eaton fire
-sept_sales_sf <- all_df %>%
-  filter(sold_after_eaton==TRUE) %>%
-  select(ain_sept, sold_after_eaton, geom) 
+sold_indices <- which(all_df$sold_after_eaton == TRUE)
 
 # rebuild status factor
 all_df <- all_df %>%
   mutate(rebuild_status_factor = factor(
     rebuild_status, 
-    levels=c("Fire Debris Removal Incomplete", "Permit Application Not Received", "Construction Not Started", "Construction In Progress", "Rebuild Complete")))
+    levels=c("Fire Debris Removal Incomplete", "Permit Application Not Received", "Construction Not Started", "Construction In Progress", "Repairs Or Rebuild Complete"))) 
 
 # Create a color palette based on the factor
 zoning_pal <- colorFactor(
@@ -182,7 +181,6 @@ rebuild_pal <- colorFactor(
   palette = c("#E2D9FF","#D3B9FF","#7A47BA", "#37157A","#1F0E4D"),
   domain= all_df$rebuild_status_factor
 )
-
 ```
 
 ```{r}
@@ -271,7 +269,7 @@ leaflet(
   addProviderTiles(providers$CartoDB.Positron) %>%
   
   # add custom sidebar
-  addControl(html=custom_sidebar, position = "topleft") %>%
+  addControl(html=custom_sidebar, position = "bottomleft") %>%
      
   #Damaged/Destroyed Properties
   addPolygons(
@@ -375,13 +373,13 @@ leaflet(
     opacity=0.5) %>% 
   # Sold Status
   addPolygons(
-    data=sept_sales_sf,
+    data = all_df[sold_indices, ],
     fillColor="black",
     fillOpacity=1,
     color="white",
     weight=0.2,
     opacity=1,
-    # popup=popup_parcel,
+    popup = popup_parcel[sold_indices],
     group="Sold After Eaton Fire") %>%
   # Rebuild Status
   addPolygons(
@@ -410,9 +408,8 @@ leaflet(
                       "Eaton Fire Perimeter"),
     options = layersControlOptions(collapsed = FALSE, autoZIndex = TRUE))  %>%
   hideGroup(c("Eaton Fire Perimeter","Lead Levels in Soil","Local Fire Hazard Zones",
-              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status")) 
-
-# %>% addFullscreenControl() # cutting off pop-up
+              "State Fire Hazard Zones","Zoning", "Sold After Eaton Fire", "Rebuild Status")) %>% 
+  addFullscreenControl() 
 
 ```
 
@@ -435,9 +432,18 @@ leaflet(
   border-top:1px solid #737373;
   border-bottom:1px solid #737373;
 }
+
+/* Make the top-left container display controls horizontally */
+.leaflet-top.leaflet-left {
+    display: flex;
+    flex-direction: row;
+    gap: 2px; /* adds space between controls */
+    align-items: flex-start;
+}
+
 /* Target all leaflet controls on the left side, regardless of top/bottom position */
 /* when keeping zoom buttons, remember to exclude from this styling */
-.leaflet-left .leaflet-control:not(.leaflet-control-zoom) {
+.leaflet-left .leaflet-control:not(.leaflet-control-zoom):not(.leaflet-control-fullscreen) {
   background-color: white;
   opacity: 1.0;
   overflow: auto;

@@ -68,7 +68,8 @@ df$`Ownership Type`<- factor(df$owner_renter, levels = c("Owner occupied, homeow
                                                              "Church or charity owned"))
 
 df <- df %>%
-  mutate("Count (%)"=ifelse(total==0, NA, paste0(comma(count)," (",round(prc,0),"%)")),
+  mutate("% (Count)"=ifelse(total==0, NA, paste0(round(prc,0),"% (", comma(count)," out of ", 
+                            comma(total), ")")),
          prc=ifelse(total==0,0,prc),
          "Share of Housing Type Lost"=prc,
          "Area" = str_to_title(area_name)) %>%
@@ -77,13 +78,13 @@ df <- df %>%
 
 
 table<- df %>%
-  select("Area","Ownership Type", "Share of Housing Type Lost", "Count (%)")%>%
+  select("Area","Ownership Type", "Share of Housing Type Lost", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Ownership Type") %>%
   tab_header(title= "Share of Significantly Damaged Properties Out of Each Ownership Type")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table %>%
-  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%

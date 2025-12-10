@@ -51,7 +51,8 @@ df_ <- st_read(con, query="Select * from data.analysis_multifamily_jan2025") %>%
                                               "Two Units","Two Units or Less", multifamily_unit_category))
 
 df <- df_ %>%
-  mutate("Count (%)"=paste0(comma(property_count)," (",round(property_prc,0),"%)"),
+  mutate("% (Count)"=paste0(round(property_prc,0),"% (", comma(property_count)," out of ", 
+                            comma(property_total), ")"),
          "Share of Multifamily Properties"=property_prc,
          "Multifamily Unit Type" = multifamily_unit_category,
          "Area" = str_to_title(area_name)) %>%
@@ -60,7 +61,7 @@ df <- df_ %>%
 
 
 table<- df %>%
-  select("Area","Multifamily Unit Type", "Share of Multifamily Properties", "Count (%)")%>%
+  select("Area","Multifamily Unit Type", "Share of Multifamily Properties", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Multifamily Unit Type") %>%
   tab_header(title= "Multifamily Properties by Size")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025."),placement="left") 

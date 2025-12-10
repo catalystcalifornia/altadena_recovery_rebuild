@@ -51,7 +51,8 @@ df_ <- st_read(con, query="Select * from data.analysis_restype_damage")
 df<- df_ %>%
   filter(res_type != "Boarding house",
          damage_category == "Significant Damage") %>% 
-  mutate("Count (%)"=paste0(comma(count)," (",round(prc,0),"%)"),        
+  mutate("% (Count)"=paste0(round(prc,0),"% (", comma(count)," out of ", 
+                            comma(total), ")"),      
          "Share of Housing Type Lost"=prc,
          "Residential Type" = res_type,
          "Area" = str_to_title(area_name)) %>%
@@ -60,13 +61,13 @@ df<- df_ %>%
 
 
 table<- df %>%
-  select("Area","Residential Type", "Share of Housing Type Lost", "Count (%)")%>%
+  select("Area","Residential Type", "Share of Housing Type Lost", "% (Count)")%>%
   gt(groupname_col = "Area", rowname_col = "Residential Type") %>%
   tab_header(title= "Significantly Damaged Properties by Residential Type")%>%
   tab_footnote(footnote=html("Catalyst California's calculations based on L.A. County Assessor Data, January 2025 and CAL FIRE Damage Data, September 2025."),placement="left") 
 
  table%>%
-  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=TRUE, fill=meteorite, background="transparent")%>%
+  gt_plt_bar_pct(column= 'Share of Housing Type Lost', scaled=TRUE, fill=meteorite, background=gainsboro)%>%
   # # if needed modify column widths here 
   # cols_width(1~px(210),2~px(100),
   #            3~px(125))%>%
