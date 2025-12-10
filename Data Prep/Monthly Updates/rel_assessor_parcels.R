@@ -28,29 +28,53 @@ month <- "12"
 xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
 # get assessor parcels for CURRENT MONTH
 assessor_parcels <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_parcels_universe_2025_12", geom="geom")
-# get assessor parcels from PREVIOUS MONTH
-shapes <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_parcels_universe_2025_09", geom="geom")
 
-#### STEP 3: FILTER (Update ain column names) ####
-# select geometries from current month in the data we want
-curr_shapes <- assessor_parcels %>% 
+# get west and east altadena
+east <- st_read(con_alt, query="SELECT * FROM data.east_altadena_3310", geom="geom")
+west <- st_read(con_alt, query="SELECT * FROM data.west_altadena_3310", geom="geom")
+
+st_crs(assessor_parcels)
+st_crs(east)
+st_crs(west)
+#### STEP 3: JOIN FOR EAST/WEST labeling (Update ain column names) ####
+
+# parcels within east altadena
+parcels_east <- st_join(assessor_parcels, east %>% select(name,label), join=st_within, left=FALSE)
+
+# check
+# mapview(parcels_east) +
+#   mapview(east) 
+# looks good
+
+# parcels within west altadena
+parcels_west <- st_join(assessor_parcels, west %>% select(name,label), join=st_within, left=FALSE)
+
+# check
+# mapview(parcels_west) +
+#   mapview(west)
+# looks good
+
+# join together
+parcels_altadena <- rbind(parcels_west,parcels_east)
+table(parcels_altadena$name,useNA='always')
+
+# check for duplicates
+nrow(parcels_altadena)
+length(unique(parcels_altadena$ain))
+
+
+# select geometries from current month in the data we want with xwalk
+parcels_altadena <- parcels_altadena %>% 
   filter(ain %in% xwalk$ain_2025_12)  
 
-#### STEP 4: LEFT JOIN (Update ain column names) ####
-# add west and east identifier so we don't need to to match to jan every time we run the analysis
-curr_shapess_alt <- curr_shapes %>%
-  left_join(xwalk, by=c("ain"="ain_2025_12")) %>%
-  left_join(shapes %>% st_drop_geometry(), by=c("ain_2025_09"="ain_2025_09")) 
+# select columns needed and rename
+rel_area_geom_df <- parcels_altadena %>%
+  select(ain,name,label) %>%
+  rename(ain_2025_12 = ain,
+         area_name=name,
+         area_label=label)
 
-# clean up
-curr_shapes_final <- curr_shapess_alt %>%
-  select(ain,area_name,area_label) %>%
-  #remove duplicates, keep only first occurrence of ain parcel 
-  distinct(ain_2025_12, .keep_all = TRUE)
-
-# mapview(curr_shapes_final)
-
-#### STEP 5: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
+#### STEP 4: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres
 table_label <- paste0("rel_assessor_parcels_", year, "_", month)
@@ -59,13 +83,13 @@ indicator <- paste0("Relational spatial table with geometries of residential pro
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_parcels.R "
 qa_filepath<-"  QA_sheet_rel_assessor_parcels.docx "
 
-export_shpfile(con=con_alt, df=curr_shapes_final, schema="dashboard",
+export_shpfile(con=con_alt, df=rel_area_geom_df, schema="dashboard",
                table_name= table_label,
                geometry_column = "geom")
 
 
 # Add metadata
-column_names <- colnames(curr_shapes_final) # Get column names
+column_names <- colnames(rel_area_geom_df) # Get column names
 
 column_comments <- c('Assessor ID number for current month - use this to match to other relational tables',
                      'West or East Altadena shortened label based on parcel as of January',
@@ -74,5 +98,5 @@ column_comments <- c('Assessor ID number for current month - use this to match t
 
 add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
-#### STEP 6: close dbconnection (NO UPDATES NEEDED) ####
+#### STEP 5: close dbconnection (NO UPDATES NEEDED) ####
 dbDisconnect(con_alt)

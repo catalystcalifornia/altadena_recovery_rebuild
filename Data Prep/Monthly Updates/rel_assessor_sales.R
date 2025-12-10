@@ -24,9 +24,11 @@ year <- "2025"
 month <- "12"
 
 #### STEP 2: PULL DATA AND FILTER (Update to latest data) ####
-
-# get assessor data for CURRENT MONTH
-assessor_data <- st_read(con_alt, query="Select * from dashboard.assessor_data_universe_2025_12")
+# get xwalk for PREVIOUS MONTH and CURRENT MONTH
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
+# get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
+assessor_data <- st_read(con_alt, query="Select * from dashboard.assessor_data_universe_2025_12") %>%
+  filter(ain %in% xwalk$ain_2025_12)
 
 sales <- assessor_data %>% 
   select(ain, use_code, contains("owner"),

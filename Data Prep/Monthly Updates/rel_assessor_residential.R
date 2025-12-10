@@ -26,28 +26,9 @@ month <- "12"
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
 xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
-# get assessor data for CURRENT MONTH
-assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2025_12")
-
-# JZ QA notes: 
-# Do we not need the step of looking at which AINs in the most recent month's assessor data were also in the January 2025 assessor data?
-# See commented out code beow:
-
-# filter jan sept crosswalk for residential parcels in Altadena
-# jan_sept_xwalk_alt <- jan_sept_xwalk %>%
-#   filter(ain_jan %in% res$ain)
-# 
-# nrow(jan_sept_xwalk_alt)
-# length(unique(jan_sept_xwalk_alt$ain_jan))
-# length(unique(jan_sept_xwalk_alt$ain_sept))
-# one duplicate september ain
-# jan_sept_xwalk_alt$ain_sept[duplicated(jan_sept_xwalk_alt$ain_sept)]
-# 
-# View(jan_sept_xwalk_alt)
-
-# filter MOST RECENT MONTH assessor data for same ains
-# sept_data_altadena <- assessor_data %>%
-#   filter(ain %in% jan_sept_xwalk_alt$ain_sept)
+# get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
+assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2025_12") %>%
+  filter(ain %in% xwalk$ain_2025_12)
 
 
 #### STEP 3:GETTING TOTAL UNITS (NO UPDATES) ####
