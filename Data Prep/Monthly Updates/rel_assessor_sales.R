@@ -107,7 +107,9 @@ sales_final <- sales_final %>%
          last_sale_date, last_sale_verif_key, last_sale_amount,
          sale_two_date, sale_two_verif_key, sale_two_amount,
          sale_three_date, sale_three_verif_key, sale_three_amount) %>%
-  rename(ain_sept=ain)
+  rename(ain_2025_12=ain) %>%
+  #remove duplicates, keep only first occurrence of ain parcel 
+  distinct(ain_2025_12, .keep_all = TRUE)
 #### STEP 7: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres
@@ -124,7 +126,7 @@ dbWriteTable(con_alt, Id(schema, table_label), sales_final,
 # Add metadata
 column_names <- colnames(sales_final) # Get column names
 
-column_comments <- c('ain for september use to match to other tables',
+column_comments <- c('ain for current month- use to match to other tables',
         ' true false field for if sale took place after 2-8-25--likely to have been listed after eaton fire',
          'year of last sale',
          'month of last sale in number format',

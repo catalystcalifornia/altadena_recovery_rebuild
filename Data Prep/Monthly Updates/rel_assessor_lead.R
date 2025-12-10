@@ -36,7 +36,9 @@ curr_lead <- xwalk %>%
             by = c("ain_2025_09" = "ain_sept")
   ) %>%
   #drop older column
-  select(-ain_jan)
+  select(-ain_jan) %>%
+  #remove duplicates, keep only first occurrence of ain parcel 
+  distinct(ain_2025_12, .keep_all = TRUE)
 
 #### STEP 4: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 

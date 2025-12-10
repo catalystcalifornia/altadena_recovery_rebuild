@@ -178,7 +178,9 @@ data_altadena_owner<-data_altadena_owner%>%
 #### STEP 7: CLEAN UP DF ####
 final_res_data <- data_altadena_owner %>% 
   select(ain, residential, mixed_use, res_type, owner_renter, total_units, landlord_units, total_square_feet, total_bedrooms, use_code, zoning_code) %>%
-  rename(ain_2025_12 = ain)
+  rename(ain_2025_12 = ain) %>%
+  #remove duplicates, keep only first occurrence of ain parcel 
+  distinct(ain_2025_12, .keep_all = TRUE)
 #### STEP 8: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres
@@ -195,7 +197,7 @@ dbWriteTable(con_alt, Id(schema, table_label), final_res_data,
 # Add metadata
 column_names <- colnames(final_res_data) # Get column names
 
-column_comments <- c('Assessor ID number from September 2025- use this to match to other relational tables ',
+column_comments <- c('Assessor ID number for current month- use this to match to other relational tables ',
                      'Flag for whether property is a residential use (e.g., use code starting with 0)',
                      'Flag for whether property is mixed residential-commercial (use code starting with 1 but with a residential combo indicated in 3rd character)',
                      'Residential type -- either single-family, multifamily, mixed use, condominium, boarding house',

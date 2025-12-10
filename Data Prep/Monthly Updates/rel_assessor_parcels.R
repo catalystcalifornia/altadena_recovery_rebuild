@@ -44,7 +44,9 @@ curr_shapess_alt <- curr_shapes %>%
 
 # clean up
 curr_shapes_final <- curr_shapess_alt %>%
-  select(ain,area_name,area_label) 
+  select(ain,area_name,area_label) %>%
+  #remove duplicates, keep only first occurrence of ain parcel 
+  distinct(ain_2025_12, .keep_all = TRUE)
 
 # mapview(curr_shapes_final)
 
