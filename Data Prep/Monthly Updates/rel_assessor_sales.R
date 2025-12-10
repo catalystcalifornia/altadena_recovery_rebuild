@@ -21,12 +21,12 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2025"
-month <- "09"
+month <- "12"
 
 #### STEP 2: PULL DATA AND FILTER (Update to latest data) ####
 
 # get assessor data for CURRENT MONTH
-assessor_data <- st_read(con_alt, query="Select * from data.assessor_data_universe_sept2025")
+assessor_data <- st_read(con_alt, query="Select * from dashboard.assessor_data_universe_2025_12")
 
 sales <- assessor_data %>% 
   select(ain, use_code, contains("owner"),
@@ -82,7 +82,7 @@ sales%>%select(last_sale_date, sold_after_eaton)%>%View() # Looks good
 check_sales <- sales %>%
   group_by(last_sale_year,sold_after_eaton) %>%
   summarise(count=n())
-# 78 NA check
+# 82 NA check
 na_sale_date <- sales %>%
   select(last_sale_date_orig, last_sale_year,recording_date, doc_reason_code, land_reason_key, everything()) %>%
   filter(is.na(sold_after_eaton))

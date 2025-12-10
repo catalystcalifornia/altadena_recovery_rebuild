@@ -21,13 +21,13 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2025"
-month <- "09"
+month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM data.crosswalk_assessor_jan_sept_2025")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
 # get assessor data for CURRENT MONTH
-assessor_data <- st_read(con_alt, query="Select * from data.assessor_data_universe_sept2025")
+assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2025_12")
 
 # JZ QA notes: 
 # Do we not need the step of looking at which AINs in the most recent month's assessor data were also in the January 2025 assessor data?
@@ -177,7 +177,8 @@ data_altadena_owner<-data_altadena_owner%>%
 
 #### STEP 7: CLEAN UP DF ####
 final_res_data <- data_altadena_owner %>% 
-  select(ain, residential, mixed_use, res_type, owner_renter, total_units, landlord_units, total_square_feet, total_bedrooms, use_code, zoning_code)
+  select(ain, residential, mixed_use, res_type, owner_renter, total_units, landlord_units, total_square_feet, total_bedrooms, use_code, zoning_code) %>%
+  rename(ain_2025_12 = ain)
 #### STEP 8: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres

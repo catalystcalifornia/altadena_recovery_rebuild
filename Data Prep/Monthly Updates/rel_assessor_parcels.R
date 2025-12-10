@@ -21,37 +21,30 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2025"
-month <- "09"
+month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM data.crosswalk_assessor_jan_sept_2025")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
 # get assessor parcels for CURRENT MONTH
-assessor_parcels <- st_read(con_alt, query="Select * from data.assessor_parcels_universe_sept2025", geom="geom")
-# get relational tables from PREVIOUS MONTH
-res <- st_read(con_alt, query="Select * from data.rel_assessor_residential_jan2025")
-shapes <- st_read(con_alt, query="Select * from data.rel_assessor_altadena_parcels_jan2025", geom="geom") %>%
-  rename(ain_jan=ain)
+assessor_parcels <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_parcels_universe_2025_12", geom="geom")
+# get assessor parcels from PREVIOUS MONTH
+shapes <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_parcels_universe_2025_09", geom="geom")
 
 #### STEP 3: FILTER (Update ain column names) ####
-# filter crosswalk for residential parcels in Altadena
-xwalk_alt <- xwalk %>%
-  filter(ain_jan %in% res$ain)
-
 # select geometries from current month in the data we want
 curr_shapes <- assessor_parcels %>% 
-  filter(ain %in% xwalk_alt$ain_sept)  
+  filter(ain %in% xwalk$ain_2025_12)  
 
 #### STEP 4: LEFT JOIN (Update ain column names) ####
 # add west and east identifier so we don't need to to match to jan every time we run the analysis
 curr_shapess_alt <- curr_shapes %>%
-  left_join(xwalk_alt, by=c("ain"="ain_sept")) %>%
-  left_join(shapes %>% st_drop_geometry(), by=c("ain_jan"="ain_jan")) 
+  left_join(xwalk, by=c("ain"="ain_2025_12")) %>%
+  left_join(shapes %>% st_drop_geometry(), by=c("ain_2025_09"="ain_2025_09")) 
 
 # clean up
 curr_shapes_final <- curr_shapess_alt %>%
-  select(ain,area_name,area_label) %>%
-  rename(ain_sept=ain)
+  select(ain,area_name,area_label) 
 
 # mapview(curr_shapes_final)
 
