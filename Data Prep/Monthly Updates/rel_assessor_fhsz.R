@@ -21,26 +21,22 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2025"
-month <- "09"
+month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM data.crosswalk_assessor_jan_sept_2025")
-# get assessor fhsz for CURRENT MONTH
-assessor_fhsz <- st_read(con_alt, query="Select * from data.rel_assessor_fhsz_sept2025")
-# get relational tables from PREVIOUS MONTH
-res <- st_read(con_alt, query="Select * from data.rel_assessor_residential_jan2025")
+xwalk <- st_read(con_alt, query="SELECT ain_2025_09, ain_2025_12 FROM dashboard.crosswalk_assessor_2025_09_12")
+# get assessor fhsz from PREVIOUS MONTH
+assessor_fhsz <- st_read(con_alt, query="Select * from dashboard.rel_assessor_fhsz_2025_09")
 
 #### STEP 3: FILTER (Update ain column names) ####
-# filter crosswalk for residential parcels in Altadena
-xwalk_alt <- xwalk %>%
-  filter(ain_jan %in% res$ain)
-
-# select from current month in the data we want
-curr_fhsz <- assessor_fhsz %>%
-  filter(ain_sept %in% xwalk_alt$ain_sept) %>%   # keep only matching ain_sept
-  left_join(xwalk_alt %>% select(ain_sept, ain_jan),
-            by = "ain_sept")                     # bring in ain_jan
+# select fhsz for current month via xwalk
+curr_fhsz <- xwalk %>%
+  left_join(assessor_fhsz,
+            by = c("ain_2025_09" = "ain_sept")
+            ) %>%
+  #drop older column
+  select(-ain_jan)
 
 #### STEP 4: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
@@ -57,13 +53,13 @@ dbWriteTable(con_alt, Id(schema, table_label), curr_fhsz,
 # Add metadata
 column_names <- colnames(curr_fhsz) # Get column names
 
-column_comments <- c('West or East Altadena shortened label based on parcel as of January',
+column_comments <- c('Assessor ID number for previous month',
                      'Assessor ID number for current month - use this to match to other relational tables',
-                     'state fire hazard zone',
-                     'local fire hazard zone - top coded based on most severe zone--uses this or combined_fhsz',
+                     "Label for area in altadena, East of West",
                      'list of local fire hazard zones the parcel fell within',
-                     'main local fire hazard zone - top coded for most severe zone parcel falls within',
-                     'Assessor ID number from month of Eaton Fire, January 2025')
+                     'local fire hazard zone - top coded based on most severe zone--uses this or combined_fhsz',
+                     'state fire hazard zone',
+                     'main local fire hazard zone - top coded for most severe zone parcel falls within, this is the category to use')
 
 add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
