@@ -325,22 +325,26 @@ xwalk_df <- bind_rows(
   xwalk_diff_shape_overlap %>% 
   select(ain_prev, ain_curr, pct_overlap_prev, pct_overlap_curr,
          use_code_prev, use_code_curr, address_prev, address_curr, 
-         xwalk_type, status))  %>%
+         xwalk_type, status)) 
+
+
+
+##### Monthly Update: Filter for universe ------
+#### Will need to update and pull in the previous xwalk that has been filtered overtime for the january universe
+# filter just for the parcel universe
+final_xwalk <- xwalk_df %>%
+  left_join(prev_xwalk, by="ain_prev") %>%
+  select(ain_2025_01, ain_prev, ain_curr, everything()) %>%
   # rename columns for export
   rename_with(~ gsub("_prev$", paste("", prev_year, prev_month, sep="_"), .x)) %>%
-  rename_with(~ gsub("_curr$", paste("",curr_year, curr_month, sep="_"), .x))
+  rename_with(~ gsub("_curr$", paste("",curr_year, curr_month, sep="_"), .x)) %>%
+  filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
+ 
 
-# ##### Monthly Update: Filter for universe ------
-# #### Will need to update and pull in the previous xwalk that has been filtered overtime for the january universe
-# # filter just for the parcel universe
-# final_xwalk <- xwalk_df %>% 
-#   filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
-# 
-# # check that all january ains are accounted for
-# missing_jan_parcels <- parcel_universe %>% anti_join(xwalk_df, by=c("ain_2025_01"))
-# nrow(missing_jan_parcels)
+# check that all january ains are accounted for
+missing_jan_parcels <- parcel_universe %>% anti_join(final_xwalk, by=c("ain_2025_01"))
+nrow(missing_jan_parcels)
 
-final_xwalk <- xwalk_df
 ##### SHOULD BE ZERO #####
 
 # QA CHECK DUPLICATES and review them--multiple of the previous ains matching
@@ -356,7 +360,7 @@ table_name <- paste("crosswalk_assessor", curr_year, prev_month, curr_month, sep
 indicator <- "Updated Crosswalk of Assessor AINs from prev(ious) to curr(ent) shapes based on significantly damaged residential parcels from January"
 qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\monthly_updates\\QA_parcel_xwalk.docx"
 
-table_name <- paste(table_name, "emg", sep="_")# remove once this looks good (just use normal table_name set at top of script)
+
 source <- "Data Prep\\Monthly Updates\\parcel_xwalk.R"
 dbWriteTable(con, Id(schema, table_name), final_xwalk,
              overwrite = FALSE, row.names = FALSE)
