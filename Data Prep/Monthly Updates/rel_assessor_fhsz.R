@@ -71,9 +71,8 @@ dbWriteTable(con_alt, Id(schema, table_label), curr_fhsz,
 # Add metadata
 column_names <- colnames(curr_fhsz) # Get column names
 
-column_comments <- c('Assessor ID number for previous month',
+column_comments <- c(
                      'Assessor ID number for current month - use this to match to other relational tables',
-                     "Label for area in altadena, East of West",
                      'list of local fire hazard zones the parcel fell within',
                      'local fire hazard zone - top coded based on most severe zone--uses this or combined_fhsz',
                      'state fire hazard zone',
