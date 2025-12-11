@@ -4,14 +4,10 @@
 
 #### STEP 1: SET UP (Update year and month) ####
 library(sf)
-library(rmapshaper)
-library(leaflet)
-library(htmlwidgets)
 library(stringr)
 library(readxl)
 library(tidyverse)
 library(janitor)
-library(mapview)
 library(writexl)
 
 options(scipen=999)
@@ -25,54 +21,47 @@ month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
-# get assessor parcels for CURRENT MONTH
-assessor_parcels <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_parcels_universe_2025_12", geom="geom")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_09_12_2025")
+# get area names from January
+assessor_areas<- st_read(con_alt, query="Select * from data.rel_assessor_altadena_parcels_jan2025")
+# get curr geoms
+geoms <- st_read(con_alt, query="Select * from dashboard.assessor_parcels_universe_2025_12") %>%
+  filter(ain %in% xwalk$ain_2025_12)
 
-# get west and east altadena
-east <- st_read(con_alt, query="SELECT * FROM data.east_altadena_3310", geom="geom")
-west <- st_read(con_alt, query="SELECT * FROM data.west_altadena_3310", geom="geom")
+#### STEP 3: FILTER (Update ain column names) ####
+# select area name for current month via xwalk
+curr_area <- geoms %>% 
+  select(ain) %>%
+  rename(ain_2025_12=ain) %>%
+  left_join(xwalk, by="ain_2025_12") %>%
+  left_join(assessor_areas %>% st_drop_geometry() %>% select(ain,area_name,area_label),
+            by = c("ain_2025_01" = "ain")
+  ) 
 
-st_crs(assessor_parcels)
-st_crs(east)
-st_crs(west)
-#### STEP 3: JOIN FOR EAST/WEST labeling (Update ain column names) ####
+# select distinct records and trim down columns
+curr_area <- curr_area %>%
+  distinct(ain_2025_12,area_name,area_label,geom)
 
-# parcels within east altadena
-parcels_east <- st_join(assessor_parcels, east %>% select(name,label), join=st_within, left=FALSE)
+# check for duplicates and gaps
+curr_area %>%
+  group_by(ain_2025_12) %>%
+  mutate(count=n()) %>%
+  filter(count > 1) %>%
+  nrow() # should be 0
 
-# check
-# mapview(parcels_east) +
-#   mapview(east) 
-# looks good
+nrow(curr_area) - length(unique(curr_area$ain_2025_12)) # should be 0
 
-# parcels within west altadena
-parcels_west <- st_join(assessor_parcels, west %>% select(name,label), join=st_within, left=FALSE)
+nrow(curr_area) - length(unique(curr_area$ain_2025_12)) # should be 0
 
-# check
-# mapview(parcels_west) +
-#   mapview(west)
-# looks good
+# check for NA - should be 0
+table(curr_area$area_name,useNA='always')
+# Dec QA
+# East West <NA> 
+#   1664 4012    0 
 
-# join together
-parcels_altadena <- rbind(parcels_west,parcels_east)
-table(parcels_altadena$name,useNA='always')
+# check geom still working
+st_crs(curr_area)
 
-# check for duplicates
-nrow(parcels_altadena)
-length(unique(parcels_altadena$ain))
-
-
-# select geometries from current month in the data we want with xwalk
-parcels_altadena <- parcels_altadena %>% 
-  filter(ain %in% xwalk$ain_2025_12)  
-
-# select columns needed and rename
-rel_area_geom_df <- parcels_altadena %>%
-  select(ain,name,label) %>%
-  rename(ain_2025_12 = ain,
-         area_name=name,
-         area_label=label)
 
 #### STEP 4: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
@@ -83,13 +72,13 @@ indicator <- paste0("Relational spatial table with geometries of residential pro
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_parcels.R "
 qa_filepath<-"  QA_sheet_rel_assessor_parcels.docx "
 
-export_shpfile(con=con_alt, df=rel_area_geom_df, schema="dashboard",
+export_shpfile(con=con_alt, df=curr_area, schema="dashboard",
                table_name= table_label,
                geometry_column = "geom")
 
 
 # Add metadata
-column_names <- colnames(rel_area_geom_df) # Get column names
+column_names <- colnames(curr_area) # Get column names
 
 column_comments <- c('Assessor ID number for current month - use this to match to other relational tables',
                      'West or East Altadena shortened label based on parcel as of January',
