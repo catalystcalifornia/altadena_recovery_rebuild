@@ -25,12 +25,16 @@ month <- "12"
 
 #### STEP 2: PULL DATA AND FILTER (Update to latest data) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_09_12_2025")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
 assessor_data <- st_read(con_alt, query="Select * from dashboard.assessor_data_universe_2025_12") %>%
   filter(ain %in% xwalk$ain_2025_12)
 
-sales <- assessor_data %>% 
+# get universe of distinct current ains to join assessor data to -- so we don't drop those without records in the data table (parcel shapes update faster than parcel data)
+curr_ain_universe <- xwalk %>% distinct(ain_2025_12) %>% rename(ain=ain_2025_12)
+
+sales <- curr_ain_universe %>% 
+  left_join(assessor_data) %>% 
   select(ain, use_code, contains("owner"),
          recording_date,
          year_sold_to_state,
@@ -63,17 +67,14 @@ View(sales) # looks good
 # what date to use for flag of being sold after Eaton?
 # first sale occurred in February according to news sources - https://www.cbsnews.com/losangeles/news/first-altadena-property-with-home-destroyed-by-eaton-fire-hits-market-sells-within-days/
 # fire started on January 7th, 2025  https://www.fire.ca.gov/incidents/2025/1/7/eaton-fire
-# LASD allowed all residents to at least visit their properties on 1/21-25 -- use thise date https://www.instagram.com/p/DFGeGEOBbw5/?hl=en
+# LASD allowed all residents to at least visit their properties on 1/21-25 -- use this date https://www.instagram.com/p/DFGeGEOBbw5/?hl=en
 
 #### STEP 4: CREATE T/F IF SOLD AFTER EATON (NO UPDATES) ####
+# based on news article and data, we use date of 2-8-25 for sale after fire -- escrow takes 30 days to close anyways typically
 sales <- sales %>%
   mutate(last_sale_year=format(last_sale_date,"%Y"),
          last_sale_month=format(last_sale_date,"%m"),
-         sold_after_eaton=ifelse(last_sale_date>"2025-01-21", TRUE, FALSE))
-
-# based on news article and this data, lets use date of 2-8-25 for sale after fire -- escrow takes 30 days to close anyways typically
-sales <- sales %>%
-  mutate(sold_after_eaton=ifelse(last_sale_date>="2025-02-08", TRUE, FALSE))
+         sold_after_eaton=ifelse(last_sale_date>="2025-02-08", TRUE, FALSE))
 
 #### STEP 5: CHECK YOUR DATA (NO UPDATES) ####
 
@@ -84,12 +85,18 @@ sales%>%select(last_sale_date, sold_after_eaton)%>%View() # Looks good
 check_sales <- sales %>%
   group_by(last_sale_year,sold_after_eaton) %>%
   summarise(count=n())
-# 82 NA check
+
+check_sales %>% filter(is.na(last_sale_year) & is.na(sold_after_eaton))
+# 31 with NA in check
+
+# check most recent sales date
+max(sales$last_sale_date,na.rm=TRUE)
+# "2025-08-14" - if this doesnt increase flag to Elycia
+
 na_sale_date <- sales %>%
   select(last_sale_date_orig, last_sale_year,recording_date, doc_reason_code, land_reason_key, everything()) %>%
   filter(is.na(sold_after_eaton))
 # those with a sales date originally have errors in the sales date, but sold prior to 2025
-# should adjust in regular update code to manually cap sale date to a date in the month
 # looking at recording date, only one had a recording date in 2025, but the recording was due to perfection of title not a sale, make nulls a FALSE flag
 # land reason key 6 for this property but key 6 isn't in data dictionary
 
@@ -108,10 +115,13 @@ sales_final <- sales_final %>%
          tax_stat_key, year_sold_to_state, impairment_key,
          last_sale_date, last_sale_verif_key, last_sale_amount,
          sale_two_date, sale_two_verif_key, sale_two_amount,
-         sale_three_date, sale_three_verif_key, sale_three_amount) %>%
-  rename(ain_2025_12=ain) %>%
-  #remove duplicates, keep only first occurrence of ain parcel 
-  distinct(ain_2025_12, .keep_all = TRUE)
+         sale_three_date, sale_three_verif_key, sale_three_amount) 
+
+# check for duplicates or gaps
+nrow(sales_final) - length(unique(sales_final$ain)) # should be 0
+nrow(sales_final) - length(unique(xwalk$ain_2025_12)) # should be 0
+
+
 #### STEP 7: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres
