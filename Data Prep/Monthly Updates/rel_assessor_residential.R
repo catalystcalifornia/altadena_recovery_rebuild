@@ -2,7 +2,7 @@
 ## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_assessor_residential.docx ##
 ## SCRIPT OUTPUT: rel_assessor_residential_YYYY_MM
 
-#### STEP 1: SET UP (Update year and month) ####
+#### STEP 1: SET UP (UPDATE year and month) ####
 library(sf)
 library(rmapshaper)
 library(stringr)
@@ -20,9 +20,9 @@ con_alt <- connect_to_db("altadena_recovery_rebuild")
 year <- "2025"
 month <- "12"
 
-#### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
+#### STEP 2: PULL XWALKS AND DATA (UPDATE to latest data and xwalks) ####
 # get for CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_09_12_2025")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
 assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2025_12") %>%
   filter(ain %in% xwalk$ain_2025_12)
@@ -34,7 +34,11 @@ nrow(assessor_data)-length(unique(xwalk$ain_2025_12))
 # Check what's missing in current data
 missing_data <- xwalk %>% filter(!ain_2025_12 %in% assessor_data$ain)
 View(missing_data)
-# add these later, we'll need the old residential type at minimum for filters to work in dashboard
+# we'll need the old residential type at minimum for filters to work in dashboard, other fields can stay blank
+# Update code before final steps
+
+xwalk_prev <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_01_09_2025") %>%
+  filter(ain_2025_09 %in% missing_data$ain_2025_09)
 
 #### STEP 3:GETTING TOTAL UNITS (NO UPDATES) ####
 
@@ -68,7 +72,7 @@ table(rel_res_df$res_type,useNA="always")
 rel_res_df <- rel_res_df %>%
   mutate(residential=ifelse(str_detect(use_code, "^0"), TRUE, FALSE),
          # Keep mixed use flag in case a parcel changes over time
-         mixed_used=ifelse(str_detect(use_code, "^121") | str_detect(use_code, "^172"), TRUE, FALSE))
+         mixed_use=ifelse(str_detect(use_code, "^121") | str_detect(use_code, "^172"), TRUE, FALSE))
 
 # Check - should be 0 NA
 table(rel_res_df$residential,useNA="always")
@@ -82,7 +86,7 @@ rel_res_df %>%
   nrow()
 # Dec - 0 vacant
 
-#### STEP 6: CREATING OWNER_RENTER COLUMN (Update ??)) ####
+#### STEP 6: CREATING OWNER_RENTER COLUMN (QA AND UPDATE IF NEEDED) ####
 data_altadena_owner <- rel_res_df  %>%
   mutate(owner_renter=case_when(
     num_howmowner_exemption>=1 & landlord_units==0 ~ "Owner occupied",
@@ -146,13 +150,69 @@ data_altadena_owner<-data_altadena_owner%>%
            TRUE ~ owner_renter_orig
          ))
 
+# Check owner and renter recoding
+table(data_altadena_owner$owner_renter,useNA='always')
+# Dec QA
+# Church or charity owned           Corporation owned                    Government owned 
+# 10                                  146                                   2 
+# Likely owner occupied, no exemption   Other ownership             Owner & renter occupied 
+# 1234                                    46                                 388 
+# Owner occupied, homeowner exemption   Renter occupied                       Sold to state 
+# 2601                                      520                                  39 
+# Trust owned                                <NA> 
+#   682                                   0 
 
-#### STEP 7: CLEAN UP DF ####
+# Review likely owner occupied
+likely_homeowner <-data_altadena_owner %>% filter(owner_renter=="Likely owner occupied, no exemption") %>%
+  select(ain, owner_renter, tax_stat_key, year_sold_to_state, first_owner_name, second_owner_name, first_owner_name_overflow, exemption_type, num_howmowner_exemption, total_units, landlord_units, owner_renter)
+View(likely_homeowner)
+
+likely_homeowner_table <- likely_homeowner %>%
+  group_by(first_owner_name,first_owner_name_overflow,second_owner_name) %>%
+  summarise(count=n())
+# looks okay
+
+
+#### STEP 7: CLEAN UP DF AND ADD PARCELS WITH MISSING DATA: UPDATE ####
 final_res_data <- data_altadena_owner %>% 
   select(ain, residential, mixed_use, res_type, owner_renter, total_units, landlord_units, total_square_feet, total_bedrooms, use_code, zoning_code) %>%
-  rename(ain_2025_12 = ain) %>%
-  #remove duplicates, keep only first occurrence of ain parcel 
-  distinct(ain_2025_12, .keep_all = TRUE)
+  rename(ain_2025_12 = ain)
+
+# Add missing parcels (UPDATE)
+final_missing_data <- missing_data %>% select(starts_with("ain"))%>% 
+  left_join(xwalk_prev %>% select(starts_with("ain"), starts_with("use_code")), by=c("ain_2025_09"="ain_2025_09"))
+
+final_missing_data <- final_missing_data %>%
+  mutate(use_code=ifelse(is.na(use_code_2025_09), use_code_2025_01,
+                          use_code_2025_09)) %>%
+  distinct(ain_2025_12,use_code) %>%
+  # add just some columns we might need, dont assume address, owner, or square feet is the same
+  # type of residential property
+  mutate(
+    res_type=case_when( 
+      # condos first
+      str_detect(use_code, "C$|E$") ~ "Condominium",
+      str_detect(use_code, "^01") ~ "Single-family",
+      str_detect(use_code, "^02|^03|^04|^05") ~ "Multifamily",
+      str_detect(use_code,"^08") ~ "Boarding house",
+      str_detect(use_code,"^12|^17") ~ "Mixed use", 
+      TRUE ~NA)) %>%
+  # res or mixed use
+  mutate(residential=ifelse(str_detect(use_code, "^0"), TRUE, FALSE),
+         # Keep mixed use flag in case a parcel changes over time
+         mixed_use=ifelse(str_detect(use_code, "^121") | str_detect(use_code, "^172"), TRUE, FALSE))
+
+final_res_data <- bind_rows(final_res_data,final_missing_data)
+
+# check for duplicates
+nrow(final_res_data)-length(unique(final_res_data$ain_2025_12)) # should be 0 difference
+
+# check for same number of rows as xwalk
+nrow(final_res_data)-length(unique(xwalk$ain_2025_12)) # should be 0 difference
+
+# check for NA res type - should be 0
+table(final_res_data$res_type,useNA='always')
+
 #### STEP 8: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres
