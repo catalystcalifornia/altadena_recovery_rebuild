@@ -19,20 +19,19 @@ table_name <- paste("scraped_general_permit_data",
                     curr_month, # month
                     sep="_") 
 
-curr_xwalk_table <- "dashboard.crosswalk_assessor_01_09_2025_test" ### MUST UPDATE
+prev_month <- "09"
+
+curr_xwalk_table <- paste0("dashboard.crosswalk_assessor_", prev_month, "_", curr_month, "_", curr_year) ### MUST UPDATE
 
 
 # EPIC LA - LA County building permits (unincorporated cities only)
 lac_permits_url <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st="
 
 
-# jan_parcels <- dbGetQuery(con, 
-#                           "SELECT DISTINCT dmgs.ain, dmgs.damage_category, xwalk.site_address_parcel FROM data.rel_assessor_damage_level as dmgs LEFT JOIN data.crosswalk_dins_assessor_jan2025 as xwalk ON dmgs.ain = xwalk.ain WHERE dmgs.damage_category = 'Significant Damage' OR dmgs.damage_category = 'Some Damage' ORDER BY dmgs.ain")
-
 xwalk <- dbGetQuery(con, paste("SELECT * FROM", curr_xwalk_table, ";"))
 ains <- xwalk %>% select(starts_with("ain_"))
 ains_list <- unlist(ains) %>% unique() 
-cat(paste("Unique number of AINS:", length(ains_list))) #5733
+cat(paste("Unique number of AINS:", length(ains_list))) #5685
 dbDisconnect(con)
 
 ##### Establish scraping process #####
@@ -55,32 +54,31 @@ if (file.exists(csv_filepath)) {
                         encoding = "UTF-8",
                         colClasses = c("character"))
   
-  # we want unsuccessful scrapes to get scraped again so only include 
-  # successful scrapes as prev_data
+  # Only count successful scrapes as "done"
   prev_data_filtered <- prev_data %>%
     filter(response_status == "success")
   
-  scraped_ains <- prev_data %>%
+  scraped_ains <- prev_data_filtered %>%  
     pull(ain) %>%
     unique()
   
   remaining <- data.frame(ain=setdiff(ains_list, scraped_ains))
   
-  include_headers <- FALSE
-  append_value <- TRUE
   
 } else {
   print("there's no csv with that name - starting scrape from the beginning")
   
   remaining <- data.frame(ain=ains_list)
-  include_headers <- TRUE
-  append_value <- FALSE
+  
 }
 
 closeAllConnections()
 gc() 
 
+first_write_this_session <- !file.exists(csv_filepath)
+
 for (row_ in 1:nrow(remaining)) { 
+  
   row_ain <- remaining[row_, "ain"]
   portal_url <- paste0(lac_permits_url, row_ain)
   
@@ -92,21 +90,22 @@ for (row_ in 1:nrow(remaining)) {
     max_retries = 1, 
     retry_wait_time = 60)
   
-
+  
   # Write initial data (with header)
-  write.table(result, 
-                file = csv_filepath, 
-                sep = ",", 
-                row.names = FALSE, 
-                col.names = include_headers,
-                append = append_value,
-                fileEncoding = "UTF-8",
-                quote = TRUE,
-                qmethod = "double")
+  write.table(result,
+              file = csv_filepath,
+              sep = ",",
+              row.names = FALSE,
+              col.names = first_write_this_session,  # Headers only on first write
+              append = !first_write_this_session,    # Don't append on first write
+              fileEncoding = "UTF-8",
+              quote = TRUE,
+              qmethod = "double")
   
+  # After first write, switch to append mode
+  first_write_this_session <- FALSE
   
-  
-  Sys.sleep(3)
+  Sys.sleep(1)
 }
 
 final_data <- read.csv(csv_filepath,
