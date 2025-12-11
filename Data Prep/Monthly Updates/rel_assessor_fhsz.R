@@ -77,7 +77,8 @@ column_comments <- c('Assessor ID number for previous month',
                      'list of local fire hazard zones the parcel fell within',
                      'local fire hazard zone - top coded based on most severe zone--uses this or combined_fhsz',
                      'state fire hazard zone',
-                     'main local fire hazard zone - top coded for most severe zone parcel falls within, this is the category to use')
+                     'main local fire hazard zone - top coded for most severe zone parcel falls within, this is the category to use',
+                     'local or state authority identifier')
 
 add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
