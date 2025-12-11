@@ -29,10 +29,6 @@ workflow_table_name <- paste("scraped_workflow_permit_data",
                              curr_month, # month
                              sep="_") 
 
-general_table_name <- paste0(general_table_name,"_backup") # note REMOVE for future updates
-detailed_table_name <- paste0(detailed_table_name,"_backup") # note REMOVE for future updates
-workflow_table_name <- paste0(workflow_table_name,"_backup") # note REMOVE for future updates
-
 detailed_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", detailed_table_name, ".csv")
 workflow_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", workflow_table_name, ".csv")
 
@@ -175,7 +171,7 @@ final_workflow_data <- read.csv(workflow_csv_filepath,
 
 
 
-##### Combine and export CSV for MM and DRA #####
+##### Combine and export CSV for ECI to review #####
 # con <- connect_to_db("altadena_recovery_rebuild")
 # general_permits <- dbGetQuery(con, statement=paste0("SELECT * FROM data.", general_table_name))
 # detailed <- dbGetQuery(con, statement=paste0("SELECT * FROM data.", detailed_table_name)) %>%
