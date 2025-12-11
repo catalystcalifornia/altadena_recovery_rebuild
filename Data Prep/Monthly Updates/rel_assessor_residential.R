@@ -5,13 +5,10 @@
 #### STEP 1: SET UP (Update year and month) ####
 library(sf)
 library(rmapshaper)
-library(leaflet)
-library(htmlwidgets)
 library(stringr)
 library(readxl)
 library(tidyverse)
 library(janitor)
-library(mapview)
 library(writexl)
 
 options(scipen=999)
@@ -24,12 +21,20 @@ year <- "2025"
 month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
-# get xwalk for PREVIOUS MONTH and CURRENT MONTH
+# get for CURRENT MONTH
 xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
 assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2025_12") %>%
   filter(ain %in% xwalk$ain_2025_12)
 
+# Check difference between new data and xwalk with jan universe in it
+nrow(assessor_data)-length(unique(xwalk$ain_2025_12))
+# 8 fewer parcels in assessor data
+
+# Check what's missing in current data
+missing_data <- xwalk %>% filter(!ain_2025_12 %in% assessor_data$ain)
+View(missing_data)
+# add these later, we'll need the old residential type at minimum for filters to work in dashboard
 
 #### STEP 3:GETTING TOTAL UNITS (NO UPDATES) ####
 
@@ -52,47 +57,33 @@ rel_res_df  <- data_total_units  %>%
       str_detect(use_code,"^12|^17") ~ "Mixed use", 
       TRUE ~NA))
 
-#### STEP 5: GETTING MIXED VS RESIDENTIAL BOOLEAN COLUMNS (Update ??) ####
-## Residential properties
-data_altadena_res_temp <- rel_res_df %>%
-  filter(str_detect(use_code, "^0")) 
+# Check - should be 0 NA
+table(rel_res_df$res_type,useNA="always")
+# Dec
+# Condominium   Multifamily Single-family          <NA> 
+#   64           312          5292             0 
 
-table(data_altadena_res_temp$use_code)
+#### STEP 5: GETTING MIXED VS RESIDENTIAL BOOLEAN COLUMNS (No Updates) ####
+## Residential & mixed use properties flag
+rel_res_df <- rel_res_df %>%
+  mutate(residential=ifelse(str_detect(use_code, "^0"), TRUE, FALSE),
+         # Keep mixed use flag in case a parcel changes over time
+         mixed_used=ifelse(str_detect(use_code, "^121") | str_detect(use_code, "^172"), TRUE, FALSE))
 
-# pull out x and v suffixes which are vacant or vacant parcel with improvements that are non-structural
+# Check - should be 0 NA
+table(rel_res_df$residential,useNA="always")
+# Dec - TRUE - 5668 0 NA
+table(rel_res_df$mixed_use,useNA="always")
+# Dec - FALSE - 5668 0 NA
 
-# QA: Looking at the Use Code 2023.pdf do we also want to include the suffix U:  Vacant parcel under UAIZ contract? I believe UAIZ contract =Urban Agriculture Incentive Zone
-# Check if there are any U suffix values
-data_altadena_res_temp_u<-data_altadena_res_temp %>%
-  filter(str_detect(use_code, "U$") ) # there are none so we can move forward
-
-# Proceed with other residential types:
-data_altadena_res_vacant <- data_altadena_res_temp %>%
-  filter(str_detect(use_code, "V$") | str_detect(use_code, "X$") ) 
-
-table(data_altadena_res_vacant$use_code) 
-
-# no vacant parcels given that they were filtered out in january -- in future want to consider how we keep these even if now vacant-- did some residential properties just become vacant?
-# # code to keep for future iterations in case vacant parcels appear
-# data_altadena_res_vacant %>%
-#   select(total_units, total_square_feet, total_bedrooms, use_code, everything()) %>%
-#   View()
-# # sort by units descending
-# 
-# View(as.data.frame((unique(data_altadena_res_vacant$ain))))
-
-# now get the final list of residential properties, excluding vacant parcels
-data_altadena_res <- data_altadena_res_temp %>%
-  filter(!ain %in% data_altadena_res_vacant$ain) 
-
-### Flags for mixed use or residential
-data_altadena_res <- data_altadena_res %>%
-  mutate(residential=TRUE, # residential column flag
-         mixed_use=FALSE) # mixed use flag
-
+# check for vacant parcels, but okay to keep in data if they change to vacant over time
+rel_res_df %>%
+  filter(str_detect(use_code, "V$") | str_detect(use_code, "X$") ) %>%
+  nrow()
+# Dec - 0 vacant
 
 #### STEP 6: CREATING OWNER_RENTER COLUMN (Update ??)) ####
-data_altadena_owner <- data_altadena_res %>%
+data_altadena_owner <- rel_res_df  %>%
   mutate(owner_renter=case_when(
     num_howmowner_exemption>=1 & landlord_units==0 ~ "Owner occupied",
     num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner & Renter occupied",
@@ -100,7 +91,7 @@ data_altadena_owner <- data_altadena_res %>%
     TRUE ~ "Other")) 
 
 # check
-table(data_altadena_owner$owner_renter)
+table(data_altadena_owner$owner_renter,useNA='always')
 
 
 data_altadena_owner<-data_altadena_owner%>%
