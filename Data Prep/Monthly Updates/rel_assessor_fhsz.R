@@ -25,7 +25,7 @@ month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT ain_2025_09, ain_2025_12 FROM dashboard.crosswalk_assessor_2025_09_12")
+xwalk <- st_read(con_alt, query="SELECT ain_2025_09, ain_2025_12 FROM dashboard.crosswalk_assessor_09_12_2025")
 # get assessor fhsz from PREVIOUS MONTH
 assessor_fhsz <- st_read(con_alt, query="Select * from dashboard.rel_assessor_fhsz_2025_09")
 
@@ -38,7 +38,23 @@ curr_fhsz <- xwalk %>%
   #drop older column
   select(-ain_jan) %>%
   #remove duplicates, keep only first occurrence of ain parcel 
-  distinct(ain_2025_12, .keep_all = TRUE)
+  distinct(ain_2025_12,local_fhsz_list, local_fhsz, state_fhsz, combined_fhsz) %>%
+  # add authority column
+  mutate(authority=case_when(state_fhsz=="Very High" & (local_fhsz=="None" | is.na(local_fhsz)) ~ "State",
+                             state_fhsz=="Very High" & (local_fhsz!="None" | !is.na(local_fhsz)) ~ "State & Local",
+                             (state_fhsz=="None" | is.na(state_fhsz)) & local_fhsz!="None" ~ "Local",
+                             TRUE ~ "None"))
+
+# check for duplicates and gaps
+curr_fhsz %>%
+  group_by(ain_2025_12) %>%
+  mutate(count=n()) %>%
+  filter(count > 1) %>%
+  nrow() # should be 0
+
+nrow(curr_fhsz) - length(unique(curr_fhsz$ain_2025_12)) # should be 0
+
+nrow(curr_fhsz) - length(unique(xwalk$ain_2025_12)) # should be 0
 
 #### STEP 4: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
