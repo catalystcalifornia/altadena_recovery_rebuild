@@ -5,13 +5,10 @@
 #### STEP 1: SET UP (Update year and month) ####
 library(sf)
 library(rmapshaper)
-library(leaflet)
-library(htmlwidgets)
 library(stringr)
 library(readxl)
 library(tidyverse)
 library(janitor)
-library(mapview)
 library(writexl)
 
 options(scipen=999)
@@ -25,7 +22,7 @@ month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT ain_2025_09, ain_2025_12 FROM dashboard.crosswalk_assessor_2025_09_12")
+xwalk <- st_read(con_alt, query="SELECT ain_2025_09, ain_2025_12 FROM dashboard.crosswalk_assessor_09_12_2025")
 # get assessor lead for PREVIOUS MONTH
 assessor_lead <- st_read(con_alt, query="Select * from dashboard.rel_assessor_lead_2025_09")
 
@@ -37,15 +34,28 @@ curr_lead <- xwalk %>%
   ) %>%
   #drop older column
   select(-ain_jan) %>%
-  #remove duplicates, keep only first occurrence of ain parcel 
-  distinct(ain_2025_12, .keep_all = TRUE)
+  distinct(ain_2025_12,grid_name,lead_geometric_mean,hi_lead_flag, hi_lead_label)
+
+# check for duplicates and gaps
+curr_lead %>%
+  group_by(ain_2025_12) %>%
+  mutate(count=n()) %>%
+  filter(count > 1) %>%
+  nrow() # should be 0
+
+nrow(curr_lead) - length(unique(curr_lead$ain_2025_12)) # should be 0
+
+nrow(curr_lead) - length(unique(curr_lead$ain_2025_12)) # should be 0
+
+# check for NA - should be 0
+table(curr_lead$hi_lead_label,useNA='always')
 
 #### STEP 4: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres
 table_label <- paste0("rel_assessor_lead_", year, "_", month)
 schema <- "dashboard"
-indicator <- paste0("Relational table of Fire Hazard State Zone in either West or East Altadena proper as of MONTH:", month, " YEAR:", year)
+indicator <- paste0("Relational table of Lead Grids and Testing in either West or East Altadena proper as of MONTH:", month, " YEAR:", year)
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_lead.R "
 qa_filepath<-"  QA_sheet_rel_assessor_lead.docx "
 
@@ -56,7 +66,7 @@ dbWriteTable(con_alt, Id(schema, table_label), curr_lead,
 # Add metadata
 column_names <- colnames(curr_lead) # Get column names
 
-column_comments <- c('Assessor ID number for previous month',
+column_comments <- c(
                      'Assessor ID number for current month - use this to match to other relational tables',
                      'lead testing grid',
                      'lead geometric mean for testing grid, NA if not tested',
