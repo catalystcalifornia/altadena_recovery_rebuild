@@ -43,7 +43,8 @@ dbDisconnect(con)
 
 permits_filtered <- general_permits %>%
   # filter out permits applied for before Eaton Fire
-  filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) 
+  filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
+  filter(!(status %in% c("Void", "Canceled", "Denied")))
 
 base_url <- "https://epicla.lacounty.gov/energov_prod/SelfService/"
 
@@ -64,7 +65,7 @@ if (file.exists(detailed_csv_filepath)) {
   prev_data_filtered <- prev_data %>%
     filter(response_status == "success")
   
-  scraped_permits <- prev_data %>%
+  scraped_permits <- prev_data_filtered %>%
     select(permit_number, ain) %>%
     mutate(id = paste(permit_number, ain, sep = "_")) %>%
     unique()
@@ -72,20 +73,16 @@ if (file.exists(detailed_csv_filepath)) {
   remaining <- data.frame(id=setdiff(permits_to_scrape$id, scraped_permits$id)) %>%
     left_join(permits_to_scrape, by="id")
   
-  include_headers <- FALSE
-  append_value <- TRUE
-  
 } else {
   print("there's no csv with that name - starting scrape from the beginning")
   
   remaining <- permits_to_scrape
-  include_headers <- TRUE
-  append_value <- FALSE
 }
 
 closeAllConnections()
 gc() 
 
+first_write_this_session <- !file.exists(detailed_csv_filepath)
 
 for (row_ in 1:nrow(remaining)) {   
   row_ain <- remaining[row_, "ain"]
@@ -113,8 +110,8 @@ for (row_ in 1:nrow(remaining)) {
               file = detailed_csv_filepath, 
               sep = ",", 
               row.names = FALSE, 
-              col.names = include_headers,
-              append = append_value,
+              col.names = first_write_this_session,  # Headers only on first write
+              append = !first_write_this_session,    # Don't append on first write
               fileEncoding = "UTF-8",
               quote = TRUE,
               qmethod = "double")
@@ -123,17 +120,21 @@ for (row_ in 1:nrow(remaining)) {
               file = workflow_csv_filepath, 
               sep = ",", 
               row.names = FALSE, 
-              col.names = include_headers,
-              append = append_value,
+              col.names = first_write_this_session,  # Headers only on first write
+              append = !first_write_this_session,    # Don't append on first write
               fileEncoding = "UTF-8",
               quote = TRUE,
               qmethod = "double")
   
-  include_headers <- FALSE
-  append_value <- TRUE
+  # After first write, switch to append mode
+  first_write_this_session <- FALSE
   
   Sys.sleep(1)
 }
+
+# note: there's a chance that the scrape could be interrupted between writes to the detailed and workflow csvs
+# should check that all ids are in both csvs
+# it's unlikely to have a big impact but still good to resolve when there's more time.
 
 #### Get final data and export to pg
 
