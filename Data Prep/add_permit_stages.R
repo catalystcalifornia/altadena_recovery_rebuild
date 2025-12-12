@@ -74,7 +74,7 @@ permits_substring <- permits_orig %>%
 table(permits_substring$permit_sub)
 # CREB County Disaster recovery Permit Rebuild Project
 # FCD Flood access/construction permit
-# FDR Construction & Demolition Final Compliance
+# FCR Construction & Demolition Final Compliance
 # FIRE tree removal
 # PROP Property report
 # PWRP Road permits
@@ -155,12 +155,12 @@ workflow <- workflow_all %>%
   group_by(ain, permit_number) %>%
   mutate(b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm = TRUE)>0, 1, 0)) %>%
   select(ain, permit_number, b3_has_inspection) %>%
-  unique() # 4669
+  unique() # 4531
 
-# check count
+# check counts and recoding
 check <- workflow %>% group_by(ain,permit_number) %>% summarise(count=n())
-workflow %>% distinct(ain,permit_number) %>% nrow() # 4669
-length(unique(workflow$permit_number)) #4653, permit numbers are not necessarily unique - a permit can have multiple workflow items (inspections, etc.)
+workflow %>% distinct(ain,permit_number) %>% nrow() # 4531 # should match number of rows in workflow df
+length(unique(workflow$permit_number)) #4516, permit numbers are not necessarily unique - a permit can be associated be associated with multiple ains and have multiple workflow items (inspections, etc.)
 
 # check result
 table(workflow$b3_has_inspection, useNA = "ifany")
@@ -229,7 +229,7 @@ permits <- permits_filtered %>%
                                     b4_has_finaled==1), 1, 0)) 
 
 # check counts of variables
-table(permits$gen_status, useNA = "ifany") # should we drop Canceled and Denied? What does Exempt mean?
+table(permits$gen_status, useNA = "ifany") # What does Exempt mean?
 table(permits$b1_has_fdr, useNA = "ifany")
 table(permits$b1_has_fdr_finaled, useNA = "ifany")
 table(permits$b2_has_build_permit, useNA = "ifany")
@@ -244,8 +244,6 @@ table(permits$b4_has_finaled_misc, useNA = "ifany")
 permits %>%
   filter(b1_has_fdr==1) %>%
   View()
-# some have finalized date but not finaled status - HK: Other statuses with finalized date are Cancelled and Exempt
-# some have applied date but no issued date
 
 ## finaled
 permits %>%
@@ -254,10 +252,12 @@ permits %>%
 
 # check finaled against status
 check <- permits %>% group_by(gen_status,b4_has_finaled) %>% summarise(count=n())
-# same are cancelled or denied but have finaled date?
+# looks good
 check_canc_den <- permits %>% filter(gen_status %in% c("Denied","Canceled") & b4_has_finaled==1) # confirms no canceled/denied statuses
-check_canc_den$ain
+length(unique(check_canc_den$ain))
 check <- permits_filtered %>% filter(gen_status=='') # none with blank status now
+
+# check exempt permits
 check <- permits %>% filter(gen_status %in% c("Exempt") & b4_has_finaled==1) # none
 check <- permits %>% filter(gen_status %in% c("Exempt")) %>%
   left_join(select(permits_substring, ain, permit_number, permit_sub), by=c("ain", "permit_number")) %>%
@@ -272,13 +272,17 @@ length(unique(permits$ain)) # 2183 multiple rows per ain which makes sense
 n_distinct(permits$permit_number, permits$ain) # 6414 unique ain/permit pairs 
 length(unique(permits_filtered$permit_number)) # 6313
 length(unique(permits$permit_number)) # 6313
-permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 1 duplicate: 5840015019 
+n_distinct(permits_filtered$permit_number, permits_filtered$ain) # 6414 unique ain/permit pairs 
 
+# explore duplicate
+duplicate <- permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 1 duplicate: 5840015019 
 # includes 1 duplicate of ain/permit pair (one version has a project name) - not sure how to resolve but flagging that we'll want to clean this up if this goes to "In Construction"
-dup_matches <- permits %>%
-  group_by(permit_number) %>%
-  filter(n() > 1) %>%
-  ungroup()
+## EMG - I'd take the waiting for applicant instance which likely came after the New - Online first submission and is the fuller record
+
+# dup_matches <- permits %>% # EMG - I don't think you need this. permits can apply to multiple ains so the duplicate df produced above is a bit more helpful for flagging dups
+#   group_by(permit_number) %>%
+#   filter(n() > 1) %>%
+#   ungroup()
 
 # check recoded permits against parcels
 permits_check <- permits %>%
@@ -345,10 +349,9 @@ combined_wf <- parcels %>%
 table(combined_wf$b3_has_inspection, useNA = "ifany")
 
 # check
-nrow(workflow)
-length(unique(workflow$ain)) # multiple rows per ain
-length(unique(workflow$permit_number)) # multiple rows per permit bc multiple workflow items
-workflow %>% distinct(ain, permit_number) %>% nrow() # distinct ain and permit pairs
+nrow(parcels) # 12938
+nrow(combined_wf) # 12938 rows
+length(unique(combined_wf$ain)) # 12938 distinct row per ain, no dups
 
 
 # summarize helper cols to the parcel level, add debris here
