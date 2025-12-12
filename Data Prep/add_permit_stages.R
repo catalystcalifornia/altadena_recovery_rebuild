@@ -450,6 +450,9 @@ dups <- combined_parcels %>%
   filter(n()>1) %>%
   ungroup() # 0
 
+# check column sums
+cols_sums <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% select(where(is.numeric)) %>% colSums(na.rm=TRUE) %>% as.data.frame()
+
 ##### Step 2: Apply Typology #####
 # create table to store final results
 final_types <- parcels %>%
@@ -457,7 +460,7 @@ final_types <- parcels %>%
   # replace NAs that arise from parcels with no permits
   mutate(across(starts_with("b") & where(is.numeric), ~replace_na(., 0))) %>%
   mutate(across(starts_with("b") & where(is.character), ~na_if(., "NA"))) %>%
-  mutate(total_permits=replace_na(0)) %>%
+  mutate(total_permits=ifelse(is.na(total_permits),0,total_permits)) %>%
   # Bucket 1 status: Is fire debris cleared?
   mutate(
     bucket_1_status = case_when(
@@ -490,7 +493,7 @@ final_types <- parcels %>%
        b4_is_temp_only==1) ~ "Construction In Progress",
     ##### QA Note - this would ignore any misc permits still open, e.g., plumbing or electrical, might want to say that all permits have to be completed? but per your exception above here, we don't count completed temp housing as completed #####
     (bucket_3_status == "Construction In Progress" & b4_has_temp==1 &
-       b4_is_housing==1 & b4_perm_finaled==1 & b4_temp_finaled==1)  ~ "Repairs or Rebuild Complete",
+       b4_is_housing==1 & b4_perm_finaled==1 & b4_temp_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
     (bucket_3_status == "Construction In Progress" & b4_has_temp==0 &
        b4_is_housing==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
     (bucket_3_status == "Construction In Progress" & 
@@ -500,6 +503,9 @@ final_types <- parcels %>%
   mutate(
     rebuild_status=bucket_4_status
   )
+
+# check column sums
+cols_sums_check_2 <- final_types %>% select(starts_with("b"),"total_permits") %>% select(where(is.numeric)) %>% colSums(na.rm=TRUE) %>% as.data.frame()
 
 table(final_types$bucket_1_status, useNA="ifany")
 table(final_types$bucket_2_status, useNA="ifany")
@@ -519,7 +525,7 @@ check_sig_dmg_detail <- sig_dmg %>% group_by(damage_type_list) %>% mutate(total=
   ungroup() %>% group_by(damage_type_list,rebuild_status) %>% summarise(prc=n()/min(total), count=n(), total=min(total))
 # some differences but not outstanding, they all have some construction happening
 
-# table(sig_dmg$rebuild_status, useNA = "ifany")
+table(sig_dmg$rebuild_status, useNA = "ifany")
 # 
 # Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
 # 293                            1451                             41                            3868
@@ -528,31 +534,6 @@ check_sig_dmg_detail <- sig_dmg %>% group_by(damage_type_list) %>% mutate(total=
 
 # QA: See if the some damage/significant damage parcels have any NAs
 sum(is.na(check)) # 0 NAs
-
-## Check significantly damaged parcels clean up
-fdr_incomplete <- final_types %>%
-  filter(damage_category=="Significant Damage" & rebuild_status=="Fire Debris Removal Incomplete")
-
-table(fdr_incomplete$damage_type_list) # majority are all destroyed check for these ains again
-
-check_fdr_incomplete <- debris_status %>%
-  inner_join(fdr_incomplete %>% select(ain,damage_category,damage_type_list))
-
-View(check_fdr_incomplete)
-table(check_fdr_incomplete$roe_status) # mostly opt out, but should returned ineligible be marked incomplete if they completed phase 1? no - confirmed by ECI
-
-check_fdr_incomplete_permits <- permits %>%
-  filter(ain %in% fdr_incomplete$ain)
-# several in progress of clean up
-
-View(check_fdr_incomplete_permits)
-
-check_fdr_incomplete_permits_missing <- fdr_incomplete %>% select(ain,damage_category,damage_type_list) %>% 
-  anti_join(permits) %>%
-  left_join(debris_status)
-
-# 2 parcels not in the army corps data
-check_fdr_incomplete_permits_missing %>% filter(is.na(apn))
 
 ## Check significantly damaged parcels rebuild
 rebuild_complete <- final_types %>%
@@ -665,3 +646,31 @@ add_table_comments(con, schema=schema, table_name = table_name, indicator = indi
 
 
 dbDisconnect(con)
+
+
+### Additional QA
+## Check significantly damaged parcels clean up
+fdr_incomplete <- final_types %>%
+  filter(damage_category=="Significant Damage" & rebuild_status=="Fire Debris Removal Incomplete")
+
+table(fdr_incomplete$damage_type_list) # majority are all destroyed check for these ains again
+
+check_fdr_incomplete <- debris_status %>%
+  inner_join(fdr_incomplete %>% select(ain,damage_category,damage_type_list))
+
+View(check_fdr_incomplete)
+table(check_fdr_incomplete$roe_status) # mostly opt out, but should returned ineligible be marked incomplete if they completed phase 1? no - confirmed by ECI
+
+check_fdr_incomplete_permits <- permits %>%
+  filter(ain %in% fdr_incomplete$ain)
+# several in progress of clean up
+
+View(check_fdr_incomplete_permits)
+
+check_fdr_incomplete_permits_missing <- fdr_incomplete %>% select(ain,damage_category,damage_type_list) %>% 
+  anti_join(permits) %>%
+  left_join(debris_status)
+
+# 2 parcels not in the army corps data
+check_fdr_incomplete_permits_missing %>% filter(is.na(apn))
+
