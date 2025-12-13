@@ -89,7 +89,7 @@ gc()
 
 # Set up parallel processing with batches to manage memory
 # Use fewer workers than cores to be respectful to the website
-plan(multisession, workers = 4)
+plan(multisession, workers = 8)
 
 # Process in small batches to write incrementally and manage memory
 batch_size <- 50  # Adjust based on your memory constraints
@@ -202,27 +202,27 @@ final_workflow_data <- read.csv(workflow_csv_filepath,
 
 
 
-# con <- connect_to_db("altadena_recovery_rebuild")
-# 
-# dbWriteTable(con, Id(schema=schema, table_name=detailed_table_name), final_detailed_data,
-#              overwrite = FALSE, row.names = FALSE)
-# 
-# dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", table_name, " IS
-#             'Detailed permit data for Altadena parcels with some or significant damage,
-#             Data imported on ",date_ran, "
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
-#             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
-# 
-# dbWriteTable(con, Id(schema=schema, table_name=workflow_table_name), final_workflow_data,
-#              overwrite = FALSE, row.names = FALSE)
-# 
-# dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", table_name, " IS
-#             'Extended detailed permit data that includes workflow items for Altadena parcels with some or significant damage,
-#             Data imported on ",date_ran, "
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
-#             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
-# 
-# dbDisconnect(con)
+con <- connect_to_db("altadena_recovery_rebuild")
+
+dbWriteTable(con, Id(schema=schema, table_name=detailed_table_name), final_detailed_data,
+             overwrite = FALSE, row.names = FALSE)
+
+dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", detailed_table_name, " IS
+            'Detailed permit data for Altadena parcels with some or significant damage,
+            Data imported on ",date_ran, "
+            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
+            Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
+
+dbWriteTable(con, Id(schema=schema, table_name=workflow_table_name), final_workflow_data,
+             overwrite = FALSE, row.names = FALSE)
+
+dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", workflow_table_name, " IS
+            'Extended detailed permit data that includes workflow items for Altadena parcels with some or significant damage,
+            Data imported on ",date_ran, "
+            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
+            Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
+
+dbDisconnect(con)
 
 
 
