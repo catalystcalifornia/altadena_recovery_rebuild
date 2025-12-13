@@ -489,20 +489,37 @@ final_types <- parcels %>%
     # If above but temp housing permits only, Construction in progress 
     # if above but no housing rebuilds and ONLY misc rebuild where all MISC permits are finaled then rebuild complete
     # else whatever bucket_3_status is
+    
+    # If only temp, construction in progress
     (bucket_3_status == "Construction In Progress" & 
        b4_is_temp_only==1) ~ "Construction In Progress",
-    ##### QA Note - this would ignore any misc permits still open, e.g., plumbing or electrical, might want to say that all permits have to be completed? but per your exception above here, we don't count completed temp housing as completed #####
-    (bucket_3_status == "Construction In Progress" & b4_has_temp==1 &
-       # if just perm and perm is finaled then complete, if perm + misc and/or temp then all have to be complete, if just temp is complete we dont count, if just misc and misc is finaled then complete
-       b4_is_housing==1 & b4_perm_finaled==1 & b4_temp_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
-    (bucket_3_status == "Construction In Progress" & b4_has_temp==0 &
-       b4_is_housing==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if only perm and perm is finaled then complete,
+    (bucket_3_status == "Construction In Progress" &
+       b4_is_perm_only==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if perm and temp, then all finaled
+    (bucket_3_status == "Construction In Progress" &
+       b4_is_perm_temp==1 & b4_perm_finaled==1 &b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if perm + misc + temp then all have to be complete
+    (bucket_3_status == "Construction In Progress" & b4_is_all==1 &
+       b4_perm_finaled==1 & b4_temp_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if perm + misc then both have to be complete
+    (bucket_3_status == "Construction In Progress" & b4_has_temp==0 & b4_is_housing==1 &
+       b4_has_misc==1 & b4_perm_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if just misc and misc is finaled then complete
     (bucket_3_status == "Construction In Progress" & 
        b4_is_misc_only==1 & 
        b4_misc_finaled==1) ~ "Repairs or Rebuild Complete",
     .default = bucket_3_status)) %>%
   mutate(
     rebuild_status=bucket_4_status
+  ) %>%
+  mutate(
+    dashboard_label = case_when(
+      rebuild_status == "Construction Not Started" ~ "With Permit Applications",
+      rebuild_status == "Permit Application Not Received" ~ "Without Permit Applications",
+      rebuild_status == "Construction In Progress" ~ "In Construction",
+      .default = rebuild_status
+    )
   )
 
 # check column sums
@@ -529,9 +546,13 @@ check_sig_dmg_detail <- sig_dmg %>% group_by(damage_type_list) %>% mutate(total=
 table(sig_dmg$rebuild_status, useNA = "ifany")
 # 
 # Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
-# 293                            1451                             41                            3868
+# 295                            1451                             41                            3868
 # Rebuild Complete 
-# 23 
+# 21 
+
+table(sig_dmg$dashboard_label, useNA = "ifany")
+# Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications 
+# 41                            295                             21                           1451                           3868 
 
 # QA: See if the some damage/significant damage parcels have any NAs
 sum(is.na(check)) # 0 NAs
@@ -636,14 +657,15 @@ column_comments <- c(
   "Rebuild Status related to permit application if applicable (else bucket_1_status)",
   "Rebuild Status related to construction progress if applicable (else bucket_2_status)",
   "Rebuild Status related to rebuild/repair completion if applicable (else bucket_3_status)",
-  "Current status - same as bucket_4_status")
+  "Current status - same as bucket_4_status",
+  "Label for dashboard")
 
-# Now write the table
+# # Now write the table
 # dbWriteTable(con, Id(schema=schema, table=table_name), final_types,
 #              overwrite = FALSE, row.names = FALSE)
 # 
-
-add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
+# 
+# add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
 
 
 dbDisconnect(con)
