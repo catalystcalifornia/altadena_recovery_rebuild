@@ -31,6 +31,9 @@ workflow_table_name <- paste("scraped_workflow_permit_data",
                              curr_month, # month
                              sep="_") 
 
+detailed_table_name <- paste0(detailed_table_name, "_parallel")
+workflow_table_name <- paste0(workflow_table_name, "_parallel")
+
 detailed_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", detailed_table_name, ".csv")
 workflow_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", workflow_table_name, ".csv")
 
