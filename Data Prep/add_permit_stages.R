@@ -414,7 +414,7 @@ combined_parcels <- combined_parcels_all %>%
     b4_is_housing = ifelse(b2_perm_count>0, 1, 0),
     b4_has_temp = ifelse(b2_temp_count>0, 1, 0),
     b4_is_temp_only = ifelse(b2_temp_count > 0 & b2_perm_count==0, 1, 0),
-    b4_has_misc = ifelse(b2_misc_count > 0 & b2_misc_count==0, 1, 0),
+    b4_has_misc = ifelse(b2_misc_count > 0, 1, 0),
     b4_is_misc_only = ifelse(
       b2_misc_count > 0 & 
         b2_perm_count==0 & 
