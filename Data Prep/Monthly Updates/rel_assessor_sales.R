@@ -25,7 +25,7 @@ month <- "12"
 
 #### STEP 2: PULL DATA AND FILTER (Update to latest data) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_09_12_2025")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
 assessor_data <- st_read(con_alt, query="Select * from dashboard.assessor_data_universe_2025_12") %>%
   filter(ain %in% xwalk$ain_2025_12)
@@ -87,11 +87,11 @@ check_sales <- sales %>%
   summarise(count=n())
 
 check_sales %>% filter(is.na(last_sale_year) & is.na(sold_after_eaton))
-# 31 with NA in check
+# 30 with NA in check
 
 # check most recent sales date
 max(sales$last_sale_date,na.rm=TRUE)
-# "2025-08-14" - if this doesnt increase flag to Elycia
+# "2025-09-26" - if this doesnt increase flag to Elycia
 
 na_sale_date <- sales %>%
   select(last_sale_date_orig, last_sale_year,recording_date, doc_reason_code, land_reason_key, everything()) %>%
@@ -121,6 +121,9 @@ sales_final <- sales_final %>%
 nrow(sales_final) - length(unique(sales_final$ain)) # should be 0
 nrow(sales_final) - length(unique(xwalk$ain_2025_12)) # should be 0
 
+# check total sales that it increased
+table(sales_final$sold_after_eaton,useNA='always')
+# 271 in December 2025
 
 #### STEP 7: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
