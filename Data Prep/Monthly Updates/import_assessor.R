@@ -7,6 +7,7 @@ library(data.table)
 library(sf)
 library(mapview)
 library(stringr)
+library(readxl)
 
 options(scipen = 999) # turn off scientific notation for batch queries
 
@@ -18,7 +19,7 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # Zipped assessor data downloaded to D: drive from EMG's OneDrive
 assessor_date <- "20251201" # Update
 
-assessor_data_folder <- "D:/Assessor Data FULL/OneDrive_2025-12-09.zip"
+assessor_data_folder <- "D:/Assessor Data FULL/OneDrive_2025_12_15.zip"
 temp_extract_dir <- "D:/temp_extract/Assessor Data/"
 
 # clear temp_extract first if it exists
@@ -39,9 +40,15 @@ print(extracted_files)
 # Define file locations we'll need
 shp_path <- paste0("D:/temp_extract/Assessor Data/Assr Data ", assessor_date, "/parcel.shp")
 
+# Dec update
 csv_1 <- "D:/temp_extract/Assessor Data/DS04 Part 1.csv"
 csv_2 <- "D:/temp_extract/Assessor Data/DS04 Part 2.csv"
 csv_3 <- "D:/temp_extract/Assessor Data/DS04 Part 3.csv"
+
+# Pre Dec Update
+# csv_1 <- "D:/temp_extract/Assessor Data/DS04 Part 1.csv"
+# csv_2 <- "D:/temp_extract/Assessor Data/DS04 Part 2.csv"
+# csv_3 <- "D:/temp_extract/Assessor Data/DS04 Part 3.csv"
 
 ##### Step 1: Intersect Jan Shps #####
 # Spatial Intersect of Jan and Sept parcel shp files to
@@ -93,18 +100,18 @@ schema <- "dashboard"
 indicator <- paste(data_vintage, "Parcels that intersect Altadena 2023 place tiger lines.")
 shp_table_name <- paste("assessor_parcels_universe", curr_year, curr_month, sep="_")
 
-export_shpfile(con=con,
-               df=shp_intersect_3310,
-               schema=schema,
-               table_name=shp_table_name,
-               srid = "", geometry_type = "",
-               geometry_column = "geometry")
-
-
-dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", shp_table_name, " IS '", indicator, "
-            Data imported on ", date_ran,". ",
-            "QA DOC: ", qa_filepath,
-            " Source: ", source, "'"))
+# export_shpfile(con=con,
+#                df=shp_intersect_3310,
+#                schema=schema,
+#                table_name=shp_table_name,
+#                srid = "", geometry_type = "",
+#                geometry_column = "geometry")
+# 
+# 
+# dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", shp_table_name, " IS '", indicator, "
+#             Data imported on ", date_ran,". ",
+#             "QA DOC: ", qa_filepath,
+#             " Source: ", source, "'"))
 
 shp_intersect <- st_read(con, query=paste0("SELECT * FROM ", schema, ".", shp_table_name, ";"))
 # confirm epsg is 3310
@@ -115,11 +122,11 @@ st_crs(shp_intersect)$epsg # 3310
 # Filter Jan csv data for AINs found in Step 1 #
 shp_ain_universe <- shp_intersect %>% st_drop_geometry() %>% select(ain) %>% pull()
 
-# January
+# December
 csv_1_ain_filter <- batch_filter_csv_data(
   csv_file=csv_1,
   target_list = shp_ain_universe,
-  filter_column="ï»¿AIN",
+  filter_column="AIN",
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
@@ -127,7 +134,7 @@ csv_1_ain_filter <- batch_filter_csv_data(
 csv_2_ain_filter <- batch_filter_csv_data(
   csv_file=csv_2,
   target_list = shp_ain_universe,
-  filter_column="ï»¿AIN",
+  filter_column="AIN",
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
@@ -135,7 +142,7 @@ csv_2_ain_filter <- batch_filter_csv_data(
 csv_3_ain_filter <- batch_filter_csv_data(
   csv_file=csv_3,
   target_list = shp_ain_universe,
-  filter_column="ï»¿AIN",
+  filter_column="AIN",
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
@@ -143,15 +150,20 @@ csv_3_ain_filter <- batch_filter_csv_data(
 # Combine results
 csv_ains_combined <- rbind(csv_1_ain_filter,
                            csv_2_ain_filter,
-                           csv_3_ain_filter) # 13933 (Altadena only)
+                           csv_3_ain_filter) # 13934 (Altadena only)
 
 colnames(csv_ains_combined) <- tolower(gsub(" ", "_", colnames(csv_ains_combined)))
 
 csv_ains_combined <- csv_ains_combined %>%
-  rename(ain = `ï»¿ain`) %>%
+  # rename(ain = `ï»¿ain`) %>%
   mutate(ain=as.character(ain))
 
-length(unique(csv_ains_combined$ain)) # 13933
+length(unique(csv_ains_combined$ain)) # 13934
+
+# check last sale date
+max(as.Date(as.character(csv_ains_combined$last_sale_date),
+            format = "%Y%m%d"),
+    na.rm = TRUE) # 10-7-2025 updated
 
 ### Export to postgres
 csv_table_name <- paste("assessor_data_universe", curr_year, curr_month, sep="_")
@@ -198,7 +210,7 @@ mismatch_1 <- data.frame(ain=setdiff(shp_ain, csv_ain$ain)) %>%
 mapview(mismatch_1, col.regions="red")
 
 # number of mismatch 1
-nrow(mismatch_1) # 15
+nrow(mismatch_1) # 14
 
 # look up on assessor portal: https://portal.assessor.lacounty.gov/parceldetail/[ain]
 # denote parcel status (e.g., no result if none/doesn't exist in portal, Shell, Deleted, etc.)
@@ -208,7 +220,6 @@ nrow(mismatch_1) # 15
 # "5831016036" - no response - https://portal.assessor.lacounty.gov/parceldetail/5831016036
 # "5839016025" - 0100/shell - https://portal.assessor.lacounty.gov/parceldetail/5839016025 <-- leftover / mapsearch shows same AIN
 # "5839016026" - no response - https://portal.assessor.lacounty.gov/parceldetail/5839016026 <-- leftover / mapsearch shows same AIN
-# "5847020027" - 0100/active - https://portal.assessor.lacounty.gov/parceldetail/5847020027 (note: misfortune and calamity is NA)
 # "5841023022" - no response - https://portal.assessor.lacounty.gov/parceldetail/5841023022 
 # "5830015029" - 0100/active - https://portal.assessor.lacounty.gov/parceldetail/5830015029 (note: misfortune and calamity is NA)
 # "5842013027" - 010v/active - https://portal.assessor.lacounty.gov/parceldetail/5842013027
