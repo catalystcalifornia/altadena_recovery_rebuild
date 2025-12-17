@@ -25,7 +25,7 @@ month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT ain_2025_09, ain_2025_12 FROM dashboard.crosswalk_assessor_09_12_2025")
+xwalk <- st_read(con_alt, query="SELECT ain_2025_09, ain_2025_12 FROM dashboard.crosswalk_assessor_2025_09_12")
 # get assessor fhsz from PREVIOUS MONTH
 assessor_fhsz <- st_read(con_alt, query="Select * from dashboard.rel_assessor_fhsz_2025_09")
 
