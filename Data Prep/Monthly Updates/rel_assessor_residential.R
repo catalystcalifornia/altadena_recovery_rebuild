@@ -182,7 +182,7 @@ table(data_altadena_owner$owner_renter,useNA='always')
 # Dec QA
 # Church or charity owned(went up)           Corporation owned(went up)         Government owned 
 # 16                                          167                                   2 
-# Likely owner occupied, no exemption(went down)   Other ownership             Owner & renter occupied 
+# Likely owner occupied, no exemption   Other ownership             Owner & renter occupied 
 # 1235                                              46                                 387 
 # Owner occupied, homeowner exemption(went down)   Renter occupied                       Sold to state(went down) 
 # 2570                                              521                                  31 
