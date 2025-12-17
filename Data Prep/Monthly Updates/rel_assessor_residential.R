@@ -22,23 +22,36 @@ month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (UPDATE to latest data and xwalks) ####
 # get for CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_09_12_2025")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
 assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2025_12") %>%
   filter(ain %in% xwalk$ain_2025_12)
 
 # Check difference between new data and xwalk with jan universe in it
 nrow(assessor_data)-length(unique(xwalk$ain_2025_12))
-# 8 fewer parcels in assessor data
+# 7 fewer parcels in assessor data
 
 # Check what's missing in current data
 missing_data <- xwalk %>% filter(!ain_2025_12 %in% assessor_data$ain)
 View(missing_data)
 # we'll need the old residential type at minimum for filters to work in dashboard, other fields can stay blank
 # Update code before final steps
-
+# pull in previous xwalk for reference later
 xwalk_prev <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_01_09_2025") %>%
   filter(ain_2025_09 %in% missing_data$ain_2025_09)
+
+#### STEP 2A: CHECK IF PADDING IS NEEDED IN USE CODE ####
+unique(nchar(assessor_data$use_code))
+# need to pad
+
+assessor_data <- assessor_data %>%
+  mutate(use_code_orig = use_code,
+         use_code=str_pad(use_code_orig, width = 4, side = "left", pad = "0"))
+
+# check
+unique(nchar(assessor_data$use_code))
+assessor_data %>% select(use_code, use_code_orig) %>% slice_sample(n=20)
+
 
 #### STEP 3:GETTING TOTAL UNITS (NO UPDATES) ####
 
@@ -65,7 +78,7 @@ rel_res_df  <- data_total_units  %>%
 table(rel_res_df$res_type,useNA="always")
 # Dec
 # Condominium   Multifamily Single-family          <NA> 
-#   64           312          5292             0 
+#   64           316          5289             0 
 
 #### STEP 5: GETTING MIXED VS RESIDENTIAL BOOLEAN COLUMNS (No Updates) ####
 ## Residential & mixed use properties flag
@@ -76,19 +89,24 @@ rel_res_df <- rel_res_df %>%
 
 # Check - should be 0 NA
 table(rel_res_df$residential,useNA="always")
-# Dec - TRUE - 5668 0 NA
+# Dec - TRUE - 5669 0 NA
 table(rel_res_df$mixed_use,useNA="always")
-# Dec - FALSE - 5668 0 NA
+# Dec - FALSE - 5669 0 NA
 
 # check for vacant parcels, but okay to keep in data if they change to vacant over time
 rel_res_df %>%
   filter(str_detect(use_code, "V$") | str_detect(use_code, "X$") ) %>%
   nrow()
-# Dec - 0 vacant
+# Dec - 1 vacant
+# ain - 5841006015, in dashboard.assessor_data_universe_2025_01 - this parcel was not vacant. important to see how use codes change over time
 
 #### STEP 6: CREATING OWNER_RENTER COLUMN (QA AND UPDATE IF NEEDED) ####
+# check exemption type recoding and fix if needed
+table(rel_res_df$exemption_type)
+
 data_altadena_owner <- rel_res_df  %>%
-  mutate(owner_renter=case_when(
+  mutate(exemption_type=ifelse(exemption_type=='ÿ', NA, exemption_type),
+    owner_renter=case_when(
     num_howmowner_exemption>=1 & landlord_units==0 ~ "Owner occupied",
     num_howmowner_exemption>=1 & landlord_units>=1 ~ "Owner & Renter occupied",
     num_howmowner_exemption==0 & landlord_units>=1 ~ "Renter occupied",
@@ -99,24 +117,27 @@ table(data_altadena_owner$owner_renter,useNA='always')
 
 
 data_altadena_owner<-data_altadena_owner%>%
+  # owner occupied or church/welfare exemption
   mutate(
     owner_renter = case_when(
       exemption_type %in% "1" & owner_renter == "Other" ~ "Owner occupied",
       exemption_type %in% c("4", "5", "7") & owner_renter == "Other" ~ "Church/Welfare exemption",
       TRUE ~ owner_renter )) %>% # keeps existing value if none of the above conditions are met 
-  # top code corporate and add other abbreviations
+  # top code corporate owned
   mutate(
     owner_renter = ifelse(
-      (grepl("LLC| LP| Inc | Investment", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC| LP| Inc | Investment", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
-        (grepl("LLC| LP| Inc | Investment", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
+      (grepl("LLC| LP| Inc| Investment| Corp", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc| Investment| Corp", first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
+        (grepl("LLC| LP| Inc| Investment| Corp", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "LLC owned",owner_renter))%>%
+  # trust owned
   mutate(
     owner_renter = ifelse(
       (grepl("TRUST|TRST| TR | TRS", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("TRUST|TRST| TR | TRS",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("TRUST|TRST| TR | TRS", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "Trust owned",owner_renter)) %>%
+  # sold to state/govt owned
   mutate(
     owner_renter = case_when(
       tax_stat_key %in% c("1","2") ~ "Sold to state",
@@ -124,23 +145,29 @@ data_altadena_owner<-data_altadena_owner%>%
       TRUE ~ owner_renter  # keeps existing value if none of the above conditions are met
     )
   ) %>%
+  # other church or charity owned
   mutate(
     owner_renter = ifelse(
       (grepl("CHURCH|FRATERNAL|SERVICES", first_owner_name, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("CHURCH|FRATERNAL|SERVICES",first_owner_name_overflow, ignore.case = TRUE) & owner_renter == "Other") |
         (grepl("CHURCH|FRATERNAL|SERVICES", second_owner_name, ignore.case = TRUE) & owner_renter == "Other"),
       "Church/Welfare exemption",owner_renter)) %>%
+  # recoding others church or charity owned
   mutate(
     owner_renter = ifelse(
-      grepl("SUBSIDIZED HOUSING CORP|Pasadena Cemetery Association|PUBLIC WORKS GROUP CORP", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
+      grepl("SUBSIDIZED HOUSING CORP|PASADENA CEMETRY ASSN CORP|Pasadena Cemetery Association|PUBLIC WORKS GROUP CORP", first_owner_name, ignore.case = TRUE),
+      "Church/Welfare exemption",owner_renter),
+    # adding land trusts will call church, charity, or nonprofit
+    owner_renter = ifelse(
+      grepl("GREENLINE HOUSING FOUNDATION|NHS NEIGHBORHOOD REDEVELOPMENT", first_owner_name, ignore.case = TRUE),
       "Church/Welfare exemption",owner_renter),
     owner_renter = ifelse(
       grepl("LA VINA HOMEOWNERS|CAMERON,JOHN K,JR AND|CAMERON,JOHN K AND|CAMERON,JOHN K JR AND|LINCOLN AVENUE WATER CO", first_owner_name, ignore.case = TRUE) & owner_renter == "Other",
       "Other",
-      ifelse(owner_renter=="Other","Likely owner-occupied, no exemption", owner_renter))) %>%
+      ifelse(owner_renter=="Other","Likely owner-occupied, no exemption", owner_renter)))%>%
   mutate(owner_renter_orig=owner_renter,
          owner_renter=case_when(
-           owner_renter_orig=="Church/Welfare exemption" ~ "Church or charity owned",
+           owner_renter_orig=="Church/Welfare exemption" ~ "Church, charity, or nonprofit owned",
            owner_renter_orig=="Likely owner-occupied, no exemption" ~ "Likely owner occupied, no exemption",
            owner_renter_orig=="LLC owned" ~ "Corporation owned",
            owner_renter_orig=="Other" ~ "Other ownership",
@@ -153,14 +180,14 @@ data_altadena_owner<-data_altadena_owner%>%
 # Check owner and renter recoding
 table(data_altadena_owner$owner_renter,useNA='always')
 # Dec QA
-# Church or charity owned           Corporation owned                    Government owned 
-# 10                                  146                                   2 
-# Likely owner occupied, no exemption   Other ownership             Owner & renter occupied 
-# 1234                                    46                                 388 
-# Owner occupied, homeowner exemption   Renter occupied                       Sold to state 
-# 2601                                      520                                  39 
+# Church or charity owned(went up)           Corporation owned(went up)         Government owned 
+# 16                                          167                                   2 
+# Likely owner occupied, no exemption(went down)   Other ownership             Owner & renter occupied 
+# 1235                                              46                                 387 
+# Owner occupied, homeowner exemption(went down)   Renter occupied                       Sold to state(went down) 
+# 2570                                              521                                  31 
 # Trust owned                                <NA> 
-#   682                                   0 
+#   694(went up)                                   0 
 
 # Review likely owner occupied
 likely_homeowner <-data_altadena_owner %>% filter(owner_renter=="Likely owner occupied, no exemption") %>%
@@ -170,12 +197,19 @@ View(likely_homeowner)
 likely_homeowner_table <- likely_homeowner %>%
   group_by(first_owner_name,first_owner_name_overflow,second_owner_name) %>%
   summarise(count=n())
+View(likely_homeowner_table) # sort desc by count
 # looks okay
 
 
 #### STEP 7: CLEAN UP DF AND ADD PARCELS WITH MISSING DATA: UPDATE ####
 final_res_data <- data_altadena_owner %>% 
-  select(ain, residential, mixed_use, res_type, owner_renter, total_units, landlord_units, total_square_feet, total_bedrooms, use_code, zoning_code) %>%
+  # add address field for dashboard
+  mutate(zip=gsub("0000","",zip)) %>%
+  mutate(city_state=gsub(" CA", ", CA", city_state)) %>% 
+  mutate(address=paste(situs_house_no, direction, street_name, unit, city_state, zip)) %>%
+  mutate(address=gsub("\\s+", " ", address)) %>% 
+  mutate(address=ifelse(address=="0 0", NA, address)) %>%
+  select(ain, residential, mixed_use, res_type, owner_renter, total_units, landlord_units, total_square_feet, total_bedrooms, address, use_code, zoning_code) %>%
   rename(ain_2025_12 = ain)
 
 # Add missing parcels (UPDATE)
@@ -237,7 +271,8 @@ column_comments <- c('Assessor ID number for current month- use this to match to
                      'Total rental units on the property -- use caution when interpreting for mixed use - can include commercial',
                      'Total square feet of buildings on property',
                      'Total bedrooms on property',
-                     'Original use code for reference',
+                     'site address if address provided in current data',
+                     'Current use code if not available in current data prior use code',
                      'Zoning code for the property')
 
 add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
