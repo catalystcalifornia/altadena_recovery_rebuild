@@ -43,18 +43,19 @@ source("Data Prep\\Monthly Updates\\functions.R")
 con <- connect_to_db("altadena_recovery_rebuild")
 options(scipen = 999)
 date_ran <- as.character(Sys.Date())
-curr_year <- strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
+curr_year <- "2025" # year
 curr_month <- "12"
-curr_month <- strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
 prev_month <- "09"
 schema <- "dashboard"
 
 # load data
-xwalk_parcels <- dbGetQuery(con, paste0("SELECT * FROM ", schema, ".", "crosswalk_assessor_", prev_month, "_", curr_month, "_", curr_year, ";")) 
+xwalk_parcels <- dbGetQuery(con, paste0("SELECT * FROM ", schema, ".", "crosswalk_assessor_", curr_year, "_", prev_month, "_",  curr_month,  ";")) 
 
 # get debris removal data
 debris_usace <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_pkg_received, fso_pkg_approved FROM data.usace_debris_removal_parcels_2025;")
 
+# get jan universe
+jan_universe <- dbGetQuery(con, "SELECT * FROM dashboard.parcel_universe_2025_01;")
 
 permits_orig <- dbGetQuery(con, paste0("SELECT gen.ain, gen.permit_number, gen.record_id, gen.applied_date, 
 gen.type, gen.issued_date, gen.project_name, gen.expiration_date, 
@@ -90,24 +91,34 @@ table(permits_substring$permit_sub)
 ##### 1. Prep data #####
 debris_transformed <- debris_usace %>% 
   select(ain, fso_pkg_approved) %>%
+  # filter for target universe
+  filter(ain %in% jan_universe$ain_2025_01) %>%
   # transform to dec ain
-  mutate(ain_2025_12 = transform_ain_to_2025_12(ain, xwalk_parcels))
+  left_join(xwalk_parcels %>% select(starts_with("ain_")), by=c("ain"="ain_2025_01"))
+  # mutate(ain_2025_12 = transform_ain_to_2025_12(ain, xwalk_parcels))
+
+# check length and NAs
+length(unique(debris_transformed$ain))
+length(unique(debris_transformed$ain_2025_12))
+# one duplicate ain 5841023022
 
 # get army corps fire debris removal status
 debris_status <- debris_transformed %>%
   mutate(
     # bucket 1 helper: does the parcel have full sign off (fso) from army corps
     b1_has_ace_fso = ifelse(!is.na(fso_pkg_approved), 1, 0)) %>%
-  # 5841023010 and 5841023009 merge into dec ain 5841023022
+  # 5841023010 and 5841023009 merge into dec ain 5841023022 and have same status
   select(-ain) %>%
   group_by(ain_2025_12) %>%
   summarise(b1_has_ace_fso=max(b1_has_ace_fso)) %>%
   rename(ain=ain_2025_12)
 
-length(unique(debris_status$ain)) # 7004
-length(unique(debris_status$ain_2025_12)) # 7003
-debris_status %>% group_by(ain_2025_12)%>% filter(n()>1)
-table(debris$b1_has_ace_fso, useNA="ifany")
+length(unique(debris_status$ain)) # 5673
+length(unique(debris_status$ain)) # 5673
+debris_status %>% group_by(ain)%>% filter(n()>1)
+table(debris_status$b1_has_ace_fso, useNA="ifany")
+# Dec Update: 0    1 
+#             396 5277 
 
 # Filter permits for applied date after Jan 7, 2025
 permits_filtered <- permits_orig %>%
