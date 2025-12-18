@@ -427,6 +427,10 @@ combined_parcels <- combined_parcels_all %>%
       b2_perm_count > 0 & 
         b2_misc_count==0 & 
         b2_temp_count>0, 1, 0),
+    b4_is_perm_misc = ifelse(
+      b2_perm_count > 0 & 
+        b2_misc_count > 0 & 
+        b2_temp_count==0, 1, 0),
     b4_is_all = ifelse(
       b2_perm_count > 0 & 
         b2_misc_count>0 & 
@@ -450,8 +454,10 @@ dups <- combined_parcels %>%
   filter(n()>1) %>%
   ungroup() # 0
 
-# check column sums
+# check column sums and recoding
 cols_sums <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% select(where(is.numeric)) %>% colSums(na.rm=TRUE) %>% as.data.frame()
+
+qa_view <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% select(sort(names(.)))
 
 ##### Step 2: Apply Typology #####
 # create table to store final results
@@ -490,22 +496,22 @@ final_types <- parcels %>%
     # if above but no housing rebuilds and ONLY misc rebuild where all MISC permits are finaled then rebuild complete
     # else whatever bucket_3_status is
     
-    # If only temp, construction in progress
+    # If ONLY TEMP, construction in progress
     (bucket_3_status == "Construction In Progress" & 
        b4_is_temp_only==1) ~ "Construction In Progress",
-    # if only perm and perm is finaled then complete,
+    # if ONLY PERM and perm is finaled then complete,
     (bucket_3_status == "Construction In Progress" &
        b4_is_perm_only==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
-    # if perm and temp, then all finaled
+    # if PERM AND TEMP, then all finaled
     (bucket_3_status == "Construction In Progress" &
-       b4_is_perm_temp==1 & b4_perm_finaled==1 &b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
-    # if perm + misc + temp then all have to be complete
+       b4_is_perm_temp==1 & b4_perm_finaled==1 & b4_temp_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if PERM + MISC + TEMP then all have to be complete
     (bucket_3_status == "Construction In Progress" & b4_is_all==1 &
        b4_perm_finaled==1 & b4_temp_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
-    # if perm + misc then both have to be complete
-    (bucket_3_status == "Construction In Progress" & b4_has_temp==0 & b4_is_housing==1 &
-       b4_has_misc==1 & b4_perm_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
-    # if just misc and misc is finaled then complete
+    # if PERM & MISC then both have to be complete
+    (bucket_3_status == "Construction In Progress" & b4_is_perm_misc==1 &
+       b4_perm_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if ONLY MISC and misc is finaled then complete
     (bucket_3_status == "Construction In Progress" & 
        b4_is_misc_only==1 & 
        b4_misc_finaled==1) ~ "Repairs or Rebuild Complete",
@@ -551,8 +557,8 @@ table(sig_dmg$rebuild_status, useNA = "ifany")
 # 21 
 
 table(sig_dmg$dashboard_label, useNA = "ifany")
-# Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications 
-# 41                            295                             21                           1451                           3868 
+# Fire Debris Removal Incomplete        In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications 
+# 41                                      295                             21                           1451                           3868 
 
 # QA: See if the some damage/significant damage parcels have any NAs
 sum(is.na(check)) # 0 NAs
@@ -646,6 +652,7 @@ column_comments <- c(
   "1/0 Flag - has misc., permanent and temporary housing building permits",
   "1/0 Flag - has temp or permanent housing permits",
   "1/0 Flag - has ONLY misc building permits",
+  "1/0 Flag - has misc AND temp building permits",
   "1/0 Flag - has ONLY permanent housing building permits",
   "1/0 Flag - has permanent and temporary building permits",
   "1/0 Flag - has ONLY temporary housing building permits",
