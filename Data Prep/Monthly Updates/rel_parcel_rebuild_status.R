@@ -126,22 +126,50 @@ permits_filtered <- permits_orig %>%
   filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
   # filter out voided, canceled, denied permits - also applied in permit scraping
   filter(!(gen_status %in% c("Void", "Canceled", "Denied"))) %>%
-  mutate(is_creb = ifelse(grepl("^CREB", permit_number), 1, 0)) %>%
-  # transform to dec ains
-  mutate(ain_2025_12 = transform_ain_to_2025_12(ain, xwalk_parcels)) %>%
-  select(-ain) %>%
-  rename(ain=ain_2025_12)
+  mutate(is_creb = ifelse(grepl("^CREB", permit_number), 1, 0)) 
 
-check_creb <- permits_filtered %>% select(ain, is_creb) %>%
-  group_by(ain) %>%
-  mutate(has_creb = ifelse(sum(is_creb, na.rm=TRUE)>0, 1, 0))
+# not needed
+# check_creb <- permits_filtered %>% select(ain, is_creb) %>%
+#   group_by(ain) %>%
+#   mutate(has_creb = ifelse(sum(is_creb, na.rm=TRUE)>0, 1, 0))
+# 
+# parcels_creb <- check_creb %>% select(ain, has_creb) %>% unique()
 
-parcels_creb <- check_creb %>% select(ain, has_creb) %>% unique()
+# check number of creb permits
+table(permits_filtered$is_creb,useNA='always')
+# Dec update 2081 CREB permits
 
+# check status to make sure no new statuses to filter out
 table(permits_filtered$gen_status, useNA="ifany")
 
+nrow(permits_filtered) # 48360
 
+# permit xwalk - need to have the same ain across datasets to group by the correct current parcel
+permit_xwalk <- permits_filtered %>% distinct(ain) %>%
+  # transform to dec ains
+  # first join to jan ains to get a match in the xwalk that way
+  left_join(xwalk_parcels %>% select(starts_with("ain_")), by=c("ain"="ain_2025_01")) %>%
+  # some ains may be the new december or september ain so try a match that way next
+  left_join(xwalk_parcels %>% select(starts_with("ain_")), by=c("ain"="ain_2025_12")) %>%
+  # recode everything to december
+  mutate(ain_2025_12_orig=ain_2025_12,
+    ain_2025_12=case_when(!is.na(ain_2025_12_orig) ~ ain_2025_12_orig,
+                       is.na(ain_2025_12_orig) ~ ain,
+                       TRUE ~ NA))
 
+# now add xwalk to permits filtered
+permits_filtered_curr_ains <- permits_filtered %>%
+  left_join(permit_xwalk %>% select(ain, ain_2025_12), by=c("ain"="ain"))
+
+# check
+sum(is.na(permits_filtered_curr_ains$ain_2025_12))
+# no NAs
+length(unique(permits_filtered_curr_ains$ain_2025_12))
+# 2640
+
+permits_filtered_curr_ains <- permits_filtered_curr_ains %>%
+  rename(ain_scrape=ain,
+         ain=ain_2025_12)
 
 # get workflow items and add has_inspection (will use for the bucket 3 check - construction has started)
 workflow_all <- permits_filtered %>% 
