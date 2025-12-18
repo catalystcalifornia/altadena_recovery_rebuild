@@ -43,25 +43,19 @@ con <- connect_to_db("altadena_recovery_rebuild")
 options(scipen = 999)
 
 # load data
-jan_parcels <- dbGetQuery(con, "SELECT * FROM data.rel_assessor_residential_jan2025;")
+jan_parcels <- dbGetQuery(con, "SELECT * FROM data.rel_assessor_residential_jan2025 where residential=TRUE;")
 xwalk_parcels <- dbGetQuery(con, "SELECT * FROM data.crosswalk_assessor_jan_sept_2025;")
-damage <- dbGetQuery(con, "SELECT ain, damage_category, mixed_damage, structure_count, damage_type_list FROM data.rel_assessor_damage_level;")
-parcels <- jan_parcels %>%
-  left_join(xwalk_parcels, by=c("ain"="ain_jan")) %>%
-  select(ain, ain_sept, residential, use_code, use_code_sept, address_jan, address_sept, source, status) %>%
-  left_join(damage, by="ain") %>%
-  rename(xwalk_status = status)
+jan_damage <- dbGetQuery(con, "SELECT ain, damage_category, mixed_damage, structure_count, damage_type_list FROM data.rel_assessor_damage_level;")
+# damage <- dbGetQuery(con, "SELECT ain_sept, damage_category FROM data.rel_assessor_damage_level_sept2025;")
 
+# get debris removal data
+debris_status <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_pkg_received, fso_pkg_approved FROM data.usace_debris_removal_parcels_2025;")
 
-check <- parcels %>% group_by(ain) %>% filter(n()>1) #0
-
-permits <- dbGetQuery(con, "SELECT gen.ain, gen.permit_number, gen.record_id, gen.applied_date, 
+permits_orig <- dbGetQuery(con, "SELECT gen.ain, gen.permit_number, gen.record_id, gen.applied_date, 
 gen.type, gen.issued_date, gen.project_name, gen.expiration_date, 
-det.status,  gen.finalized_date, gen.main_parcel, gen.address, 
-det.description, gen.response_status, gen.retried, det.completed_percent, 
+gen.status as gen_status,  gen.finalized_date, gen.main_parcel, gen.address, 
+det.description, det.completed_percent, 
 det.in_progress_percent, det.not_started_percent, 
-det.response_status as response_status_det, 
-det.retried as retried_det, 
 wf.workflow_item, 
 wf.status as wf_status, 
 wf.status_date as wf_status_date 
@@ -69,342 +63,644 @@ FROM data.scraped_general_permit_data_2025_10 gen
 LEFT JOIN data.scraped_detailed_permit_data_2025_10 det
 ON gen.ain = det.ain AND gen.permit_number = det.permit_number 
 LEFT JOIN data.scraped_workflow_permit_data_2025_10 wf
-ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;") 
+ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number")
 
-# get debris removal data
-debris_status <- dbGetQuery(con, "SELECT apn, ain, epa_status, roe_status, fso_pkg_received, fso_pkg_approved FROM data.usace_debris_removal_parcels_2025;")
+table(permits_orig$gen_status, useNA="ifany")
+
+# look at permit numbers
+permits_substring <- permits_orig %>%
+  mutate(permit_sub=substring(permit_number, 1,4)) # if you look at first 8 you'll see the building codes under UNC- noted below
+
+table(permits_substring$permit_sub)
+# CREB County Disaster recovery Permit Rebuild Project
+# FCD Flood access/construction permit
+# FCR Construction & Demolition Final Compliance
+# FIRE tree removal
+# PROP Property report
+# PWRP Road permits
+# RRP Construction & Demolition Deposit
+# SWRC Sewer Tap & Saddle Installation
+# UNC- Mechanical, Plumbing, Electrical permits (and building permits for SFR, MFR, Temporary Housing, Commercial buildings, etc.)
 
 ##### 1. Prep data #####
 ### Note update these in the scraping script: (leaving in 0ct 2025 for now)
-# Remove permits where applied_date.general is before 2025
-# Remove permits that start with: FCDP (flood control), FILM, FIRE (related to trees mostly), PWRP (Public Works))
-# Extend permits to include: CREB, FCR, PROP, RRP, SWRC, UNC- 
+# Extend permits to include: CREB, FCR, PROP, RRP, SWRC, UNC- # everything but UNC and CREB go under other
+# Remove Some Damage parcels (only keep Significant Damage)
 
-# Filter out 2025 and permits with status Void 
-# (note: ECI doesn't mention doing this but I think we need to to keep data clean and logic reliable)
-permits_filtered <- permits %>% # 5477
-  # filter out permits from before 2025
-  filter(grepl("(2025|2026)$", applied_date)) %>%
-  # filter out voided permits
-  filter(status != "Void") %>%
-  # remove workflow items to get a dataframe of just permit-level cols
-  select(-c(workflow_item, wf_status, wf_status_date)) %>%
-  unique()
+# Filter permits for applied date after Jan 7, 2025
+permits_filtered <- permits_orig %>%
+  # note: this filter happens in the general permit scraping script - we can remove but leaving for now while we prep the December update
+  filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
+  # filter out voided, canceled, denied permits
+  filter(!(gen_status %in% c("Void", "Canceled", "Denied"))) %>%
+  mutate(is_creb = ifelse(grepl("^CREB", permit_number), 1, 0))
 
-# create a dataframe of workflow items that we'll use for the bucket 3 check (construction has started)
-workflow_filtered <- permits %>% # 28921
-  # filter out permits from before 2025
-  filter(grepl("(2025|2026)$", applied_date)) %>%
-  # filter out voided permits?
-  filter(status != "Void") %>%
-  unique()
+check_creb <- permits_filtered %>% select(ain, is_creb) %>%
+  group_by(ain) %>%
+  mutate(has_creb = ifelse(sum(is_creb, na.rm=TRUE)>0, 1, 0))
 
-workflow <- workflow_filtered %>% # 28507
+parcels_creb <- check_creb %>% select(ain, has_creb) %>% unique()
+
+table(permits_filtered$gen_status, useNA="ifany")
+
+# Minor clean up, filter, add helper columns
+# get parcel-level data for some and significant damage parcels
+parcels <- jan_parcels %>%
+  left_join(xwalk_parcels, by=c("ain"="ain_jan")) %>%
+  select(ain, ain_sept, residential, use_code, use_code_sept, address_jan, address_sept, source, status) %>%
+  left_join(jan_damage, by="ain") %>%
+  rename(xwalk_status = status)
+
+# check
+length(unique(jan_parcels$ain)) # 12938
+length(unique(parcels$ain))     # 12938
+length(unique(jan_damage$ain))  # 12958 - 20 extra here; 5 are significant damage - these are mixed use, not including
+
+# mixed use ains
+extra_ains_list <- setdiff(jan_damage$ain, jan_parcels$ain)
+extra_ains_df <- jan_damage %>% filter(ain %in% extra_ains_list)
+
+
+debris <- debris_status %>%
+  mutate(
+    # bucket 1 helper: does the parcel have full sign off (fso) from army corps
+    b1_has_ace_fso = ifelse(!is.na(fso_pkg_approved), 1, 0))
+
+length(unique(debris$ain)) # 7004
+table(debris$b1_has_ace_fso, useNA="ifany")
+
+
+# get workflow items and add has_inspection (will use for the bucket 3 check - construction has started)
+workflow_all <- permits_filtered %>% 
   select(ain, permit_number, workflow_item, wf_status, wf_status_date) %>%
-  unique()
+  unique() %>%
+  # filter out FDR permits (those are pre-build and "debris removal inspection" is not sufficient to exclude)
+  mutate(is_fdr = ifelse(grepl("^FDR", permit_number), 1, 0)) %>%
+  filter(is_fdr==0) %>%
+  # filter out those that do not have a wf status date AND wf status, if at least one exists it will indicate if inspection is planned or in some stage of passing (indicating construction has begun)
+  filter(wf_status_date != "" | wf_status != "") %>%
+  # flag that a workflow status or date exists
+  mutate(has_status_or_date = case_when(wf_status != "" ~1,
+                                        wf_status_date != "" ~1,
+                                        .default=0)) %>%
+  # add bucket 3 helper columns - has an inspection occurred based on workflow description (excluding debris removal)
+  mutate(b3_has_inspection = ifelse(grepl("inspection", workflow_item, ignore.case = TRUE), 1, 0)) 
 
+# check recode
+check <- workflow_all %>% group_by(b3_has_inspection,workflow_item,wf_status) %>% summarise(count=n())
+View(workflow_all)
 
+# summarize to the permit level
+workflow <- workflow_all %>%
+  group_by(ain, permit_number) %>%
+  mutate(b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm = TRUE)>0, 1, 0)) %>%
+  select(ain, permit_number, b3_has_inspection) %>%
+  unique() # 4531
+
+# check counts and recoding
+check <- workflow %>% group_by(ain,permit_number) %>% summarise(count=n())
+workflow %>% distinct(ain,permit_number) %>% nrow() # 4531 # should match number of rows in workflow df
+length(unique(workflow$permit_number)) #4516, permit numbers are not necessarily unique - a permit can be associated be associated with multiple ains and have multiple workflow items (inspections, etc.)
+
+# check result
+table(workflow$b3_has_inspection, useNA = "ifany")
+
+# permit level data
 # key words used to determine permits related to residential permanent housing
 keyword_list <- c("ADU", "SFR", "SFD", "SB9", "story", "duplex", "dwelling", 
                   "rebuild burned house", "main house", "residence", "pre-approved standard plan",
                   "rebuild house", "mfr", "mfd")
 
-# use workflow df to fins out which parcels have had ANY permits with an inspection
-combined_wf <- parcels %>%
-  left_join(workflow, by="ain") %>%
-  # add bucket 3 helper columns - has an inspection occurred (excl. debris removal inspection)
-  mutate(has_inspection = ifelse((grepl("inspection", workflow_item, ignore.case = TRUE) & 
-                                    !grepl("debris removal inspection", workflow_item, ignore.case = TRUE)), 1, 0)) %>%
-  # summarize the inspection flag to the parcel level to join later
-  group_by(ain) %>%
-  mutate(has_inspection = ifelse(sum(has_inspection, na.rm=TRUE)>0, 1, 0)) %>%
-  ungroup() %>%
-  select(ain, has_inspection) %>%
-  unique()
-
-# create a primary dataframe to use for each bucket classification (section 2. Apply Typology)
-# this dataframe is at the permit-level and then in section 2 will be aggregated to a parcel-level table called final_types
-combined_permits <- parcels %>%
-  left_join(permits_filtered, by="ain") %>% # 16468
-  # add data from USA Army Corps of Engineers for debris removal checks (bucket 1)
-  left_join(debris_status, by="ain") %>%
-  # add bucket 1 helper columns
+# create a primary permit df of helper columns for each bucket classification (section 2. Apply Typology)
+# this df is at permit-level and in section 2 will be aggregated to a parcel-level table called final_types
+permits <- permits_filtered %>%
+  # remove workflow items to get a dataframe of just permit-level cols
+  select(-c(workflow_item, wf_status, wf_status_date)) %>%
+  # keep unique permits - drop workflow items 
+  unique() %>%
+  
+  # add helper cols
   mutate(
-    # does the parcel have full sign off (fso) from army corps
-    has_ace_fso = ifelse(!is.na(fso_pkg_approved), 1, 0),
-    # does parcel have a permit for fire debris removal
-    has_fdr=ifelse(grepl("^FDR", permit_number), 1, 0),
-    # if the parcel has a permit for fire debris removal, is it finaled?
-    has_fdr_finaled = ifelse((grepl("^FDR", permit_number) & status=="Finaled"), 1, 0)) %>%
+    # is this an FDR (Fire Debris Removal) permit
+    b1_has_fdr=ifelse(grepl("^FDR", permit_number), 1, 0),
+    # is this permit's status finaled - will use for other buckets too
+    b4_has_finaled = ifelse(gen_status=="Finaled", 1, 0)) %>% 
+  # bucket 1 helper column: check is fdr is finaled
+  mutate(
+    b1_has_fdr_finaled = case_when(
+      (b1_has_fdr==1 & b4_has_finaled==1) ~ 1,
+      .default = 0)) %>%
   # add bucket 2 helper columns
   mutate(
-    # is there a permit associated with rebuilding for this parcel
-    has_rebuild_app = ifelse(grepl("^(CREB|UNC-)", permit_number), 1, 0)) %>%
-  mutate(
+    # add flag for key word for reference and QA
+    is_keyword=ifelse(grepl(paste(keyword_list, collapse="|"), project_name, ignore.case = TRUE) |
+                          grepl(paste(keyword_list, collapse="|"), description, ignore.case = TRUE),1,0),
+    is_tempword=ifelse( grepl("temp hous|temporary hous", description, ignore.case = TRUE),1,0),
+    # is this permit associated with rebuilding structures (e.g., perm, temp, comm, misc)
+    b2_has_build_permit = ifelse(grepl("^(CREB|UNC-)", permit_number), 1, 0),
     # if the permit is for permanent housing, saves permit_number here
-    bucket_2_perm = ifelse((grepl("^(CREB|UNC-BLDR|UNC-BLDF)", permit_number) & 
-                              (grepl(paste(keyword_list, collapse="|"), project_name, ignore.case = TRUE) |
-                                 grepl(paste(keyword_list, collapse="|"), description, ignore.case = TRUE))), permit_number, ""),
+    b2_perm = ifelse((grepl("^(CREB|UNC-BLDR|UNC-BLDF)", permit_number) & 
+                        (grepl(paste(keyword_list, collapse="|"), project_name, ignore.case = TRUE) |
+                           grepl(paste(keyword_list, collapse="|"), description, ignore.case = TRUE))), permit_number, ""),
     # if the permit is for temp housing, saves permit_number here
-    bucket_2_temp = ifelse((grepl("^UNC-EXPR", permit_number)& 
-                              (grepl("temp hous|temporary hous", project_name, ignore.case = TRUE) |
-                                 grepl("temp hous|temporary hous", description, ignore.case = TRUE))), permit_number, ""),
+    b2_temp = ifelse((grepl("^UNC-EXPR", permit_number)& 
+                        (grepl("temp hous|temporary hous", project_name, ignore.case = TRUE) |
+                           grepl("temp hous|temporary hous", description, ignore.case = TRUE))), permit_number, ""),
     # if the permit is for commercial building, saves permit_number here
-    bucket_2_comm = ifelse(grepl("^UNC-BLDC", permit_number), permit_number, ""),
-    # if the permit does not have a known rebuild prefix, save permit_number here
-    other_permits = ifelse((!is.na(permit_number) & !grepl("^(CREB|UNC-)", permit_number)), permit_number, "")) %>%
-  rowwise() %>%
+    b2_comm = ifelse(grepl("^UNC-BLDC", permit_number), permit_number, ""), 
+    # if the permit does not have a known building permit prefix, saves permit_number here
+    b2_other = ifelse(!grepl("^(CREB|UNC-)", permit_number), permit_number, "")) %>% # this includes fire debris and removal, but is kept for reference and not used in estimates
   mutate(
-    # if the permit has a known rebuild prefix but doesn't belong under permanent, temporary, or commerical, put here
-    bucket_2_misc = ifelse((has_rebuild_app==1 & paste0(bucket_2_perm, bucket_2_temp, bucket_2_comm)==""), permit_number, "")) %>%
-  ungroup() %>%
-  
-  # add bucket 4 helper columns
-  mutate(
-    # is the status for this permit "finaled"?
-    has_finaled = case_when(status=="Finaled" ~ 1,
-                                 is.na(permit_number) ~ 0,
-                                 .default = 0)) %>%
+    # if the permit has a known rebuild prefix but doesn't belong under permanent, temporary, or commercial, put here
+    b2_misc = ifelse((b2_has_build_permit==1 & paste0(b2_perm, b2_temp, b2_comm)==""), permit_number, "")) %>%
+  # bucket 4 helper cols
   mutate(
     # specifically is this a finaled permit for permanent housing
-    has_finaled_perm = ifelse((bucket_2_perm != "" &
-                                  has_finaled==1), 1, 0),
+    b4_has_finaled_perm = ifelse((b2_perm != "" &
+                                    b4_has_finaled==1), 1, 0),
     # specifically is this a finaled permit for temp housing
-    has_finaled_temp = ifelse((bucket_2_temp != "" &
-                                  has_finaled==1), 1, 0),
+    b4_has_finaled_temp = ifelse((b2_temp != "" &
+                                    b4_has_finaled==1), 1, 0),
     # specifically is this a finaled permit for commercial building
-    has_finaled_comm = ifelse((bucket_2_comm !="" &
-                                  has_finaled==1), 1, 0),
-    # specifically is this a finaled permit for misc building
-    has_finaled_misc = ifelse((bucket_2_misc != "" &
-                                  has_finaled==1), 1, 0)) %>%
-  # summarize helper cols to the permit level (bucket 4)
-  # might not need  183-185 anymore - i think it does the same as has_finaled on line 165?
-  group_by(ain, permit_number) %>%
-  mutate(has_finaled = ifelse(sum(has_finaled, na.rm=TRUE)>0, 1,0)) %>%
+    b4_has_finaled_comm = ifelse((b2_comm !="" &
+                                    b4_has_finaled==1), 1, 0),
+    # specifically is this a finaled permit for misc construction related to rebuilding or repairs
+    b4_has_finaled_misc = ifelse((b2_misc != "" &
+                                    b4_has_finaled==1), 1, 0)) 
+
+# check counts of variables
+table(permits$gen_status, useNA = "ifany") # What does Exempt mean?
+table(permits$b1_has_fdr, useNA = "ifany")
+table(permits$b1_has_fdr_finaled, useNA = "ifany")
+table(permits$b2_has_build_permit, useNA = "ifany")
+table(permits$b4_has_finaled, useNA = "ifany")
+table(permits$b4_has_finaled_perm, useNA = "ifany")
+table(permits$b4_has_finaled_temp, useNA = "ifany")
+table(permits$b4_has_finaled_comm, useNA = "ifany")
+table(permits$b4_has_finaled_misc, useNA = "ifany")
+
+# check recoding of variables
+## fdr
+permits %>%
+  filter(b1_has_fdr==1) %>%
+  View()
+
+## finaled
+permits %>%
+  filter(b4_has_finaled==1) %>%
+  View()
+
+# check finaled against status
+check <- permits %>% group_by(gen_status,b4_has_finaled) %>% summarise(count=n())
+# looks good
+check_canc_den <- permits %>% filter(gen_status %in% c("Denied","Canceled") & b4_has_finaled==1) # confirms no canceled/denied statuses
+length(unique(check_canc_den$ain))
+check <- permits_filtered %>% filter(gen_status=='') # none with blank status now
+
+# check exempt permits
+check <- permits %>% filter(gen_status %in% c("Exempt") & b4_has_finaled==1) # none
+check <- permits %>% filter(gen_status %in% c("Exempt")) %>%
+  left_join(select(permits_substring, ain, permit_number, permit_sub), by=c("ain", "permit_number")) %>%
+  group_by(permit_sub) %>%
+  summarize(count=n()) 
+View(check) # 1 UNC- is UNC-GRAD (misc permit), all remaining are "other" permits (e.g., RRP - Construction/Demolition deposit)
+
+# check counts for dups
+nrow(permits)  # 6415
+length(unique(permits$permit_number)) # 6313 multiple rows per permit 
+length(unique(permits$ain)) # 2183 multiple rows per ain which makes sense
+n_distinct(permits$permit_number, permits$ain) # 6414 unique ain/permit pairs 
+length(unique(permits_filtered$permit_number)) # 6313
+length(unique(permits$permit_number)) # 6313
+n_distinct(permits_filtered$permit_number, permits_filtered$ain) # 6414 unique ain/permit pairs 
+
+# explore duplicate
+duplicate <- permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 1 duplicate: 5840015019 
+# includes 1 duplicate of ain/permit pair (one version has a project name) - not sure how to resolve but flagging that we'll want to clean this up if this goes to "In Construction"
+## EMG - I'd take the waiting for applicant instance which likely came after the New - Online first submission and is the fuller record
+
+# dup_matches <- permits %>% # EMG - I don't think you need this. permits can apply to multiple ains so the duplicate df produced above is a bit more helpful for flagging dups
+#   group_by(permit_number) %>%
+#   filter(n() > 1) %>%
+#   ungroup()
+
+# check recoded permits against parcels
+permits_check <- permits %>%
+  left_join(parcels %>% select(ain,damage_category,damage_type_list))
+
+finaled_perm_check <- permits_check %>% 
+  filter(b4_has_finaled_perm==1) %>% 
+  select(ain, main_parcel,permit_number, type, description, damage_category, 
+         damage_type_list, completed_percent, applied_date, issued_date, 
+         finalized_date, gen_status,record_id ) 
+# checked these in random qa
+
+finaled_temp_check <- permits_check %>% 
+  filter(b4_has_finaled_temp==1) %>% 
+  select (ain, main_parcel,permit_number, type, description, damage_category, 
+          damage_type_list, completed_percent, applied_date, issued_date, 
+          finalized_date, gen_status,record_id )
+
+finaled_comm_check <- permits_check %>% 
+  filter(b4_has_finaled_comm==1) %>% 
+  select (ain, main_parcel,permit_number, type, description, damage_category, 
+          damage_type_list, completed_percent, applied_date, issued_date, 
+          finalized_date, gen_status,record_id )
+# empty - makes sense
+
+# check recoding of main fields
+permits_check_table <- permits_check %>%
+  select(ain,permit_number, type, description, project_name, b2_has_build_permit, 
+         is_keyword, is_tempword, is_creb,
+         b2_perm, b2_temp, b2_comm, b2_other, b2_misc, damage_category,
+         damage_type_list)
+
+# check key words against crebs
+creb_notperm <- permits_check_table %>% filter(is_creb==1 & is_keyword==0)
+#### QA note key word list consider expanding key word list like Eaton Fire Rebuild, new house, etc. ####
+# HK: If the purpose is to reassign some of these to permanent housing, using "Eaton Fire Rebuild" will also return permits for detached garages - those should stay as misc.
+# adding "house", "home", "single family", "S.F.D.", "bedroom", "bath" may be a good start - it looks like some like-for-likes can just be for one element of the property (e.g., CMU Wall)
+ 
+# check crebs against key words
+perm_notcreb <- permits_check_table %>% filter(is_creb==0 & is_keyword==1 & b2_perm!="")
+#### QA note repairs vs rebuilds I think we can assume these Residential Repair/Replacement Building Permit - County are repairs completed whereas CREB or Residential New Construction Building Permit - County are rebuilds ####
+# consider sub-buckets for rebuilds or repairs, e.g., X repairs and X rebuilds somehow on the dashboard under broader Repair/Rebuild umbrella
+
+permits_check_ain <- permits_check_table %>%
+  group_by(ain, damage_category, damage_type_list) %>%
+  summarise(b2_has_build_permit=sum(!is.na(b2_has_build_permit)),
+            b2_perm=sum(!is.na(b2_perm[b2_perm != ""])), 
+            b2_temp=sum(!is.na(b2_temp[b2_temp != ""])), 
+            b2_comm=sum(!is.na(b2_comm[b2_comm != ""])), 
+            b2_other=sum(!is.na(b2_other[b2_other != ""])), 
+            b2_misc=sum(!is.na(b2_misc[b2_misc != ""]))) %>%
+  filter(damage_category=="Significant Damage")
+
+
+# summarize workflow df to parcel level, apply flag to any parcel with at least one inspection
+combined_wf <- parcels %>%
+  left_join(workflow, by="ain") %>%
+  group_by(ain) %>%
+  mutate(b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm=TRUE)>0, 1, 0)) %>%
   ungroup() %>%
+  select(ain, b3_has_inspection) %>%
+  unique()
+
+table(combined_wf$b3_has_inspection, useNA = "ifany")
+
+# check
+nrow(parcels) # 12938
+nrow(combined_wf) # 12938 rows
+length(unique(combined_wf$ain)) # 12938 distinct row per ain, no dups
+
+
+# summarize helper cols to the parcel level, add debris here
+# save df before grouping by ain
+combined_parcels_all <- parcels %>%
+  left_join(permits, by="ain") %>%
+  left_join(debris, by="ain") %>%
+  left_join(combined_wf, by="ain") %>%
+  select(ain, permit_number, starts_with("b"), -b1_has_fdr) # exclude permit level flag we no longer need
+
+combined_parcels <- combined_parcels_all %>%
   # summarize helper cols to the parcel level (bucket 1, 2, and 4)
   group_by(ain) %>%
-  # fire debris removal
-  mutate(has_fdr = ifelse(sum(has_fdr, na.rm=TRUE)>0, 1, 0),
-         has_fdr_finaled = ifelse(sum(has_fdr_finaled, na.rm=TRUE)>0, 1, 0)) %>%
-  
+  # bucket 1 - fire debris removal
+  mutate(b1_has_fdr_finaled = ifelse(sum(b1_has_fdr_finaled, na.rm=TRUE)>0, 1, 0),
+         b1_has_ace_fso = ifelse(sum(b1_has_ace_fso, na.rm=TRUE)>0, 1, 0)) %>%
+  # bucket 2 - types of build permits
   mutate(
     # get number of ALL permits per parcel
-    total_permits = ifelse((n()==1 & is.na(permit_number)), 0, n()),
+    total_permits = ifelse(n()==1 & is.na(permit_number), 0, n()),
     # keep flag for rebuild permit application
-    has_rebuild_app = ifelse(sum(has_rebuild_app, na.rm=TRUE)>0, 1, 0),
+    b2_has_build_permit = ifelse(sum(b2_has_build_permit, na.rm=TRUE)>0, 1, 0),
     # summarize in a list all permanent housing permits for that parcel
-    bucket_2_perm = paste(bucket_2_perm[bucket_2_perm != ""], collapse = ";"),
+    b2_perm = paste(b2_perm[b2_perm != ""], collapse = ";"),
     # summarize in a list all temp housing permits for that parcel
-    bucket_2_temp = paste(bucket_2_temp[bucket_2_temp != ""], collapse = ";"),
+    b2_temp = paste(b2_temp[b2_temp != ""], collapse = ";"),
     # summarize in a list all commercial permits for that parcel
-    bucket_2_comm = paste(bucket_2_comm[bucket_2_comm != ""], collapse = ";"),
+    b2_comm = paste(b2_comm[b2_comm != ""], collapse = ";"),
     # summarize in a list all misc building permits for that parcel
-    bucket_2_misc = paste(bucket_2_misc[bucket_2_misc != ""], collapse = ";"),
+    b2_misc = paste(b2_misc[b2_misc != ""], collapse = ";"),
     # summarize in a list all other permits (e.g. PROP, FCR, RRP, SWRC)
-    other_permits = paste(other_permits[other_permits != ""], collapse = ";")
-  ) %>%
+    b2_other = paste(b2_other[b2_other != ""], collapse = ";")) %>%
   mutate(
     # get count of permanent housing permits for the parcel
-    perm_count = lengths(strsplit(bucket_2_perm,";")),
+    b2_perm_count = ifelse(b2_perm=="NA", 0, lengths(strsplit(b2_perm,";"))),
     # get count of temp housing permits for the parcel
-    temp_count = lengths(strsplit(bucket_2_temp,";")),
+    b2_temp_count = ifelse(b2_temp=="NA", 0, lengths(strsplit(b2_temp,";"))),
     # get count of commercial building permits for the parcel
-    comm_count = lengths(strsplit(bucket_2_comm,";")),
+    b2_comm_count = ifelse(b2_comm=="NA", 0, lengths(strsplit(b2_comm,";"))),
     # get count of misc building permits for the parcel
-    misc_count = lengths(strsplit(bucket_2_misc,";")),
+    b2_misc_count = ifelse(b2_misc=="NA", 0, lengths(strsplit(b2_misc,";"))),
     # get count of all other permits for the parcel
-    other_count = lengths(strsplit(other_permits,";"))
-  ) %>%
+    b2_other_count = ifelse(b2_other=="NA", 0, lengths(strsplit(b2_other,";")))) %>%
+  # bucket 3 - has at least one inspection
+  mutate(
+    b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm=TRUE)>0, 1, 0)) %>%
   # get count of how many finaled permits exist for parcel
-  mutate(has_finaled = sum(has_finaled, na.rm=TRUE)) %>%
+  mutate(b4_has_finaled_count = sum(b4_has_finaled, na.rm=TRUE)) %>% # should this exclude fire debris removal finaled? - no
+  # bucket 4 
   mutate(
     # get count of how many finaled permits exist for each type (permanent, temp, misc, commercial)
-    finaled_perm_count = sum(has_finaled_perm, na.rm=TRUE),
-    finaled_temp_count = sum(has_finaled_temp, na.rm=TRUE),
-    finaled_comm_count = sum(has_finaled_comm, na.rm=TRUE),
-    finaled_misc_count = sum(has_finaled_misc, na.rm=TRUE)) %>% 
+    b4_finaled_perm_count = sum(b4_has_finaled_perm, na.rm=TRUE),
+    b4_finaled_temp_count = sum(b4_has_finaled_temp, na.rm=TRUE),
+    b4_finaled_comm_count = sum(b4_has_finaled_comm, na.rm=TRUE),
+    b4_finaled_misc_count = sum(b4_has_finaled_misc, na.rm=TRUE)) %>%
+  select(-permit_number) %>%
+  unique() %>%
+  rowwise() %>% 
+  mutate(
+    b4_is_housing = ifelse(b2_perm_count>0, 1, 0),
+    b4_has_temp = ifelse(b2_temp_count>0, 1, 0),
+    b4_is_temp_only = ifelse(b2_temp_count > 0 & b2_perm_count==0, 1, 0),
+    b4_has_misc = ifelse(b2_misc_count > 0, 1, 0),
+    b4_is_misc_only = ifelse(
+      b2_misc_count > 0 & 
+        b2_perm_count==0 & 
+        b2_temp_count==0, 1, 0),
+    b4_is_perm_only = ifelse(
+      b2_perm_count > 0 & 
+        b2_misc_count==0 & 
+        b2_temp_count==0, 1, 0),
+    b4_is_perm_temp = ifelse(
+      b2_perm_count > 0 & 
+        b2_misc_count==0 & 
+        b2_temp_count>0, 1, 0),
+    b4_is_perm_misc = ifelse(
+      b2_perm_count > 0 & 
+        b2_misc_count > 0 & 
+        b2_temp_count==0, 1, 0),
+    b4_is_all = ifelse(
+      b2_perm_count > 0 & 
+        b2_misc_count>0 & 
+        b2_temp_count>0, 1, 0)) %>%
   ungroup() %>%
-  # add the workflow df with has_inspection flag
-  left_join(combined_wf, by="ain")
+  mutate(b4_perm_finaled = ifelse((b2_perm_count>0 & b4_finaled_perm_count==b2_perm_count), 1, 0),
+         b4_temp_finaled = ifelse((b2_temp_count>0 & b4_finaled_temp_count==b2_temp_count), 1, 0),
+         b4_misc_finaled = ifelse((b2_misc_count>0 & b4_finaled_misc_count==b2_misc_count), 1, 0)) %>%
+  # need to drop flags that we summed to _count cols - keeping introduces duplicates
+  select(-c(b4_has_finaled, b4_has_finaled_perm, b4_has_finaled_temp, b4_has_finaled_comm, b4_has_finaled_misc)) %>%
+  select(sort(colnames(.))) %>%
+  select(ain, everything()) %>%
+  unique() 
 
+length(unique(combined_parcels$ain)) # 12938
+nrow(combined_parcels) # 12938
+# no more dupes
+
+dups <- combined_parcels %>%
+  group_by(ain) %>%
+  filter(n()>1) %>%
+  ungroup() # 0
+
+# check column sums and recoding
+cols_sums <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% select(where(is.numeric)) %>% colSums(na.rm=TRUE) %>% as.data.frame()
+
+qa_view <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% select(sort(names(.)))
 
 ##### Step 2: Apply Typology #####
 # create table to store final results
 final_types <- parcels %>%
-  left_join(combined_wf, by="ain")
-
-#### Bucket 1: Fire Debris Cleared #### 
-### check if there's an fdr permit or army corps full sign off "fso" to indicate debris removal complete (phase_2_result)
-check_debris <- combined_permits %>%
-  select(ain, damage_category, epa_status, roe_status, fso_pkg_received, fso_pkg_approved,
-         has_ace_fso, has_fdr, has_fdr_finaled) %>% 
-  # if army corp sign off OR fire debris removal is finaled then debris removal complete,
-  # if parcel has no damage, say NA
-  # else Fire Debris Removal Incomplete
-  mutate(phase_2_result = case_when((has_ace_fso==1|(has_fdr==1 & has_fdr_finaled==1)) ~ "Fire Debris Cleared",
-                                    (has_ace_fso==0 & damage_category == "No Damage") ~ "Fire Debris Removal Not Applicable",
-                                    .default = "Fire Debris Removal Incomplete")) %>%
-  select(ain, has_ace_fso, has_fdr, has_fdr_finaled, phase_2_result) %>%
-  unique() 
-
-
-### Add what we have to final_types and create bucket_1_status
-final_types <- final_types %>% 
-  left_join(check_debris, by="ain") %>%
-  mutate(bucket_1_status = phase_2_result)
-  
-# check
-check <- final_types %>% group_by(ain) %>% filter(n()>1) # 0
-table(final_types$bucket_1_status, useNA="ifany")
-
-#### Bucket 2: Permit Application Received ####
-### Yes 
-# Sub-bucket: Permanent Housing (permit_number "^CREB|UNC-BLDR|UNC-BLDF" AND project_name or description.detailed contains "ADU|SFR|SFD|SB9|story|duplex|dwelling|rebuild burned house|main house|residence|dwelling|pre-approved standard plan|rebuild house|mfr|mfd)
-# Sub-bucket: Temporary Housing (permit_number "^UNC-EXPR") AND project_name or description.detailed contains "temp hous|temporary hous"
-# Sub-bucket: Garages, Pools, Etc. (if none of the others, then default to this bucket)
-# Sub-bucket: Commercial (permit_number "^UNC-BLDC")
-### No if none of above
-
-check_rebuild <- combined_permits %>%
-  select(ain, has_rebuild_app, total_permits, 
-         bucket_2_perm, bucket_2_temp, bucket_2_comm, bucket_2_misc, other_permits,
-         perm_count, temp_count, comm_count, misc_count, other_count) %>%
-  unique() 
-
-### Add to final_types
-final_types <- final_types %>%
-  left_join(check_rebuild, by="ain") %>%
-  # using an assumption that is the parcel has a rebuild app, it is probably finished with debris removal
-  mutate(bucket_1_status = case_when(has_rebuild_app==1 ~ "Fire Debris Cleared",
-                                     .default=bucket_1_status)) %>%
-  # if debris removal complete AND there's a rebuild permit AND parcel has some/sig damage then Applied for rebuild
-  # if the above but NO rebuild app then Awaiting application
-  # else whatever bucket 1 status is
-  mutate(bucket_2_status = case_when((bucket_1_status=="Fire Debris Cleared" & has_rebuild_app==1 & (damage_category=="Some Damage"|damage_category=="Significant Damage")) ~ "Permit Application Received", 
-                                     (bucket_1_status=="Fire Debris Cleared" & has_rebuild_app==0 & (damage_category=="Some Damage"|damage_category=="Significant Damage")) ~ "Permit Application Not Received",
-                                     .default=bucket_1_status))
-
-# check
-table(final_types$has_rebuild_app, useNA = "ifany")
-table(final_types$bucket_1_status, useNA = "ifany")
-table(final_types$bucket_2_status, useNA = "ifany")
-table(final_types$damage_category, final_types$bucket_1_status, useNA = "ifany")
-table(final_types$damage_category, final_types$bucket_2_status, useNA = "ifany")
-
-#### Bucket 3: Rebuild/Construction In Progress ####
-## Yes
-# Parcel has Yes for Bucket 2 AND workflow.item that contains "inspection" (excl. "debris removal inspection")
-## No (default if not yes)
-
-# # check what values appear in workflow_item
-# check <- as.data.frame(table(combined$workflow_item, useNA = "ifany")) %>%
-#   filter(grepl("inspection", Var1, ignore.case=TRUE))
-
-check_construction <- combined_permits %>%
-  mutate(has_1_inspection = ifelse((has_rebuild_app==1 & has_inspection==1), 1, 0)) %>%
-  group_by(ain) %>%
-  mutate(has_1_inspection = ifelse(sum(has_1_inspection, na.rm=TRUE)>0, 1, 0)) %>%
-  select(ain, has_1_inspection) %>%
-  unique()
-
-# join to final_types, create bucket_3_status
-final_types <- final_types %>%
-  left_join(check_construction, by="ain") %>%
-  # if bucket 2 status is Permit Application Received and has at least one inspection then Construction In Progress
-  # if above but no inspection, Construction Not Started
-  # else whatever bucket 2 status is
-  mutate(bucket_3_status = case_when((bucket_2_status == "Permit Application Received" & has_1_inspection==1) ~ "Construction In Progress", 
-                                     (bucket_2_status == "Permit Application Received" & has_1_inspection==0) ~ "Construction Not Started", 
-                                     .default=bucket_2_status))
-  
-
-table(final_types$damage_category, final_types$bucket_3_status, useNA = "ifany")
-#### Bucket 4: Construction Complete ####
-## Yes: Qualifies for bucket 3 AND
-# Sub-bucket 4.1: Permanent Housing Complete - Bucket 2.1 == Yes AND permit_number starts with “CREB”, “UNC-BLDR”, or “UNC-BLDF” and with status.detailed = “Finaled” 
-# Sub-bucket 4.2: Temporary Housing Complete - Bucket 2.2 == Yes AND permit_number starts with “UNC-EXPR” And status.detailed = “Finaled” 
-# Sub-bucket 4.3: Garages, Pools, etc., Complete (Alt name like Misc./Utility/Non housing?) - Bucket 2.3 == Yes And status.detailed = “Finaled” for ALL permits associated with this AIN (may be less accurate; possibly exclude?)
-# Sub-bucket 4.4: Commercial - Bucket 2.4 == Yes AND permit_number starts with “UNC-BLDC” AND status.detailed = “Finaled”
-
-check_complete <- combined_permits %>%
-  select(ain, damage_category, use_code, use_code_sept, 
-         has_finaled, has_rebuild_app, 
-         bucket_2_perm, bucket_2_temp, bucket_2_comm, bucket_2_misc,
-         total_permits, 
-         perm_count, temp_count, comm_count, misc_count, other_count,
-         has_inspection, 
-         finaled_perm_count, finaled_temp_count, finaled_comm_count, finaled_misc_count) %>%
-  unique() %>%
-  # # add flags that all rebuild permits for perm, temp, and misc building are all finaled or not 
-  # mutate(bucket_4_perm_comp = ifelse((bucket_2_perm != "" & finaled_perm_count==perm_count), 1, 0),
-  #        bucket_4_temp_comp = ifelse((bucket_2_temp != "" & finaled_temp_count==temp_count), 1, 0),
-  #        bucket_4_misc_comp = ifelse((bucket_2_misc != "" & finaled_misc_count==misc_count), 1, 0),) %>%
-  # add flags if parcel has housing rebuild (perm or temp) or misc
-  mutate(is_housing = ifelse(sum(perm_count, temp_count, na.rm=TRUE)>0, 1, 0),
-         is_misc = ifelse(misc_count>0, 1, 0)) %>%
-  select(ain, 
-         finaled_perm_count, finaled_temp_count, finaled_comm_count, finaled_misc_count,
-         is_housing, is_misc) %>%
-  unique()
-           
-# join to final_types, create bucket_4_status
-final_types <- final_types %>%
-  left_join(check_complete, by="ain") %>%
-  rowwise() %>%
+  left_join(combined_parcels, by="ain") %>%
+  # replace NAs that arise from parcels with no permits
+  mutate(across(starts_with("b") & where(is.numeric), ~replace_na(., 0))) %>%
+  mutate(across(starts_with("b") & where(is.character), ~na_if(., "NA"))) %>%
+  mutate(total_permits=ifelse(is.na(total_permits),0,total_permits)) %>%
+  # Bucket 1 status: Is fire debris cleared?
+  mutate(
+    bucket_1_status = case_when(
+      b1_has_ace_fso==1 | b1_has_fdr_finaled== 1 ~ "Fire Debris Cleared",
+      # we infer properties with a build permit have Fire Debris Cleared 
+      b2_has_build_permit==1 ~ "Fire Debris Cleared",
+      b1_has_ace_fso==0 & b1_has_fdr_finaled == 0 & damage_category == "No Damage"  ~ "Fire Debris Removal Not Applicable",
+      b1_has_ace_fso==0 & b1_has_fdr_finaled == 0 & damage_category !="No Damage" ~ "Fire Debris Removal Incomplete",
+      .default = "Something else - please QA")) %>% # nothing left in the default
+  # Bucket 2 status: Build Permit Application Received
+  mutate(
+    bucket_2_status = 
+      case_when(
+        (bucket_1_status=="Fire Debris Cleared" & b2_has_build_permit==1) ~ "Permit Application Received", 
+        (bucket_1_status=="Fire Debris Cleared" & b2_has_build_permit==0) ~ "Permit Application Not Received",
+        .default=bucket_1_status)) %>%
+  # Bucket 3 status: Construction progress
+  mutate(bucket_3_status = 
+           case_when((
+             bucket_2_status == "Permit Application Received" & b3_has_inspection==1) ~ "Construction In Progress",
+             (bucket_2_status == "Permit Application Received" & b3_has_inspection==0) ~ "Construction Not Started",
+             .default=bucket_2_status)) %>%
+  # Bucket 4 Status: Rebuild complete
   mutate(bucket_4_status = case_when(
-    # if Construction In Progress and has housing rebuild and all housing permits are finaled then rebuild complete
+    # if Construction In Progress and has perm housing permits: all perm and temp housing permits are finaled then rebuild complete
+    # If above but temp housing permits only, Construction in progress 
     # if above but no housing rebuilds and ONLY misc rebuild where all MISC permits are finaled then rebuild complete
-    # else whateever bucket_3_status is
+    # else whatever bucket_3_status is
+    
+    # If ONLY TEMP, construction in progress
     (bucket_3_status == "Construction In Progress" & 
-       is_housing==1 & 
-       sum(perm_count, temp_count, na.rm=TRUE)==sum(finaled_perm_count, finaled_temp_count, na.rm=TRUE)) ~ "Rebuild Complete",
+       b4_is_temp_only==1) ~ "Construction In Progress",
+    # if ONLY PERM and perm is finaled then complete,
+    (bucket_3_status == "Construction In Progress" &
+       b4_is_perm_only==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if PERM AND TEMP, then all finaled
+    (bucket_3_status == "Construction In Progress" &
+       b4_is_perm_temp==1 & b4_perm_finaled==1 & b4_temp_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if PERM + MISC + TEMP then all have to be complete
+    (bucket_3_status == "Construction In Progress" & b4_is_all==1 &
+       b4_perm_finaled==1 & b4_temp_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if PERM & MISC then both have to be complete
+    (bucket_3_status == "Construction In Progress" & b4_is_perm_misc==1 &
+       b4_perm_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
+    # if ONLY MISC and misc is finaled then complete
     (bucket_3_status == "Construction In Progress" & 
-       is_housing==0 & 
-       is_misc==1 & 
-       misc_count==finaled_misc_count)~ "Rebuild Complete",
-    .default=bucket_3_status)) %>%
-  ungroup() %>%
-  mutate(rebuild_status = bucket_4_status)
+       b4_is_misc_only==1 & 
+       b4_misc_finaled==1) ~ "Repairs or Rebuild Complete",
+    .default = bucket_3_status)) %>%
+  mutate(
+    rebuild_status=bucket_4_status
+  ) %>%
+  mutate(
+    dashboard_label = case_when(
+      rebuild_status == "Construction Not Started" ~ "With Permit Applications",
+      rebuild_status == "Permit Application Not Received" ~ "Without Permit Applications",
+      rebuild_status == "Construction In Progress" ~ "In Construction",
+      .default = rebuild_status
+    )
+  )
+
+# check column sums
+cols_sums_check_2 <- final_types %>% select(starts_with("b"),"total_permits") %>% select(where(is.numeric)) %>% colSums(na.rm=TRUE) %>% as.data.frame()
+
+table(final_types$bucket_1_status, useNA="ifany")
+table(final_types$bucket_2_status, useNA="ifany")
+table(final_types$bucket_3_status, useNA="ifany")
+table(final_types$bucket_4_status, useNA="ifany")
+table(final_types$rebuild_status, useNA="ifany")
+check_final_creb <- final_types %>%  left_join(parcels_creb, by="ain") 
+check <- as.data.frame(table(check_final_creb$has_creb, check_final_creb$rebuild_status))
+# see above - parcels with CREBs are only associated with construction phase (none are "Rebuild Complete")
 
 # Check rebuild status
 check <- as.data.frame(table(final_types$damage_category, final_types$rebuild_status))
 
-# check for residential with some or significant damage only
-check <- final_types%>%
-  filter(residential==TRUE & (damage_category== "Some Damage" | damage_category == "Significant Damage")) %>%
-  unique()
+sig_dmg <- final_types %>% filter(damage_category=="Significant Damage")
+# check how rebuild varies by damage combos
+check_sig_dmg_detail <- sig_dmg %>% group_by(damage_type_list) %>% mutate(total=n()) %>%
+  ungroup() %>% group_by(damage_type_list,rebuild_status) %>% summarise(prc=n()/min(total), count=n(), total=min(total))
+# some differences but not outstanding, they all have some construction happening
+
+table(sig_dmg$rebuild_status, useNA = "ifany")
+# 
+# Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
+# 295                            1451                             41                            3868
+# Rebuild Complete 
+# 21 
+
+table(sig_dmg$dashboard_label, useNA = "ifany")
+# Fire Debris Removal Incomplete        In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications 
+# 41                                      295                             21                           1451                           3868 
 
 # QA: See if the some damage/significant damage parcels have any NAs
-sum(is.na(check)) # 4 NAs
+sum(is.na(check)) # 0 NAs
 
-check_na <- check %>%
-  filter(if_any(everything(), is.na)) # these 4 NAs are a result of not having usecodes in Sept but being present in the jan data. 
-# Their statuses are all "Fire Debris Cleared" and  "Permit Application Not Received" 
+## Check significantly damaged parcels rebuild
+rebuild_complete <- final_types %>%
+  filter(damage_category=="Significant Damage" & rebuild_status=="Repairs or Rebuild Complete")
 
-# pull out AINs flagged by emg (based on QA doc)
+View(rebuild_complete)
 
-ain_emg<-c("5830015015" ,"5841023009" ,"5841023010", "5842007015", "5847020011") # 4 out of 5 of these are the ones with the Sept NA usecodes above
+# compare to list of finaled perm housing permits for ones not included
+finaled_perm_check_2 <- finaled_perm_check %>% filter(!ain %in% rebuild_complete$ain) %>% filter(damage_category=="Significant Damage")
+# look up their permit details
+check_permit_details <- combined_parcels_all %>% filter(ain %in% finaled_perm_check_2$ain)
+# look up their final types
+check_final_type_details <- final_types %>% filter(ain %in% finaled_perm_check_2$ain)
+# looks good
 
-check_emg<-check%>%filter(ain %in% ain_emg)
 
-# The other AIN that is in EMG's flagged AINs but does not have NA in the september usecode: 5842007015
-# # Status == "Fire Debris Cleared" and  "Permit Application Not Received" 
+##### QA note on permit type uses and how they could help with keyword search #####
+# interesting one here that had one finaled permit for roof and then subsequent permits for demo, etc.
+# https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5833016044
+# but note that UNC-BLDR250519005667 got flagged as permanent housing when it was a reroof, consider using type categories instead
+# also a situation where we'd want all the miscellaneous permits finaled before marking complete
+
+
+# missing CREC permit for this one? - this is a CREC plan, not permit - will have ECI advise
+# https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5829015003
+
+# 	5846021031 looks accurate
+# https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5846021031
+
+# 5835017027 looks accurate
+# https://portal.assessor.lacounty.gov/parceldetail/5835017027
+# https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5835017027
+
+
+# 5829034019 looks accurate minor damage to house and house roof repaired
+# https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5829034019 
+# https://portal.assessor.lacounty.gov/parceldetail/5829034019
+
+# select final columns
+final_types <- final_types %>%
+  select(-c(residential, starts_with("use_code"), starts_with("address"),
+            source, xwalk_status))
+
+# final row and duplicate check
+nrow(final_types)
+nrow(jan_parcels)
+length(unique(final_types$ain))
+
+
 
 ##### Export to postgres #####
 con <- connect_to_db("altadena_recovery_rebuild")
+schema <- "data"
 table_name <- "rel_parcel_rebuild_status_2025_10"
 date_ran <- as.character(Sys.Date())
-  
+indicator <- "Rebuild status for residential Altadena parcels based on scraped permit data from _2025_10 tables."
+source <- "Data imported on 12-10-2025. Multiple sources - see QA doc."
+qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_permit_typology.docx"
+column_names <- colnames(final_types)
+column_comments <- c(
+  "AIN - January 2025",
+  "AIN - September 2025",
+  "Damage category",
+  "Flags if single, mixed or no (NA) damage on property",
+  "Number of structures assessed by CalFire",
+  "List of unique damage types",
+  "1/0 Flag - has Full Sign Off (fso) from Army Corps of Engineers (ace)",
+  "1/0 Flag - has FDR permit that is finaled",
+  "List of commerical building permit numbers associated with this parcel",
+  "Count of commerical permit numbers associated with this parcel",
+  "1/0 Flag - property has permit associated with building structures (e.g., commercial, housing, miscellaneous)",
+  "List of miscellaneous building permit numbers associated with this parcel",
+  "Count of misc permit numbers associated with this parcel",
+  "List of other permit numbers associated with this parcel",
+  "Count of other permit numbers associated with this parcel",
+  "List of permanent housing permit numbers associated with this parcel",
+  "Count of permanent housing permit numbers associated with this parcel",
+  "List of temporary housing permit numbers associated with this parcel",
+  "Count of temporary housing permit numbers associated with this parcel",
+  "1/0 Flag - property has permit with a relevant inspection to signal construction has started",
+  "Count of commercial permits with a Finaled status",
+  "Count of misc permits with a Finaled status",
+  "Count of permanent housing permits with a Finaled status",
+  "Count of temporary housing permits with a Finaled status",
+  "Count of ALL permits (commercial, housing, misc, and other) with a Finaled status",
+  "1/0 Flag - has misc building permits",
+  "1/0 Flag - has temporary housing building permits",
+  "1/0 Flag - has misc., permanent and temporary housing building permits",
+  "1/0 Flag - has temp or permanent housing permits",
+  "1/0 Flag - has ONLY misc building permits",
+  "1/0 Flag - has misc AND temp building permits",
+  "1/0 Flag - has ONLY permanent housing building permits",
+  "1/0 Flag - has permanent and temporary building permits",
+  "1/0 Flag - has ONLY temporary housing building permits",
+  "1/0 Flag - ALL misc permits are finaled",
+  "1/0 Flag - ALL permanent housing building permits are finaled",
+  "1/0 Flag - ALL temporary housing building permits are finaled",
+  "Count of all permits associated with this parcel (includes commercial, housing, misc., and other)",
+  "Rebuild Status related to fire debris removal",
+  "Rebuild Status related to permit application if applicable (else bucket_1_status)",
+  "Rebuild Status related to construction progress if applicable (else bucket_2_status)",
+  "Rebuild Status related to rebuild/repair completion if applicable (else bucket_3_status)",
+  "Current status - same as bucket_4_status",
+  "Label for dashboard")
+
 # # Now write the table
-# dbWriteTable(con, Id(schema="data", table=table_name), final_types,
+# dbWriteTable(con, Id(schema=schema, table=table_name), final_types,
 #              overwrite = FALSE, row.names = FALSE)
 # 
-# dbSendQuery(con, paste0("COMMENT ON TABLE data.", table_name, " IS
-#             'Rebuild status for Altadena parcels based on scraped permit data from _2025_10 tables,
-#             Data imported on ",date_ran, "
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_permit_typology.docx
-#             Source: Multiple sources - see QA doc'"))
+# 
+# add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
+
 
 dbDisconnect(con)
+
+
+### Additional QA
+## Check significantly damaged parcels clean up
+fdr_incomplete <- final_types %>%
+  filter(damage_category=="Significant Damage" & rebuild_status=="Fire Debris Removal Incomplete")
+
+table(fdr_incomplete$damage_type_list) # majority are all destroyed check for these ains again
+
+check_fdr_incomplete <- debris_status %>%
+  inner_join(fdr_incomplete %>% select(ain,damage_category,damage_type_list))
+
+View(check_fdr_incomplete)
+table(check_fdr_incomplete$roe_status) # mostly opt out, but should returned ineligible be marked incomplete if they completed phase 1? no - confirmed by ECI
+
+check_fdr_incomplete_permits <- permits %>%
+  filter(ain %in% fdr_incomplete$ain)
+# several in progress of clean up
+
+View(check_fdr_incomplete_permits)
+
+check_fdr_incomplete_permits_missing <- fdr_incomplete %>% select(ain,damage_category,damage_type_list) %>% 
+  anti_join(permits) %>%
+  left_join(debris_status)
+
+# 2 parcels not in the army corps data
+check_fdr_incomplete_permits_missing %>% filter(is.na(apn))
+
