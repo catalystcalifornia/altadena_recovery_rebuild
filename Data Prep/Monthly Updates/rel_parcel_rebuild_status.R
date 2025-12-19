@@ -172,7 +172,7 @@ permits_filtered_curr_ains <- permits_filtered_curr_ains %>%
          ain=ain_2025_12)
 
 # get workflow items and add has_inspection (will use for the bucket 3 check - construction has started)
-workflow_all <- permits_filtered %>% 
+workflow_all <- permits_filtered_curr_ains %>% 
   select(ain, permit_number, workflow_item, wf_status, wf_status_date) %>%
   unique() %>%
   # filter out FDR permits (those are pre-build and "debris removal inspection" is not sufficient to exclude)
@@ -196,15 +196,18 @@ workflow <- workflow_all %>%
   group_by(ain, permit_number) %>%
   mutate(b3_has_inspection = ifelse(sum(b3_has_inspection, na.rm = TRUE)>0, 1, 0)) %>%
   select(ain, permit_number, b3_has_inspection) %>%
-  unique() # 7680
+  unique() # 7679
 
 # check counts and recoding
 check <- workflow %>% group_by(ain,permit_number) %>% summarise(count=n())
-workflow %>% distinct(ain,permit_number) %>% nrow() # 7680 # should match number of rows in workflow df
+workflow %>% distinct(ain,permit_number) %>% nrow() # 7679 # should match number of rows in workflow df
 length(unique(workflow$permit_number)) #7610, permit numbers are not necessarily unique - a permit can be associated be associated with multiple ains and have multiple workflow items (inspections, etc.)
 
 # check result
 table(workflow$b3_has_inspection, useNA = "ifany")
+# Dec Update
+# 0    1 
+# 5724 1955 
 
 # permit level data
 # key words used to determine permits related to residential permanent housing
@@ -214,7 +217,7 @@ keyword_list <- c("ADU", "SFR", "SFD", "SB9", "story", "duplex", "dwelling",
 
 # create a primary permit df of helper columns for each bucket classification (section 2. Apply Typology)
 # this df is at permit-level and in section 2 will be aggregated to a parcel-level table called final_types
-permits <- permits_filtered %>%
+permits <- permits_filtered_curr_ains %>%
   # remove workflow items to get a dataframe of just permit-level cols
   select(-c(workflow_item, wf_status, wf_status_date)) %>%
   # keep unique permits - drop workflow items 
@@ -270,7 +273,7 @@ permits <- permits_filtered %>%
                                     b4_has_finaled==1), 1, 0)) 
 
 # check counts of variables
-table(permits$gen_status, useNA = "ifany") # What does Exempt mean?
+table(permits$gen_status, useNA = "ifany") 
 table(permits$b1_has_fdr, useNA = "ifany")
 table(permits$b1_has_fdr_finaled, useNA = "ifany")
 table(permits$b2_has_build_permit, useNA = "ifany")
@@ -311,77 +314,35 @@ nrow(permits)  # 8743
 length(unique(permits$permit_number)) # 8642 multiple rows per permit 
 length(unique(permits$ain)) # 2640 multiple rows per ain which makes sense
 n_distinct(permits$permit_number, permits$ain) # 8715 unique ain/permit pairs 
-length(unique(permits_filtered$permit_number)) # 8642
+length(unique(permits_filtered_curr_ains$permit_number)) # 8642
 length(unique(permits$permit_number)) # 8642
-n_distinct(permits_filtered$permit_number, permits_filtered$ain) # 8715 unique ain/permit pairs 
+n_distinct(permits_filtered_curr_ains$permit_number, permits_filtered_curr_ains$ain) # 8715 unique ain/permit pairs 
 
-# explore duplicate
+# explore duplicates
 duplicate <- permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56
-# includes 1 duplicate of ain/permit pair (one version has a project name) - not sure how to resolve but flagging that we'll want to clean this up if this goes to "In Construction"
-## EMG - I'd take the waiting for applicant instance which likely came after the New - Online first submission and is the fuller record
-dupes_to_drop <- duplicate %>%
-  filter(is.na(project_name)|project_name=="") %>%
-  select(permit_number, ain)
+# includes duplicates where some permits have a blank description
+dupes_to_keep <- permits  %>%
+  filter(ain %in% duplicate$ain & permit_number %in% duplicate$permit_number) %>%
+  filter(!is.na(description)) 
+
+# check deduped work
+n_distinct(duplicate$permit_number, duplicate$ain) # 28 unique ain/permit pairs 
+n_distinct(dupes_to_keep$permit_number, dupes_to_keep$ain) # 28 unique ain/permit pairs 
+# checks out
 
 permits_deduped <- permits %>%
-  anti_join(dupes_to_drop, by = c("permit_number", "ain"))
+  # remove duplicates first
+  anti_join(dupes_to_keep, by = c("permit_number", "ain"))
 
-# # don't think this is needed - crosswalk already filtered for damage
-# # check recoded permits against parcels
-# permits_check <- permits %>%
-#   left_join(parcels %>% select(ain,damage_category,damage_type_list))
-# 
-# finaled_perm_check <- permits_check %>% 
-#   filter(b4_has_finaled_perm==1) %>% 
-#   select(ain, main_parcel,permit_number, type, description, damage_category, 
-#          damage_type_list, completed_percent, applied_date, issued_date, 
-#          finalized_date, gen_status,record_id ) 
-# # checked these in random qa
-# 
-# finaled_temp_check <- permits_check %>% 
-#   filter(b4_has_finaled_temp==1) %>% 
-#   select (ain, main_parcel,permit_number, type, description, damage_category, 
-#           damage_type_list, completed_percent, applied_date, issued_date, 
-#           finalized_date, gen_status,record_id )
-# 
-# finaled_comm_check <- permits_check %>% 
-#   filter(b4_has_finaled_comm==1) %>% 
-#   select (ain, main_parcel,permit_number, type, description, damage_category, 
-#           damage_type_list, completed_percent, applied_date, issued_date, 
-#           finalized_date, gen_status,record_id )
-# # empty - makes sense
-# 
-# # check recoding of main fields
-# permits_check_table <- permits_check %>%
-#   select(ain,permit_number, type, description, project_name, b2_has_build_permit, 
-#          is_keyword, is_tempword, is_creb,
-#          b2_perm, b2_temp, b2_comm, b2_other, b2_misc, damage_category,
-#          damage_type_list)
-# 
-# # check key words against crebs
-# creb_notperm <- permits_check_table %>% filter(is_creb==1 & is_keyword==0)
-# #### QA note key word list consider expanding key word list like Eaton Fire Rebuild, new house, etc. ####
-# # HK: If the purpose is to reassign some of these to permanent housing, using "Eaton Fire Rebuild" will also return permits for detached garages - those should stay as misc.
-# # adding "house", "home", "single family", "S.F.D.", "bedroom", "bath" may be a good start - it looks like some like-for-likes can just be for one element of the property (e.g., CMU Wall)
-# 
-# # check crebs against key words
-# perm_notcreb <- permits_check_table %>% filter(is_creb==0 & is_keyword==1 & b2_perm!="")
-# #### QA note repairs vs rebuilds I think we can assume these Residential Repair/Replacement Building Permit - County are repairs completed whereas CREB or Residential New Construction Building Permit - County are rebuilds ####
-# # consider sub-buckets for rebuilds or repairs, e.g., X repairs and X rebuilds somehow on the dashboard under broader Repair/Rebuild umbrella
-# 
-# permits_check_ain <- permits_check_table %>%
-#   group_by(ain, damage_category, damage_type_list) %>%
-#   summarise(b2_has_build_permit=sum(!is.na(b2_has_build_permit)),
-#             b2_perm=sum(!is.na(b2_perm[b2_perm != ""])), 
-#             b2_temp=sum(!is.na(b2_temp[b2_temp != ""])), 
-#             b2_comm=sum(!is.na(b2_comm[b2_comm != ""])), 
-#             b2_other=sum(!is.na(b2_other[b2_other != ""])), 
-#             b2_misc=sum(!is.na(b2_misc[b2_misc != ""]))) %>%
-#   filter(damage_category=="Significant Damage")
+# add records we are keeping
+permits_deduped <- rbind(permits_deduped,dupes_to_keep)
 
+n_distinct(permits_deduped$permit_number, permits_deduped$ain) # 8715 unique ain/permit pairs 
+duplicate <- permits_deduped %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56
+# RRP permit won't matter later, and due to 5841023022 which merged 2 parcels, original permit from original parcel
 
 parcels_df <- xwalk_parcels %>%
-  select(ain_2025_12, use_code_2025_12, address_2025_12) %>%
+  select(ain_2025_12) %>%
   rename(ain=ain_2025_12) %>% 
   unique()
 
@@ -396,6 +357,9 @@ combined_wf <- parcels_df %>%
   unique()
 
 table(combined_wf$b3_has_inspection, useNA = "ifany")
+# Dec Update
+# 0    1 
+# 4811  865 
 
 # check
 nrow(parcels_df) # 5676 - should be 5676 (number of distinct 12/2025 ains)
