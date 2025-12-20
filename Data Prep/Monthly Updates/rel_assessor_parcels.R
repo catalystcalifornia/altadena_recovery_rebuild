@@ -21,7 +21,7 @@ month <- "12"
 
 #### STEP 2: PULL XWALKS AND DATA (Update to latest data and xwalks) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_09_12_2025")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
 # get area names from January
 assessor_areas<- st_read(con_alt, query="Select * from data.rel_assessor_altadena_parcels_jan2025")
 # get curr geoms
