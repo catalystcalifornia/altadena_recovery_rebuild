@@ -495,6 +495,10 @@ combined_parcels <- combined_parcels_all %>%
   select(ain, everything()) %>%
   unique() 
 
+# For QA: AIN == 5833025005 is a great test case for spot checking because it has multiple different types of permits including misc repair, misc, and perm 
+# combined_parcels_all%>%filter("ain==5833025005")%>%View() # compare this against:
+# combined_parcels%>%filter("ain==5833025005")%>%View() 
+
 length(unique(combined_parcels$ain)) # 5676
 nrow(combined_parcels) # 5676
 # no more dupes
