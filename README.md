@@ -22,7 +22,7 @@ January 2026
     <li> <a href="#license">License</a> 
   
   </ol>
-</details>)
+</details>
 
 # About Red Tape to Recovery
 
@@ -30,13 +30,9 @@ The Eaton Fire that rampaged through Altadena in January 2025 burned 14,000 acre
 
 We analyzed the devastation in West and East Altadena to understand the housing lost, the uphill battle to recovery, and the threats to residents returning home to help support a just and inclusive recovery. The dashboard shows the repair/rebuild and sold status of residential properties significantly damaged by the Eaton Fire—answering the question of who has the means to return home and who does not. It also shows how environmental and fire hazards—two factors that can influence fair rebuilding efforts—affect properties. 
 
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 # Acknowledgements 
 
 We thank the [Dena Rise UP!](https://denariseup.org/) coalition for their collaboration, insights and stories that contributed to this project. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
-
-<p align="right">(<a href="#top">back to top</a>)</p>
 
 # Data Sources
 All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team calculated outputs from a combination of the following data sources:
@@ -46,15 +42,11 @@ All research and analysis is conducted by [Catalyst California](https://www.cata
 * Los Angeles County Unincorporated Zoning Data April 10, 2025 | https://egis-lacounty.hub.arcgis.com/datasets/3a3cf8766dca45e7a9fd0fbb8d0cd93c_3/explore?location=33.798293%2C-118.298800%2C7.76
 * Los Angeles County Electronic Permiting and Inspections Data (EPIC LA) December 2025 | https://epicla.lacounty.gov/energov_prod/SelfService/#/home
 * Los Angeles County Department of Public Health 2025 | https://storymaps.arcgis.com/stories/667412ef37ee4392bddb5c90da3480f1?cover=false
-* Los Angeles County Assessor Data November 2025 |
-
-<p align="right">(<a href="#top">back to top</a>)</p>
+* Los Angeles County Assessor Data November 2025 
 
 # Methodolody
 
 To learn more about the detailed methodology behind the 'Red Tape to Recovery' dashboard, please see the methodology documentation [here](INSERT GITHUB LINK).
-
-<p align="right">(<a href="#top">back to top</a>)</p>
 
 # About the Repository  
 
@@ -63,8 +55,6 @@ In this repository, you will find three main folders:
 * Analysis | Scripts that run frequency and cross-tabulation tables focused on summarizing the data to areas of interest. 
 * Deliverables | Scripts that produce the visuals and embeds. Some are reproduced for the dashboard and some are only available for an internal team for analysis and research. 
 
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 # Contributors
 
 * [Elycia Mulholland Graves](https://github.com/elyciamg)
@@ -72,21 +62,15 @@ In this repository, you will find three main folders:
 * [Jennifer Zhang](https://github.com/jzhang514)
 * [Maria T. Khan](https://github.com/mariatkhan)
 
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 # Contact Us
 
 [Elycia Mulholland Graves](https://www.linkedin.com/in/elycia-mulholland-graves-54578258/) - egraves[at]catalystcalifornia.org  <br>
 
 [Hillary Khan](https://www.linkedin.com/in/hillary-khan/) - hkhan[at]catalystcalifornia.org 
 
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 # Citation
 
 Catalyst California. *Red Tape to Recovery: Tracking Altadena Rebuilding After the Eaton Fire,* January 7, 2026. https://catalystca.maps.arcgis.com/apps/dashboards/5aac849a3ada4c79b1ac1677964530e8
-
-<p align="right">(<a href="#top">back to top</a>)</p>
 
 # About Catalyst California
 
@@ -97,8 +81,6 @@ A world where systems are designed for justice and support equitable access to r
 [Catalyst California](https://www.catalystcalifornia.org/) advocates for racial justice by building power and transforming public systems. We partner with communities of color, conduct innovative research, develop policies for actionable change, and shift money and power back into our communities. 
 
 [Click here to view Catalyst California's Projects on GitHub](https://github.com/catalystcalifornia)
-
-<p align="right">(<a href="#top">back to top</a>)</p>
 
 # License
 
