@@ -457,7 +457,8 @@ combined_parcels <- combined_parcels_all %>%
     b4_is_temp_only = ifelse(b2_temp_count > 0 & b2_perm_count==0, 1, 0),
     b4_has_misc = ifelse(b2_misc_count > 0, 1, 0),
     b4_is_misc_repair_only=ifelse(
-      # if misc repair is the same count as misc
+      # if misc repair is greater than zero and the same count as misc
+      b2_misc_repair_count>0 &
       b2_misc_repair_count>=b2_misc_count & 
         # no permanent housing
         b2_perm_count==0 & 
