@@ -266,7 +266,7 @@ permits <- permits_filtered_curr_ains %>%
     # if the permit has a known rebuild prefix but doesn't belong under permanent, temporary, or commercial, put here
     b2_misc = ifelse((b2_has_build_permit==1 & paste0(b2_perm, b2_temp, b2_comm)==""), permit_number, ""),
     # if permit is a UNC (build permit), but its just related to mechanical, plumbing, etc. and other minor repairs put here
-    b2_misc_repair = ifelse(grepl("^(UNC-BLDG|UNC-ELEC|UNC-EXPR|UNC-GRAD|UNC-MECH|UNC-PLMB|UNC-PLSP|UNC-SEWR|UNC-SOLR)", permit_number), permit_number, "") 
+    b2_misc_minor = ifelse(grepl("^(UNC-BLDG|UNC-ELEC|UNC-EXPR|UNC-GRAD|UNC-MECH|UNC-PLMB|UNC-PLSP|UNC-SEWR|UNC-SOLR)", permit_number), permit_number, "") 
   ) %>%
   # bucket 4 helper cols
   mutate(
@@ -283,7 +283,7 @@ permits <- permits_filtered_curr_ains %>%
     b4_has_finaled_misc = ifelse((b2_misc != "" &
                                     b4_has_finaled==1), 1, 0),
     # specifically is this a finaled permit for misc construction related to MINOR just mechnical, electrical, solar, plumbing, grading, pool repairs
-    b4_has_finaled_misc_repair = ifelse((b2_misc_repair != "" &
+    b4_has_finaled_misc_minor = ifelse((b2_misc_minor != "" &
                                     b4_has_finaled==1), 1, 0)) 
 
 # check counts of variables
@@ -296,7 +296,7 @@ table(permits$b4_has_finaled_perm, useNA = "ifany")
 table(permits$b4_has_finaled_temp, useNA = "ifany")
 table(permits$b4_has_finaled_comm, useNA = "ifany")
 table(permits$b4_has_finaled_misc, useNA = "ifany")
-table(permits$b4_has_finaled_misc_repair, useNA = "ifany")
+table(permits$b4_has_finaled_misc_minor, useNA = "ifany")
 
 
 # check recoding of variables
@@ -312,7 +312,7 @@ permits %>%
 
 ## misc repairs that may not be substantial to count as completed repair
 permits %>%
-  filter(b4_has_finaled_misc_repair==1) %>%
+  filter(b4_has_finaled_misc_minor==1) %>%
   View()
 
 # check finaled against status
@@ -418,7 +418,7 @@ combined_parcels <- combined_parcels_all %>%
     b2_comm = paste(b2_comm[b2_comm != ""], collapse = ";"),
     # summarize in a list all misc building permits for that parcel
     b2_misc = paste(b2_misc[b2_misc != ""], collapse = ";"),
-    b2_misc_repair = paste(b2_misc_repair[b2_misc_repair != ""], collapse = ";"),
+    b2_misc_minor = paste(b2_misc_minor[b2_misc_minor != ""], collapse = ";"),
     # summarize in a list all other permits (e.g. PROP, FCR, RRP, SWRC)
     b2_other = paste(b2_other[b2_other != ""], collapse = ";")) %>%
   mutate(
@@ -431,7 +431,7 @@ combined_parcels <- combined_parcels_all %>%
     # get count of misc building permits for the parcel
     b2_misc_count = ifelse(b2_misc=="NA", 0, lengths(strsplit(b2_misc,";"))),
     # get count of misc building permits for minor repairs for the parcel
-    b2_misc_repair_count = ifelse(b2_misc_repair=="NA", 0, lengths(strsplit(b2_misc_repair,";"))),
+    b2_misc_minor_count = ifelse(b2_misc_minor=="NA", 0, lengths(strsplit(b2_misc_minor,";"))),
     # get count of all other permits for the parcel
     b2_other_count = ifelse(b2_other=="NA", 0, lengths(strsplit(b2_other,";")))) %>%
   # bucket 3 - has at least one inspection
@@ -446,7 +446,7 @@ combined_parcels <- combined_parcels_all %>%
     b4_finaled_temp_count = sum(b4_has_finaled_temp, na.rm=TRUE),
     b4_finaled_comm_count = sum(b4_has_finaled_comm, na.rm=TRUE),
     b4_finaled_misc_count = sum(b4_has_finaled_misc, na.rm=TRUE),
-    b4_finaled_misc_repair_count = sum(b4_has_finaled_misc_repair, na.rm=TRUE)
+    b4_finaled_misc_minor_count = sum(b4_has_finaled_misc_minor, na.rm=TRUE)
     ) %>%
   select(-permit_number) %>%
   unique() %>%
@@ -456,10 +456,10 @@ combined_parcels <- combined_parcels_all %>%
     b4_has_temp = ifelse(b2_temp_count>0, 1, 0),
     b4_is_temp_only = ifelse(b2_temp_count > 0 & b2_perm_count==0, 1, 0),
     b4_has_misc = ifelse(b2_misc_count > 0, 1, 0),
-    b4_is_misc_repair_only=ifelse(
+    b4_is_misc_minor_only=ifelse(
       # if misc repair is greater than zero and the same count as misc
-      b2_misc_repair_count>0 &
-      b2_misc_repair_count>=b2_misc_count & 
+      b2_misc_minor_count>0 &
+      b2_misc_minor_count>=b2_misc_count & 
         # no permanent housing
         b2_perm_count==0 & 
         # no temporary housing
@@ -488,10 +488,10 @@ combined_parcels <- combined_parcels_all %>%
   mutate(b4_perm_finaled = ifelse((b2_perm_count>0 & b4_finaled_perm_count==b2_perm_count), 1, 0),
          b4_temp_finaled = ifelse((b2_temp_count>0 & b4_finaled_temp_count==b2_temp_count), 1, 0),
          b4_misc_finaled = ifelse((b2_misc_count>0 & b4_finaled_misc_count==b2_misc_count), 1, 0),
-         b4_misc_repair_finaled = ifelse((b2_misc_repair_count>0 & b4_finaled_misc_repair_count==b2_misc_repair_count), 1, 0)
+         b4_misc_minor_finaled = ifelse((b2_misc_minor_count>0 & b4_finaled_misc_minor_count==b2_misc_minor_count), 1, 0)
          ) %>%
   # need to drop flags that we summed to _count cols - keeping introduces duplicates
-  select(-c(b4_has_finaled, b4_has_finaled_perm, b4_has_finaled_temp, b4_has_finaled_comm, b4_has_finaled_misc,b4_has_finaled_misc_repair)) %>%
+  select(-c(b4_has_finaled, b4_has_finaled_perm, b4_has_finaled_temp, b4_has_finaled_comm, b4_has_finaled_misc,b4_has_finaled_misc_minor)) %>%
   select(sort(colnames(.))) %>%
   select(ain, everything()) %>%
   unique() 
@@ -555,7 +555,7 @@ final_types <- parcels_df %>%
        b4_is_temp_only==1) ~ "Construction In Progress",
     # if only misc repair, construction in progress
     (bucket_3_status == "Construction In Progress" & 
-       b4_is_misc_repair_only==1) ~ "Construction In Progress",    
+       b4_is_misc_minor_only==1) ~ "Construction In Progress",    
     # if only perm and perm is finaled then complete,
     (bucket_3_status == "Construction In Progress" &
        b4_is_perm_only==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
