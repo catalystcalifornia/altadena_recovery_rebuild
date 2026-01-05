@@ -7,7 +7,7 @@ library(data.table)
 library(sf)
 library(mapview)
 library(stringr)
-library(readxl)
+# library(readxl)
 
 options(scipen = 999) # turn off scientific notation for batch queries
 
@@ -92,8 +92,8 @@ shp_intersect_3310 <- st_transform(shp_intersect, 3310)
 # # export results
 data_vintage <- "November 2025"
 date_ran <- as.character(Sys.Date()) # "2025-12-09"
-curr_year <- strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
-curr_month <- strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+curr_year <-  "2025" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
+curr_month <- "12" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
 source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
 qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_import_assessor_data.docx"
 schema <- "dashboard"
@@ -190,7 +190,8 @@ dbSendQuery(con, sql_create_new_col)
 sql_set_values <- paste("UPDATE", sql_csv_table_name, "SET exemption_type = exemption_type_original;")
 dbSendQuery(con, sql_set_values)
 
-sql_recode <- paste("UPDATE", sql_csv_table_name, "SET exemption_type = NULL WHERE exemption_type = 'Ã¿';")
+sql_recode <- paste("UPDATE", sql_csv_table_name, 
+                    "SET exemption_type = NULL WHERE exemption_type IN ('ÿ', 'Ã¿');")
 dbSendQuery(con, sql_recode)
 
 
