@@ -553,22 +553,22 @@ final_types <- parcels_df %>%
     # If only temp, construction in progress
     (bucket_3_status == "Construction In Progress" & 
        b4_is_temp_only==1) ~ "Construction In Progress",
-    # if only misc repair, construction in progress
+    # if only misc minor, construction in progress
     (bucket_3_status == "Construction In Progress" & 
        b4_is_misc_minor_only==1) ~ "Construction In Progress",    
     # if only perm and perm is finaled then complete,
     (bucket_3_status == "Construction In Progress" &
        b4_is_perm_only==1 & b4_perm_finaled==1)  ~ "Repairs or Rebuild Complete",
-    # if perm and temp, then all finaled
+    # if perm + temp, then perm and temp finaled
     (bucket_3_status == "Construction In Progress" &
        b4_is_perm_temp==1 & b4_perm_finaled==1 & b4_temp_finaled==1)  ~ "Repairs or Rebuild Complete",
-    # if perm + misc + temp then all have to be complete
+    # if all (perm + misc + temp) then all have to be complete
     (bucket_3_status == "Construction In Progress" & b4_is_all==1 &
        b4_perm_finaled==1 & b4_temp_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
     # if perm + misc then both have to be complete
     (bucket_3_status == "Construction In Progress" & b4_is_perm_misc==1 &
        b4_perm_finaled==1 & b4_misc_finaled==1)  ~ "Repairs or Rebuild Complete",
-    # if just misc and misc is finaled then complete
+    # if only misc and misc is finaled then complete
     (bucket_3_status == "Construction In Progress" & 
        b4_is_misc_only==1 & 
        b4_misc_finaled==1) ~ "Repairs or Rebuild Complete",
