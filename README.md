@@ -44,7 +44,7 @@ All research and analysis is conducted by [Catalyst California](https://www.cata
 
 # Methodology
 
-To learn more about the detailed methodology behind the 'Red Tape to Recovery' dashboard, please see the methodology documentation [here](Red Tape to Recovery Methodology_Jan2026.pdf).
+To learn more about the detailed methodology behind the 'Red Tape to Recovery' dashboard, please see the methodology documentation [here](https://github.com/catalystcalifornia/altadena_recovery_rebuild/blob/main/Red%20Tape%20to%20Recovery%20Methodology_Jan2026.pdf).
 
 # About the Repository  
 
