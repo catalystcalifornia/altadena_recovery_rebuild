@@ -45,7 +45,7 @@ We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, i
 All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team used the following data sources to build the dashboard and summarize the challenges to recovery:
 * California Department of Forestry & Fire Protection. *CAL FIRE damage inspection (DINS) data*. June 2, 2025. https://gis.data.cnra.ca.gov/datasets/CALFIRE-Forestry::cal-fire-damage-inspection-dins-data/explore
 * California Office of State Fire Marshall. *Fire hazard severity zones*. 2024-2025. https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones
-* Los Angeles County. IElectronic permitting and inspections portal (EPIC-LA)*. December 10, 2025. https://epicla.lacounty.gov/energov_prod/SelfService/#/home
+* Los Angeles County. *Electronic permitting and inspections portal (EPIC-LA)*. December 10, 2025. https://epicla.lacounty.gov/energov_prod/SelfService/#/home
 * Los Angeles County Department of Public Health & Roux Associates Inc. *Community soil sampling and human health screening report*. September 5, 2025. https://storymaps.arcgis.com/stories/667412ef37ee4392bddb5c90da3480f1?cover=false
 * Los Angeles County Assessor. *Secured basic file abstract*. November 2025. https://assessor.lacounty.gov/real-estate-toolkit/data-sales
 
