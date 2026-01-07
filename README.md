@@ -10,6 +10,8 @@ January 2026
 
 [View the data dashboard](https://catalystca.maps.arcgis.com/apps/dashboards/5aac849a3ada4c79b1ac1677964530e8)
 
+[View the dashboard methodology](https://github.com/catalystcalifornia/altadena_recovery_rebuild/blob/main/Red%20Tape%20to%20Recovery%20Methodology_Jan2026.pdf)
+
 <br>
 
 <details>
@@ -31,20 +33,20 @@ January 2026
 
 # About Red Tape to Recovery
 
-The Eaton Fire that rampaged through Altadena in January 2025 burned 14,000 acres over 24 days, destroyed thousands of properties and resulted in 18 deaths. A year later, data and personal stories show that only a few Altadenans and Pasadenans have returned home. This research project, developed in partnership with [Dena Rise UP!](https://denariseup.org/), provides crucial, accurate data on how different areas and properties are moving toward rebuilding. 
+The Eaton Fire that rampaged through Altadena in January 2025 burned 14,000 acres over 24 days, destroyed thousands of properties and resulted in 19 deaths. A year later, data and personal stories show that only a few Altadenans and Pasadenans have returned home. This research project, developed in partnership with [Dena Rise UP!](https://denariseup.org/), provides crucial, accurate data on how different areas and properties are moving toward rebuilding. 
 
-We analyzed the devastation in West and East Altadena to understand the housing lost, the uphill battle to recovery, and the threats to residents returning home to help support a just and inclusive recovery. The dashboard shows the repair/rebuild and sold status of residential properties significantly damaged by the Eaton Fire—answering the question of who has the means to return home and who does not. It also shows how environmental and fire hazards—two factors that can influence fair rebuilding efforts—affect properties. 
+We analyzed the devastation in West and East Altadena to understand the housing lost, the uphill battle to recovery, and the threats to residents returning home to help support a just and inclusive recovery. The [Read Tape to Recovery: Tracking Altadena Rebuilding After the Eaton Fire dashboard](https://catalystca.maps.arcgis.com/apps/dashboards/5aac849a3ada4c79b1ac1677964530e8) shows the **repair/rebuild** and **sold status** of residential properties significantly damaged by the Eaton Fire—answering the question of who has the means to return home and who does not. It also shows how environmental and fire hazards—two factors that can influence fair rebuilding efforts—affect properties. The dashboard's [companion report](https://www.catalystcalifornia.org/campaign-tools/publications/red-tape-to-recovery-tracking-altadena-rebuilding) provides additional data and initial recommendations for elected officials, funders, and insurance companies to pursue solutions that support a just and inclusive reconstruction.  
 
 # Acknowledgements 
 
-We thank the [Dena Rise UP!](https://denariseup.org/) coalition for their collaboration, insights and stories that contributed to this project. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
+We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, insights, and stories that contributed to this project. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
 
 # Data Sources
-All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team calculated outputs from a combination of the following data sources:
-* CAL FIRE Damage Inspection (DINS) Data June 2, 2025 | https://gis.data.cnra.ca.gov/datasets/CALFIRE-Forestry::cal-fire-damage-inspection-dins-data/explore
-* CAL FIRE, Fire Hazard Severity Zones 2025 | https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones
-* Los Angeles County Electronic Permiting and Inspections Data (EPIC LA) December 2025 | https://epicla.lacounty.gov/energov_prod/SelfService/#/home
-* Los Angeles County Department of Public Health 2025 | https://storymaps.arcgis.com/stories/667412ef37ee4392bddb5c90da3480f1?cover=false
+All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team used the following data sources to build the dashboard and summarize the challenges to recovery for Altadenans trying to rebuild:
+* CAL FIRE Damage Inspection (DINS) Data, June 2, 2025 | https://gis.data.cnra.ca.gov/datasets/CALFIRE-Forestry::cal-fire-damage-inspection-dins-data/explore
+* California Office of State Fire Marshall, Fire Hazard Severity Zones, 2024-2025 | https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones
+* Los Angeles County Electronic Permitting and Inspections Data (EPIC-LA), December 10, 2025 | https://epicla.lacounty.gov/energov_prod/SelfService/#/home
+* Los Angeles County Department of Public Health & Roux Associates Inc., Community soil sampling and human health screening report, September 5, 2025 | https://storymaps.arcgis.com/stories/667412ef37ee4392bddb5c90da3480f1?cover=false
 * Los Angeles County Assessor Data November 2025 
 
 # Methodology
