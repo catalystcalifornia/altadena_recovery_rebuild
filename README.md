@@ -1,5 +1,10 @@
 # Red Tape to Recovery: Tracking Altadena Rebuilding After the Eaton Fire
 January 2026
+<p align="left">
+  <img src="https://catalyst-california-logos.s3.us-west-2.amazonaws.com/DENA-RISEUP-catalyst-california-3.png"
+       alt="DENA RISE UP / Catalyst California logo"
+       width="180">
+</p>
 
 [View the report](https://www.catalystcalifornia.org/campaign-tools/publications/red-tape-to-recovery-tracking-altadena-rebuilding)
 
