@@ -43,22 +43,22 @@ We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, i
 
 # Data Sources
 All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team used the following data sources to build the dashboard and summarize the challenges to recovery for Altadenans trying to rebuild:
-* CAL FIRE Damage Inspection (DINS) Data, June 2, 2025 | https://gis.data.cnra.ca.gov/datasets/CALFIRE-Forestry::cal-fire-damage-inspection-dins-data/explore
-* California Office of State Fire Marshall, Fire Hazard Severity Zones, 2024-2025 | https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones
-* Los Angeles County Electronic Permitting and Inspections Data (EPIC-LA), December 10, 2025 | https://epicla.lacounty.gov/energov_prod/SelfService/#/home
+* California Department of Forestry & Fire Protection, CAL FIRE damage inspection (DINS) data, June 2, 2025 | https://gis.data.cnra.ca.gov/datasets/CALFIRE-Forestry::cal-fire-damage-inspection-dins-data/explore
+* California Office of State Fire Marshall, Fire hazard severity zones, 2024-2025 | https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones
+* Los Angeles County, Electronic permitting and inspections portal (EPIC-LA), December 10, 2025 | https://epicla.lacounty.gov/energov_prod/SelfService/#/home
 * Los Angeles County Department of Public Health & Roux Associates Inc., Community soil sampling and human health screening report, September 5, 2025 | https://storymaps.arcgis.com/stories/667412ef37ee4392bddb5c90da3480f1?cover=false
-* Los Angeles County Assessor Data November 2025 
+* Los Angeles County Assessor, Secured basic file abstract, November 2025 | https://assessor.lacounty.gov/real-estate-toolkit/data-sales
 
 # Methodology
 
-To learn more about the detailed methodology behind the 'Red Tape to Recovery' dashboard, please see the methodology documentation [here](https://github.com/catalystcalifornia/altadena_recovery_rebuild/blob/main/Red%20Tape%20to%20Recovery%20Methodology_Jan2026.pdf).
+To learn more about the data and methods behind the 'Red Tape to Recovery' dashboard, please see the detailed methodology [here](https://github.com/catalystcalifornia/altadena_recovery_rebuild/blob/main/Red%20Tape%20to%20Recovery%20Methodology_Jan2026.pdf).
 
 # About the Repository  
 
-In this repository, you will find three main folders: 
-* Data Prep | Scripts that were developed to scrape, import, clean, and recode data sets. Within this folder, a child folder called 'Monthly Updates' holds all the scripts for running relational tables that may be used to update the dashboard with new data. A folder titled 'crosswalks_relational_tables' also is held in here to hold any scripts created to ensure capturing comparable data from post-fire damage to now. 
-* Analysis | Scripts that run frequency and cross-tabulation tables focused on summarizing the data to areas of interest. 
-* Deliverables | Scripts that produce the visuals and embeds. Some are reproduced for the dashboard and some are only available for an internal team for analysis and research. 
+This repository includes scripts the team used to identify the findings shown in the 'Red Tape to Recovery' report and prepare the data shown on the dashboard. It also includes scripts used for internal reports and analysis. In this repository, you will find three main folders: 
+* Data Prep | Scripts that were developed to scrape, import, clean, and recode data sets for internal reports and 'Red Tape to Recovery'. Within this folder, a subfolder called 'Monthly Updates' holds all the scripts for preparing the data on the dashboard. A subfolder titled 'crosswalks_relational_tables' includes scripts for initial versions of this project that compared data from pre and post the Eaton Fire. 
+* Analysis | Scripts that run frequency and cross-tabulation tables focused on summarizing the data by area, e.g., West and East Altadena, and property characteristics, e.g. single family versus multifamily. These scripts underlie most of the findings shown in the 'Red Tape to Recovery' report.  
+* Deliverables | Scripts that produce internal visuals, embeds, and interactive reports that were from the early stages of project development. These visuals and files are not meant for public distribution. 
 
 # Contributors
 
@@ -75,7 +75,7 @@ In this repository, you will find three main folders:
 
 # Citation
 
-Catalyst California. *Red Tape to Recovery: Tracking Altadena Rebuilding After the Eaton Fire,* January 7, 2026. https://www.catalystcalifornia.org/campaign-tools/publications/red-tape-to-recovery-tracking-altadena-rebuilding
+Catalyst California. *Red Tape to Recovery: Tracking Altadena Rebuilding After the Eaton Fire.* January 7, 2026. https://www.catalystcalifornia.org/campaign-tools/publications/red-tape-to-recovery-tracking-altadena-rebuilding
 
 # About Catalyst California
 
