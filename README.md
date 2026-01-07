@@ -1,9 +1,9 @@
 # Red Tape to Recovery: Tracking Altadena Rebuilding After the Eaton Fire
 January 2026
 
-[View the report](INSERT LINK)
+[View the report](https://www.catalystcalifornia.org/campaign-tools/publications/red-tape-to-recovery-tracking-altadena-rebuilding)
 
-[View the data dashboard](https://catalystca.maps.arcgis.com/apps/dashboards/5aac849a3ada4c79b1ac1677964530e8
+[View the data dashboard](https://catalystca.maps.arcgis.com/apps/dashboards/5aac849a3ada4c79b1ac1677964530e8)
 
 <br>
 
@@ -38,15 +38,13 @@ We thank the [Dena Rise UP!](https://denariseup.org/) coalition for their collab
 All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team calculated outputs from a combination of the following data sources:
 * CAL FIRE Damage Inspection (DINS) Data June 2, 2025 | https://gis.data.cnra.ca.gov/datasets/CALFIRE-Forestry::cal-fire-damage-inspection-dins-data/explore
 * CAL FIRE, Fire Hazard Severity Zones 2025 | https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones
-* City of Pasadena Zoning Data Dec 4, 2024 | https://data.cityofpasadena.net/datasets/17339081d410464a94d2df1ddd95d3d6_0/about
-* Los Angeles County Unincorporated Zoning Data April 10, 2025 | https://egis-lacounty.hub.arcgis.com/datasets/3a3cf8766dca45e7a9fd0fbb8d0cd93c_3/explore?location=33.798293%2C-118.298800%2C7.76
 * Los Angeles County Electronic Permiting and Inspections Data (EPIC LA) December 2025 | https://epicla.lacounty.gov/energov_prod/SelfService/#/home
 * Los Angeles County Department of Public Health 2025 | https://storymaps.arcgis.com/stories/667412ef37ee4392bddb5c90da3480f1?cover=false
 * Los Angeles County Assessor Data November 2025 
 
-# Methodolody
+# Methodology
 
-To learn more about the detailed methodology behind the 'Red Tape to Recovery' dashboard, please see the methodology documentation [here](INSERT GITHUB LINK).
+To learn more about the detailed methodology behind the 'Red Tape to Recovery' dashboard, please see the methodology documentation [here](Red Tape to Recovery Methodology_Jan2026.pdf).
 
 # About the Repository  
 
@@ -70,7 +68,7 @@ In this repository, you will find three main folders:
 
 # Citation
 
-Catalyst California. *Red Tape to Recovery: Tracking Altadena Rebuilding After the Eaton Fire,* January 7, 2026. https://catalystca.maps.arcgis.com/apps/dashboards/5aac849a3ada4c79b1ac1677964530e8
+Catalyst California. *Red Tape to Recovery: Tracking Altadena Rebuilding After the Eaton Fire,* January 7, 2026. https://www.catalystcalifornia.org/campaign-tools/publications/red-tape-to-recovery-tracking-altadena-rebuilding
 
 # About Catalyst California
 
