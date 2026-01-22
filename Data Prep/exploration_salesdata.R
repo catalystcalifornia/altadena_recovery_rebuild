@@ -14,6 +14,7 @@ library(purrr)
 library(stringr)
 library(sf)
 library(RPostgres)
+library(leaflet)
 
 #Add database connection and source script with functions for pushing to postgres
 source("W:\\RDA Team\\R\\credentials_source.R")
@@ -61,6 +62,47 @@ dmg_anfs_sales <- anfs_sales %>%
 dmg_anfs_sales %>%
   count(damage_category)
 #The count reveals that only 343 of the properties marked as sold in the anfs data are significantly damaged so yes, they are including other properties but also have reported more properties sold that are significantly damaged than we have with assesor data
+
+#Question: Are there any significantly damaged properties they've identified as sold before October 7th that we have not? 
+anfs_beforeoct7 <- dmg_anfs_sales %>% 
+  filter(damage_category == 'Significant Damage')%>%
+  mutate(sold_date = as.Date(sold_date)) %>%
+  filter(sold_date < as.Date("2025-10-07"))
+#ANFS identified a total of 261 significantly damaged properties sold before October 7th and we have identified 10 more sold than they have. 
+#Which ones did we identify as sold and they did not? 
+discrepency_lac <- anti_join(lac_sales %>% filter(sold_after_eaton == TRUE), 
+                             anfs_beforeoct7, by = c("ain" = "parcel"))
+
+discrepency_anfs <- anti_join(anfs_beforeoct7,
+                              lac_sales %>% filter(sold_after_eaton == TRUE), 
+                               by = c("parcel" = "ain"))
+#32 properties identified for discrepency by lac.. may be due to private sales that are in assessor data and not on public sites
+#22 properties identified for discrepency by anfs..
+
+#check discrepency_anfs parcel numbers for addresses, maybe we have a different parcel number for an address than they do
+# 5829014016 | https://portal.assessor.lacounty.gov/parceldetail/5829014016 address: 509 W ALTADENA DR AND discrepency_anfs says the address as 509 Altadena Dr so there is a discrepency in address
+##searching to see if address match but first I need sales data that has address
+View(lac_sales %>% filter(ain == "5829014016")) #we report as not sold
+## public sale site says 509 W ALTADENA DR has been sold: https://www.zillow.com/homedetails/509-W-Altadena-Dr-Altadena-CA-91001/20909445_zpid/
+## public sale site also says 509 ALTADENA DR has been sold: https://www.realtor.com/realestateandhomes-detail/509-W-Altadena-Dr_Altadena_CA_91001_M18287-76316
+
+
+#check discrepency_anfs online if it does say the ain parcel has been sold from a public sale site
+
+# View(lac_sales %>% filter(sold_after_eaton == TRUE))
+#My follow up questions is what geographic area are ANFS monitoring? It may be a smaller area than we are? I cannot identify what else is contributing to the discrepency?
+geom_lac <- st_read(con, query="SELECT * FROM dashboard.rel_assessor_parcels_2025_12")
+geom_disrepency_lac <- right_join(geom_lac,
+                                 discrepency_lac, by = c("ain_2025_12" = "ain"))
+geom_disrepency_lac %>%
+  st_transform(4326) %>%   # Leaflet wants WGS84
+  leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    weight = 1,
+    color = "blue",
+    fillOpacity = 0.6
+  )
 
 #### Goal 2: QA ANFS data for significantly damaged properties sold ####
 #start with filtering for the properties that are significantly damaged AND have not been identified as sold by us 
