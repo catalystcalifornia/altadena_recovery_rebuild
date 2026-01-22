@@ -139,7 +139,7 @@ anfs_sales <- anfs_sales %>%
   relocate(notes, .after = last_col())
 
 #second merge with damage level data to filter for only significantly damaged sales reported
-dmg_lac_data <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")
+dmg_lac_data <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")
 dmg_anfs_sales <- anfs_sales %>%
   left_join(dmg_lac_data, by = c("parcel" = "ain_sept"))
 filter_anfs <- dmg_anfs_sales %>% 
