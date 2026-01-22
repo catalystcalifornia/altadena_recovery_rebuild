@@ -100,7 +100,7 @@ na_sale_date <- sales %>%
 # looking at recording date, only one had a recording date in 2025, but the recording was due to perfection of title not a sale, make nulls a FALSE flag
 # land reason key 6 for this property but key 6 isn't in data dictionary
 
-#### STEP 6: CLEAN UP NAs for POSTGRES (Update AIN column names) ####
+#### STEP 6A: CLEAN UP NAs for POSTGRES (Update AIN column names) ####
 
 # clean up for postgres
 sales_final <- sales %>%
@@ -124,6 +124,48 @@ nrow(sales_final) - length(unique(xwalk$ain_2025_12)) # should be 0
 # check total sales that it increased
 table(sales_final$sold_after_eaton,useNA='always')
 # 271 in December 2025
+
+#### STEP 6B: Add sales data from "Altadena Not for Sale" database ####
+
+#first download and import most recent sales data 
+anfs_sales <- read.csv("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Altadena Not for Sale Data\\Altadena Not for Sale_ property sold through Jan 7, 2025-Jan.9, 2026 - Final stats _ SOLD (Jan 7, 2025 - Jan 9, 2026).csv")
+anfs_sales <- anfs_sales %>% 
+  rename_with(~ .x %>%
+                tolower() %>%
+                str_replace_all("\\.", "_")) %>%
+  rename(notes = x,
+         contract_amt = contract__,
+         parcel = parcel__) %>% 
+  relocate(notes, .after = last_col())
+
+#second merge with damage level data to filter for only significantly damaged sales reported
+dmg_lac_data <- st_read(con, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")
+dmg_anfs_sales <- anfs_sales %>%
+  left_join(dmg_lac_data, by = c("parcel" = "ain_sept"))
+filter_anfs <- dmg_anfs_sales %>% 
+  filter(damage_category == 'Significant Damage') %>% 
+  inner_join(sales_final %>% filter(sold_after_eaton == FALSE), by = c("parcel" = "ain")) %>%
+  select(parcel, sold_date)
+
+#third, merge to add ANFS data to final sales data and rewrite sold_after_eaton = TRUE if from ANFS data 
+# (note this doesn't update other columns)
+sales_final_updated <- sales_final %>%
+  left_join(
+    filter_anfs %>% mutate(sold_override = TRUE),
+    by = c("ain" = "parcel")
+  ) %>%
+  mutate(
+    sold_after_eaton = if_else(
+      sold_override %in% TRUE,
+      TRUE,
+      sold_after_eaton
+    )
+  ) %>%
+  select(-sold_override)
+
+# check total sales that it increased from before ANFS data was added
+table(sales_final_updated$sold_after_eaton,useNA='always')
+# 375 in December 2025
 
 #### STEP 7: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
