@@ -2,6 +2,8 @@
 
 ## Sales Data from 'Altadena Not for Sale' https://docs.google.com/spreadsheets/d/1qDFwOTnUq87o12n-EeFIZ0xfcqpGOEoNIGFbDJe33a8/edit?gid=846804396#gid=846804396
 
+## QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_anfs_sales_data.docx
+
 ## The goal for this exploratory script is to do the following: 
 # 1. Evaluating where their higher # of sales come from - is this from sales that occurred after October 7th or from them tracking undamaged homes?
 # 2. For additional sales they have tracked of significantly damaged properties, QA their data against a public source of current sales (e.g., redfin or other site) to make sure they aren't over identifying sales
