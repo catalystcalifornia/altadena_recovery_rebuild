@@ -22,6 +22,9 @@ con <- connect_to_db("altadena_recovery_rebuild")
 options(scipen = 999)
 
 lac_sales <-  st_read(con, query="SELECT * FROM dashboard.rel_assessor_sales_2025_12")
+
+lac_res <- st_read(con, query = "SELECT * FROM dashboard.rel_assessor_residential_2025_12")
+
 #### download and import new sales data ####
 #First, I downloaded to the data from the URL link to here as a csv file: W:\Project\RDA Team\Altadena Recovery and Rebuild\Data\Altadena Not for Sale Data
 
@@ -79,15 +82,24 @@ discrepency_anfs <- anti_join(anfs_beforeoct7,
 #32 properties identified for discrepency by lac.. may be due to private sales that are in assessor data and not on public sites
 #22 properties identified for discrepency by anfs..
 
-#check discrepency_anfs parcel numbers for addresses, maybe we have a different parcel number for an address than they do
+#check discrepency_anfs parcel numbers for addresses, maybe we have a different parcel number for an address than they do. And if it does say the ain parcel has been sold from a public sale site
 # 5829014016 | https://portal.assessor.lacounty.gov/parceldetail/5829014016 address: 509 W ALTADENA DR AND discrepency_anfs says the address as 509 Altadena Dr so there is a discrepency in address
-##searching to see if address match but first I need sales data that has address
-View(lac_sales %>% filter(ain == "5829014016")) #we report as not sold
+## searching to see if address match but first I need sales data that has address
+## View(lac_sales %>% filter(ain == "5829014016")) #we report as not sold
+## View(lac_res %>% filter(ain_2025_12 == "5829014016")) #address we associated with this ain: 509 W Altadena so address DOES NOT MATCH
 ## public sale site says 509 W ALTADENA DR has been sold: https://www.zillow.com/homedetails/509-W-Altadena-Dr-Altadena-CA-91001/20909445_zpid/
 ## public sale site also says 509 ALTADENA DR has been sold: https://www.realtor.com/realestateandhomes-detail/509-W-Altadena-Dr_Altadena_CA_91001_M18287-76316
 
+# 5843012005 | https://portal.assessor.lacounty.gov/parceldetail/5843012005 address: 3273 ALEGRE LN
+## View(lac_sales %>% filter(ain == "5843012005")) #we report as not sold
+## View(lac_res %>% filter(ain_2025_12 == "5843012005")) # address matches 3273 ALEGRE LN
+## public sale site says 3273 ALEGRE LN has been sold: https://www.zillow.com/homedetails/3273-Alegre-Ln-Altadena-CA-91001/20916352_zpid/
 
-#check discrepency_anfs online if it does say the ain parcel has been sold from a public sale site
+# 5843024014 | https://portal.assessor.lacounty.gov/parceldetail/5843024014 address: 1695 E Loma Alta Drive (matches with anfs)
+## View(lac_sales %>% filter(ain == "5843024014")) #we report as not sold
+## View(lac_res %>% filter(ain_2025_12 == "5843024014")) # address matches 
+## public site says it has been sold: https://www.realtor.com/realestateandhomes-detail/1695-E-Loma-Alta-Dr_Altadena_CA_91001_M21621-20172
+
 
 # View(lac_sales %>% filter(sold_after_eaton == TRUE))
 #My follow up questions is what geographic area are ANFS monitoring? It may be a smaller area than we are? I cannot identify what else is contributing to the discrepency?
@@ -103,6 +115,8 @@ geom_disrepency_lac %>%
     color = "blue",
     fillOpacity = 0.6
   )
+
+#Assessment: area is not a factor. Likely it is a discrepency of different reporting to la county and some AIN variations
 
 #### Goal 2: QA ANFS data for significantly damaged properties sold ####
 #start with filtering for the properties that are significantly damaged AND have not been identified as sold by us 
