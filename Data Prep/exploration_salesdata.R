@@ -107,7 +107,7 @@ geom_lac <- st_read(con, query="SELECT * FROM dashboard.rel_assessor_parcels_202
 geom_disrepency_lac <- right_join(geom_lac,
                                  discrepency_lac, by = c("ain_2025_12" = "ain"))
 geom_disrepency_lac %>%
-  st_transform(4326) %>%   # Leaflet wants WGS84
+  st_transform(4326) %>%   
   leaflet() %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(
