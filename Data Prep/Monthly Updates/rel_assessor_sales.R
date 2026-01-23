@@ -127,16 +127,8 @@ table(sales_final$sold_after_eaton,useNA='always')
 
 #### STEP 6B: Add sales data from "Altadena Not for Sale" database ####
 
-#first download and import most recent sales data 
-anfs_sales <- read.csv("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Altadena Not for Sale Data\\Altadena Not for Sale_ property sold through Jan 7, 2025-Jan.9, 2026 - Final stats _ SOLD (Jan 7, 2025 - Jan 9, 2026).csv")
-anfs_sales <- anfs_sales %>% 
-  rename_with(~ .x %>%
-                tolower() %>%
-                str_replace_all("\\.", "_")) %>%
-  rename(notes = x,
-         contract_amt = contract__,
-         parcel = parcel__) %>% 
-  relocate(notes, .after = last_col())
+#first pull most recent sales data 
+anfs_sales <- st_read(con, query="SELECT * FROM dashboard.anfs_sales_data_01092026")
 
 #second merge with damage level data to filter for only significantly damaged sales reported
 dmg_lac_data <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")

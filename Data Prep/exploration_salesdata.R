@@ -41,6 +41,36 @@ anfs_sales <- anfs_sales %>%
          parcel = parcel__) %>% 
   relocate(notes, .after = last_col())
 
+dbWriteTable(con, DBI::Id(schema = "dashboard", table = "anfs_sales_data_01092026"), anfs_sales,
+  overwrite = FALSE,  
+  row.names = FALSE
+)
+
+# Comment on table and columns
+schema <- "dashboard"
+table_name <- "anfs_sales_data_01092026"
+indicator <- "Data on sales in Altadena from January 7, 2025 to January 9, 2026. Reported from Altadena No for Sale."
+source <- "Source: https://docs.google.com/spreadsheets/d/1qDFwOTnUq87o12n-EeFIZ0xfcqpGOEoNIGFbDJe33a8/edit?gid=846804396#gid=846804396"
+qa_filepath <- " QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_Sheet_anfs_sales_data.docx"
+column_names <- colnames(anfs_sales) # Get column names
+column_comments <- c(
+  "New Owner",
+  "address of property",
+  "days on market",
+  "first day on market",
+  "contract/sale amount?",
+  "price listed",
+  "contact final amount?",
+  "date sold", 
+  "square footage of lot", 
+  "parcel aka ain", 
+  "year built", 
+  "notes"
+)
+
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+
+
 #### Goal 1: Evaluating where the higher # of sales comes from ####
 #Question: Do they have sales documented after October 7th? 
 
