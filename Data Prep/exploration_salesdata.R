@@ -41,10 +41,12 @@ anfs_sales <- anfs_sales %>%
   rename(notes = x,
          contract_amt = contract__,
          parcel = parcel__) %>% 
-  relocate(notes, .after = last_col())
+  relocate(notes, .after = last_col()) %>%
+  filter(!is.na(sold_date), sold_date != "") #filter out empty rows at the bottom. 
+
 
 dbWriteTable(con, DBI::Id(schema = "dashboard", table = "anfs_sales_data_01092026"), anfs_sales,
-  overwrite = FALSE,  
+  overwrite = TRUE,  
   row.names = FALSE
 )
 
