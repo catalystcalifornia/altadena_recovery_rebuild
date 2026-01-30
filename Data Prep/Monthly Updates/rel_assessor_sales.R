@@ -128,7 +128,7 @@ table(sales_final$sold_after_eaton,useNA='always')
 #### STEP 6B: Add sales data from "Altadena Not for Sale" database ####
 
 #first pull most recent sales data and clean up columns to match la county sales data
-anfs_sales <- st_read(con, query="SELECT * FROM dashboard.anfs_sales_data_01092026") 
+anfs_sales <- st_read(con_alt, query="SELECT * FROM dashboard.anfs_sales_data_01092026") 
 
 #second, add column anfs_sale TRUE or FALSE for record and strip data to just parcel and anfs_sold
 anfs_record <- anfs_sales %>%
@@ -168,70 +168,72 @@ sales_merged <- sales_record %>%
 
 #fifth, first clean up sales data tables from lac and anfs to merge later
 anfs_sales_clean <- anfs_sales %>%
-  mutate(last_sale_year = year(as.Date(sold_date)),
-         last_sale_month = month(as.Date(sold_date)),
-         last_sale_date = sold_date,
-         sold_amount = contract_amt,
-         owner_name = new_owner,
+  mutate(last_sale_year_anfs = year(as.Date(sold_date)),
+         last_sale_month_anfs = month(as.Date(sold_date)),
+         last_sale_date_anfs = sold_date,
+         sold_amount_anfs = contract_amt,
+         owner_name_anfs = new_owner,
          address = property) %>%
   select(parcel, 
-         last_sale_year,
-         last_sale_month,
-         last_sale_date,
-         sold_amount,
+         last_sale_year_anfs,
+         last_sale_month_anfs,
+         last_sale_date_anfs,
+         sold_amount_anfs,
          list_price, #unique to anfs, not in lac
-         owner_name,
+         owner_name_anfs,
          address) #unique to anfs, not in lac
   
 lac_sales_clean <- sales_final %>%
-  mutate(owner_name = first_owner_name,
-         sold_amount = last_sale_amount) %>%
+  mutate(owner_name_lac = first_owner_name,
+         sold_amount_lac = last_sale_amount) %>%
+  rename(last_sale_year_lac = last_sale_year,
+         last_sale_month_lac = last_sale_month,
+         last_sale_date_lac = last_sale_date) %>%
   select(ain, 
-         last_sale_year,
-         last_sale_month,
-         last_sale_date,
-         sold_amount,
+         last_sale_year_lac,
+         last_sale_month_lac,
+         last_sale_date_lac,
+         sold_amount_lac,
          recording_date, #unique to lac, not in anfs
-         owner_name)
+         owner_name_lac)
 
 #sixth, merge to final dataset to get merged information needed. 
 
-sales_updated_test <- sales_merged %>% 
+sales_updated <- sales_merged %>% 
   left_join(lac_sales_clean, by = c("lac_ain" = "ain")) %>%
-  left_join(anfs_sales_clean, by = c("lac_ain" = "parcel"), suffix = c("", "_anfs"))
+  left_join(anfs_sales_clean, by = c("lac_ain" = "parcel"))
 
 sales_updated_final <- sales_updated %>%
   mutate(
-    last_sale_year_final = case_when()
-  )
-df <- df %>%
-  mutate(
-    price_final = case_when(
-      source_sold == "A" ~ price_a,
-      source_sold == "B" ~ price_b
-    )
-  )
-
-
-# add ANFS data to final sales data and rewrite sold_after_eaton = TRUE if from ANFS data 
-# (note this doesn't update other columns)
-sales_final_updated <- sales_final %>%
-  left_join(
-    anfs_sales %>% mutate(sold_override = TRUE),
-    by = c("ain" = "parcel")
-  ) %>%
-  mutate(
-    sold_after_eaton = if_else(
-      sold_override %in% TRUE,
-      TRUE,
-      sold_after_eaton
-    )
-  ) %>%
-  select(-sold_override)
+    last_sale_year = ifelse(sold_source == "anfs", 
+                            last_sale_year_anfs,
+                            last_sale_year_lac),
+    last_sale_month = ifelse(sold_source == "anfs", 
+                             last_sale_month_anfs,
+                             last_sale_month_lac),
+    last_sale_date = ifelse(sold_source == "anfs", 
+                            last_sale_date_anfs,
+                            last_sale_date_lac),
+    sold_amount = ifelse(sold_source == "anfs", 
+                         sold_amount_anfs,
+                         sold_amount_lac),
+    owner_name = ifelse(sold_source == "anfs", 
+                        owner_name_anfs,
+                        owner_name_lac)
+  ) %>% 
+  select(lac_ain, sold_after_eaton, anfs_sold, sold_source, 
+         last_sale_year,
+         last_sale_month, 
+         last_sale_date,
+         sold_amount,
+         owner_name,
+         recording_date,
+         list_price,
+         address)
 
 # check total sales that it increased from before ANFS data was added
-table(sales_final_updated$sold_after_eaton,useNA='always')
-# 375 in December 2025
+table(sales_updated_final$sold_source,useNA='always')
+# 104+239+32 = 375 TOTAL SALES in December 2025
 
 #### STEP 7: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
@@ -275,6 +277,36 @@ column_comments <- c('ain for current month- use to match to other tables',
         "Third to last unverified sale amount - If the sale is a verified sale (non-numeric character as indicated on the verifications key), the sale amount will not show")
 
 add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
+
+#### STEP 7B: Add updates sales data from "Altadena Not for Sale" to pgadmin database ####
+# Export to postgres
+table_label <- paste0("rel_assessor_sales_updated_", year, "_", month)
+schema <- "dashboard"
+indicator <- "Relational table with information on sales date and ownership/documentation changes combined with sales data from Altadena Not For Sale. "
+source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_sales.R "
+qa_filepath<-"  QA_Sheet_anfs_sales_data.docx "
+
+dbWriteTable(con_alt, Id(schema, table_label), sales_updated_final,
+             overwrite = FALSE, row.names = FALSE)
+
+# Add metadata
+column_names <- colnames(sales_updated_final) # Get column names
+
+column_comments <- c('ain for current month- use to match to other tables',
+                     ' true false field for if sale took place after 1-8-25--likely to have been listed after eaton fire',
+                     ' true false field for if sale is recorded by group: Altadena Not For Sale', 
+                     ' flag if la county, altadena not for sale, both, or neither recorded the sale. Default was to use relative data from la county but anfs if only they recorded the information.',
+                     'year of last sale',
+                     'month of last sale in number format',
+                     " This is the date of last change or correction of ownership",
+                     'amount sold for',
+                     'owner name',
+                     "This is the last sale date - Present for both verified and unverified sales",
+                     "price the property is originally listed for",
+                     'address of property')
+
+add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
+
 
 #### STEP 8: close dbconnection (NO UPDATES NEEDED) ####
 dbDisconnect(con_alt)
