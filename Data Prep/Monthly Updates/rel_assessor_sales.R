@@ -127,23 +127,97 @@ table(sales_final$sold_after_eaton,useNA='always')
 
 #### STEP 6B: Add sales data from "Altadena Not for Sale" database ####
 
-#first pull most recent sales data 
-anfs_sales <- st_read(con, query="SELECT * FROM dashboard.anfs_sales_data_01092026")
+#first pull most recent sales data and clean up columns to match la county sales data
+anfs_sales <- st_read(con, query="SELECT * FROM dashboard.anfs_sales_data_01092026") 
 
-#second merge with damage level data to filter for only significantly damaged sales reported
-dmg_lac_data <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")
-dmg_anfs_sales <- anfs_sales %>%
-  left_join(dmg_lac_data, by = c("parcel" = "ain_sept"))
-filter_anfs <- dmg_anfs_sales %>% 
-  filter(damage_category == 'Significant Damage') %>% 
-  inner_join(sales_final %>% filter(sold_after_eaton == FALSE), by = c("parcel" = "ain")) %>%
-  select(parcel, sold_date)
+#second, add column anfs_sale TRUE or FALSE for record and strip data to just parcel and anfs_sold
+anfs_record <- anfs_sales %>%
+  mutate(
+    anfs_sold = as.Date(sold_date) > as.Date("2025-01-07"),
+    anfs_ain = parcel
+  ) %>%
+  select(anfs_ain, anfs_sold) 
 
-#third, merge to add ANFS data to final sales data and rewrite sold_after_eaton = TRUE if from ANFS data 
+#third, before merging anfs to lac, add older AINs to lac data
+sales_record <- sales_final %>% select(ain, sold_after_eaton) %>% 
+  mutate(lac_ain = ain) %>%
+  left_join(xwalk, by = c("ain" = "ain_2025_12")) %>% # merge to get older ains jic anfs data is recording from prior ains
+  select(lac_ain, sold_after_eaton, ain_2025_01, ain_2025_09)
+
+#fourth, merge to anfs and add source column
+sales_merged <- sales_record %>%
+  left_join(anfs_record, by = c("lac_ain" = "anfs_ain"), suffix = c("", "_c")) %>%
+  left_join(anfs_record, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_c")) %>%
+  left_join(anfs_record, by = c("ain_2025_09" = "anfs_ain"), suffix = c("", "_c")) %>%
+  # coalesce all anfs columns
+  mutate(
+    across(
+      ends_with(c("_a", "_b", "_c")),
+      ~ coalesce(.x, get(sub("_[abc]$", "", cur_column())))
+    )
+  ) %>%
+  # drop extra suffixed columns
+  select(-ends_with(c("_a", "_b", "_c"))) %>%
+  mutate(anfs_sold = coalesce(anfs_sold, FALSE)) %>%
+  mutate(sold_source = ifelse(sold_after_eaton == TRUE & anfs_sold == TRUE, "both",
+                              ifelse(sold_after_eaton == TRUE & anfs_sold == FALSE, "lac",
+                                     ifelse(sold_after_eaton == FALSE & anfs_sold == TRUE, "anfs",
+                                            "neither"))))
+# table(sales_merged$sold_source)
+
+
+#fifth, first clean up sales data tables from lac and anfs to merge later
+anfs_sales_clean <- anfs_sales %>%
+  mutate(last_sale_year = year(as.Date(sold_date)),
+         last_sale_month = month(as.Date(sold_date)),
+         last_sale_date = sold_date,
+         sold_amount = contract_amt,
+         owner_name = new_owner,
+         address = property) %>%
+  select(parcel, 
+         last_sale_year,
+         last_sale_month,
+         last_sale_date,
+         sold_amount,
+         list_price, #unique to anfs, not in lac
+         owner_name,
+         address) #unique to anfs, not in lac
+  
+lac_sales_clean <- sales_final %>%
+  mutate(owner_name = first_owner_name,
+         sold_amount = last_sale_amount) %>%
+  select(ain, 
+         last_sale_year,
+         last_sale_month,
+         last_sale_date,
+         sold_amount,
+         recording_date, #unique to lac, not in anfs
+         owner_name)
+
+#sixth, merge to final dataset to get merged information needed. 
+
+sales_updated_test <- sales_merged %>% 
+  left_join(lac_sales_clean, by = c("lac_ain" = "ain")) %>%
+  left_join(anfs_sales_clean, by = c("lac_ain" = "parcel"), suffix = c("", "_anfs"))
+
+sales_updated_final <- sales_updated %>%
+  mutate(
+    last_sale_year_final = case_when()
+  )
+df <- df %>%
+  mutate(
+    price_final = case_when(
+      source_sold == "A" ~ price_a,
+      source_sold == "B" ~ price_b
+    )
+  )
+
+
+# add ANFS data to final sales data and rewrite sold_after_eaton = TRUE if from ANFS data 
 # (note this doesn't update other columns)
 sales_final_updated <- sales_final %>%
   left_join(
-    filter_anfs %>% mutate(sold_override = TRUE),
+    anfs_sales %>% mutate(sold_override = TRUE),
     by = c("ain" = "parcel")
   ) %>%
   mutate(
