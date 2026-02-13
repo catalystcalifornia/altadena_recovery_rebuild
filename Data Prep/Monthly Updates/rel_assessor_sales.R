@@ -133,7 +133,7 @@ anfs_sales <- st_read(con_alt, query="SELECT * FROM dashboard.anfs_sales_data_01
 #second, add column anfs_sale TRUE or FALSE for record and strip data to just parcel and anfs_sold
 anfs_record <- anfs_sales %>%
   mutate(
-    anfs_sold = as.Date(sold_date) > as.Date("2025-01-07"),
+    anfs_sold = as.Date(sold_date) > as.Date("2025-02-08"),
     anfs_ain = parcel
   ) %>%
   select(anfs_ain, anfs_sold) 
@@ -144,27 +144,38 @@ sales_record <- sales_final %>% select(ain, sold_after_eaton) %>%
   left_join(xwalk, by = c("ain" = "ain_2025_12")) %>% # merge to get older ains jic anfs data is recording from prior ains
   select(lac_ain, sold_after_eaton, ain_2025_01, ain_2025_09)
 
+# check on duplicates
+nrow(sales_record) - nrow(sales_final)
+dup_check <- sales_record %>% count(lac_ain) %>% filter(n>1)
+print(dup_check)
+# checked in the xwalk
+xwalk %>% filter(ain_2025_12 %in% dup_check$lac_ain) %>% View()
+# makes sense to have duplicate here, take care of later to ensure no more dups at the end
+
 #fourth, merge to anfs and add source column
 sales_merged <- sales_record %>%
-  left_join(anfs_record, by = c("lac_ain" = "anfs_ain"), suffix = c("", "_c")) %>%
-  left_join(anfs_record, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_c")) %>%
+  # join anfs records based on each ain field date in the crosswalk, add suffix after 2nd join
+  left_join(anfs_record, by = c("lac_ain" = "anfs_ain")) %>%
+  left_join(anfs_record, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>%
   left_join(anfs_record, by = c("ain_2025_09" = "anfs_ain"), suffix = c("", "_c")) %>%
-  # coalesce all anfs columns
-  mutate(
-    across(
-      ends_with(c("_a", "_b", "_c")),
-      ~ coalesce(.x, get(sub("_[abc]$", "", cur_column())))
-    )
-  ) %>%
-  # drop extra suffixed columns
-  select(-ends_with(c("_a", "_b", "_c"))) %>%
-  mutate(anfs_sold = coalesce(anfs_sold, FALSE)) %>%
-  mutate(sold_source = ifelse(sold_after_eaton == TRUE & anfs_sold == TRUE, "both",
-                              ifelse(sold_after_eaton == TRUE & anfs_sold == FALSE, "lac",
-                                     ifelse(sold_after_eaton == FALSE & anfs_sold == TRUE, "anfs",
+  # coalesce anfs sales columns into one field
+  mutate(anfs_sold_combined = coalesce(anfs_sold,
+                                 anfs_sold_b,
+                                 anfs_sold_c, FALSE)) %>%
+  # add source column
+  mutate(sold_source = ifelse(sold_after_eaton == TRUE & anfs_sold_combined == TRUE, "both",
+                              ifelse(sold_after_eaton == TRUE & anfs_sold_combined == FALSE, "lac",
+                                     ifelse(sold_after_eaton == FALSE & anfs_sold_combined == TRUE, "anfs",
                                             "neither"))))
-# table(sales_merged$sold_source)
 
+# check recoding worked
+sales_merged %>% filter(is.na(anfs_sold) & !is.na(anfs_sold_b)) %>% View()
+table(sales_merged$sold_source)
+sales_merged %>% group_by(sold_source,anfs_sold_combined,sold_after_eaton) %>% summarise(count=n())
+
+# check for dups again
+nrow(sales_merged) - nrow(sales_record)
+# none extra
 
 #fifth, first clean up sales data tables from lac and anfs to merge later
 anfs_sales_clean <- anfs_sales %>%
