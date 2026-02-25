@@ -1,8 +1,10 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_sales table for the Monthly Dashboard Updates ##
 ## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_assessor_sales.docx ##
 ## SCRIPT OUTPUT: rel_assessor_sales_YYYY_MM
+## Script combines data from LAC assessor with sales data collected from Altadena Not For Sale
+## LAC sales data used as base and Altadena not for sale data supplements it
 
-#### STEP 1: SET UP (Update year and month) ####
+#### STEP 1: *UPDATE YEAR AND MONTH* SET UP  ####
 library(sf)
 library(rmapshaper)
 library(leaflet)
@@ -23,7 +25,7 @@ con_alt <- connect_to_db("altadena_recovery_rebuild")
 year <- "2025"
 month <- "12"
 
-#### STEP 2: PULL DATA AND FILTER (Update to latest data) ####
+#### STEP 2: *UPDATE* PULL DATA AND FILTER (update to latest data) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
 xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
@@ -33,7 +35,7 @@ assessor_data <- st_read(con_alt, query="Select * from dashboard.assessor_data_u
 # get universe of distinct current ains to join assessor data to -- so we don't drop those without records in the data table (parcel shapes update faster than parcel data)
 curr_ain_universe <- xwalk %>% distinct(ain_2025_12) %>% rename(ain=ain_2025_12)
 
-sales <- curr_ain_universe %>% 
+lac_sales <- curr_ain_universe %>% 
   left_join(assessor_data) %>% 
   select(ain, use_code, contains("owner"),
          recording_date,
@@ -49,10 +51,11 @@ sales <- curr_ain_universe %>%
          exemption_type,
          ownership_code
   ) 
+## PART 1 - LAC SALES FROM ASSESSOR -------
+##### STEP 3: MUTATE DATES for SALES (NO UPDATES) #####
 
-#### STEP 3: MUTATE DATES for SALES (NO UPDATES) ####
-
-sales <- sales %>%
+## extract year and month of most recent sale
+lac_sales <- lac_sales %>%
   mutate(last_sale_date_orig=last_sale_date,
          last_sale_char=as.character(last_sale_date),
          last_sale_date=as.Date(last_sale_char, format = "%Y%m%d"),
@@ -62,53 +65,46 @@ sales <- sales %>%
          sale_three_date=as.Date(sale_three_char, format = "%Y%m%d")
   )
 
-View(sales) # looks good
-## extract year and month of most recent sale and flag for if sale took place after Eaton
-# what date to use for flag of being sold after Eaton?
-# first sale occurred in February according to news sources - https://www.cbsnews.com/losangeles/news/first-altadena-property-with-home-destroyed-by-eaton-fire-hits-market-sells-within-days/
-# fire started on January 7th, 2025  https://www.fire.ca.gov/incidents/2025/1/7/eaton-fire
-# LASD allowed all residents to at least visit their properties on 1/21-25 -- use this date https://www.instagram.com/p/DFGeGEOBbw5/?hl=en
+View(lac_sales) # looks good
 
-#### STEP 4: CREATE T/F IF SOLD AFTER EATON (NO UPDATES) ####
+##### STEP 4: LAC SALES  - CREATE T/F IF SOLD AFTER EATON BASED ON LAC (NO UPDATES) #####
 # based on news article and data, we use date of 2-8-25 for sale after fire -- escrow takes 30 days to close anyways typically
-sales <- sales %>%
+# flag for if sale took place after Eaton
+lac_sales <- lac_sales %>%
   mutate(last_sale_year=format(last_sale_date,"%Y"),
          last_sale_month=format(last_sale_date,"%m"),
          sold_after_eaton=ifelse(last_sale_date>="2025-02-08", TRUE, FALSE))
 
-#### STEP 5: CHECK YOUR DATA (NO UPDATES) ####
-
 # quick check
-sales%>%select(last_sale_date, sold_after_eaton)%>%View() # Looks good
+lac_sales%>%select(last_sale_date, sold_after_eaton)%>%View() # Looks good
+
+##### STEP 5: *UPDATE* CHECK LAC DATA EACH  #####
+# check most recent sales date
+max(lac_sales$last_sale_date,na.rm=TRUE)
+# "2025-09-26" - if this doesnt increase flag to Elycia
 
 # check for nulls
-check_sales <- sales %>%
+check_sales <- lac_sales %>%
   group_by(last_sale_year,sold_after_eaton) %>%
   summarise(count=n())
 
 check_sales %>% filter(is.na(last_sale_year) & is.na(sold_after_eaton))
 # 30 with NA in check
 
-# check most recent sales date
-max(sales$last_sale_date,na.rm=TRUE)
-# "2025-09-26" - if this doesnt increase flag to Elycia
-
-na_sale_date <- sales %>%
+na_sale_date <- lac_sales %>%
   select(last_sale_date_orig, last_sale_year,recording_date, doc_reason_code, land_reason_key, everything()) %>%
   filter(is.na(sold_after_eaton))
 # those with a sales date originally have errors in the sales date, but sold prior to 2025
 # looking at recording date, only one had a recording date in 2025, but the recording was due to perfection of title not a sale, make nulls a FALSE flag
 # land reason key 6 for this property but key 6 isn't in data dictionary
 
-#### STEP 6A: CLEAN UP NAs for POSTGRES (Update AIN column names) ####
+# clean up sold after eaton and specify for LAC
+lac_sales_final <- lac_sales %>%
+  mutate(sold_after_eaton_lac=ifelse(is.na(sold_after_eaton), FALSE, sold_after_eaton))
 
-# clean up for postgres
-sales_final <- sales %>%
-  mutate(sold_after_eaton=ifelse(is.na(sold_after_eaton), FALSE, sold_after_eaton))
-
-sales_final <- sales_final %>%
+lac_sales_final <- lac_sales_final %>%
   select(ain,
-         sold_after_eaton, last_sale_year, last_sale_month, 
+         sold_after_eaton_lac, last_sale_year, last_sale_month, 
          first_owner_name, first_owner_name_overflow, second_owner_name,
          recording_date, 
          ownership_code, doc_reason_code, land_reason_key, partial_interest,
@@ -118,70 +114,110 @@ sales_final <- sales_final %>%
          sale_three_date, sale_three_verif_key, sale_three_amount) 
 
 # check for duplicates or gaps
-nrow(sales_final) - length(unique(sales_final$ain)) # should be 0
-nrow(sales_final) - length(unique(xwalk$ain_2025_12)) # should be 0
+nrow(lac_sales_final) - length(unique(lac_sales_final$ain)) # should be 0
+nrow(lac_sales_final) - length(unique(xwalk$ain_2025_12)) # should be 0
 
 # check total sales that it increased
-table(sales_final$sold_after_eaton,useNA='always')
+table(lac_sales_final$sold_after_eaton,useNA='always')
 # 271 in December 2025
 
-#### STEP 6B: Add sales data from "Altadena Not for Sale" database ####
-
-#first pull most recent sales data and clean up columns to match la county sales data
+### PART 2 - ADD ALTADENA NOT FOR SALE DATA ####
+##### STEP 6: *UPDATE* Add sales data from "Altadena Not for Sale" database #####
+# first pull most recent sales data and clean up columns to match la county sales data
+# update with most recent dataset
 anfs_sales <- st_read(con_alt, query="SELECT * FROM dashboard.anfs_sales_data_01092026") 
 
-#second, add column anfs_sale TRUE or FALSE for record and strip data to just parcel and anfs_sold
-anfs_record <- anfs_sales %>%
+#### PART 3 - *UPDATE* MERGE SALES FROM LAC ASSESSOR AND ANFS#####
+##### STEP 7: *UPDATE* PREP DATA FOR MERGE #####
+# before merging anfs to lac, add older AINs to lac data so we can match sales to prior ains if necessary
+lac_sales_records <- lac_sales_final %>% select(ain, sold_after_eaton_lac) %>% 
+  mutate(lac_ain = ain) %>%
+  left_join(xwalk, by = c("ain" = "ain_2025_12")) %>% # merge to get older ains jic anfs data is recording from prior ains
+  select(lac_ain, sold_after_eaton_lac, ain_2025_01, ain_2025_09)
+
+# check on duplicates after adding crosswalk
+nrow(lac_sales_records) - nrow(lac_sales_final)
+dup_check <- lac_sales_records %>% count(lac_ain) %>% filter(n>1)
+print(dup_check)
+# checked in the xwalk
+xwalk %>% filter(ain_2025_12 %in% dup_check$lac_ain) %>% View()
+# makes sense to have duplicate here, take care of later to ensure no more dups at the end
+
+# check to make sure if any anfs parcels will get dropped and find no match
+anfs_missing <- anfs_sales %>% 
+  filter(!parcel %in% c(lac_sales_records$lac_ain,lac_sales_records$ain_2025_01,lac_sales_records$ain_2025_09))
+# check against prior damage records
+damage <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")
+anfs_missing <- anfs_missing %>% left_join(damage,by=c("parcel"="ain_sept"))
+###### *UPDATE running log of ANFS issues to fix #####
+# 5842020011  - 5842022011 - typo
+# 5841032019 - commercial
+# 5843022001 - deleted
+# 5845002015 - commercial
+# 5844018036 - 5846018036
+# 5844012018,19 - 5844012018 - significant damage split
+# 5844012018,19 - 5844012019 - no damage split
+# 5482015020 - 5842015020 typo
+# 5835038003 - commercial
+
+# Update anfs data in cases where there is a typo
+anfs_sales <- anfs_sales %>%
+  mutate(parcel=case_when(
+    parcel=='5842020011' ~ '5842022011',
+    parcel=='5844018036' ~ '5846018036',
+    parcel=='5844012018,19' ~ '5844012018',
+    parcel=='5482015020' ~ '5842015020',
+    TRUE ~ parcel
+  ))
+
+##### STEP 8: Flag ANFS PARCELS SOLD AFTER EATON #####
+# add column anfs_sale TRUE or FALSE for record and strip data to just parcel and anfs_sold
+anfs_sales_records <- anfs_sales %>%
   mutate(
     anfs_sold = as.Date(sold_date) > as.Date("2025-02-08"),
     anfs_ain = parcel
   ) %>%
   select(anfs_ain, anfs_sold) 
 
-#third, before merging anfs to lac, add older AINs to lac data
-sales_record <- sales_final %>% select(ain, sold_after_eaton) %>% 
-  mutate(lac_ain = ain) %>%
-  left_join(xwalk, by = c("ain" = "ain_2025_12")) %>% # merge to get older ains jic anfs data is recording from prior ains
-  select(lac_ain, sold_after_eaton, ain_2025_01, ain_2025_09)
-
-# check on duplicates
-nrow(sales_record) - nrow(sales_final)
-dup_check <- sales_record %>% count(lac_ain) %>% filter(n>1)
-print(dup_check)
-# checked in the xwalk
-xwalk %>% filter(ain_2025_12 %in% dup_check$lac_ain) %>% View()
-# makes sense to have duplicate here, take care of later to ensure no more dups at the end
-
-#fourth, merge to anfs and add source column
-sales_merged <- sales_record %>%
+##### STEP 9: MERGE DATASET AND ADD SOURCE COLUMN #####
+# merge to anfs and add source column
+sales_merged <- lac_sales_records %>%
   # join anfs records based on each ain field date in the crosswalk, add suffix after 2nd join
-  left_join(anfs_record, by = c("lac_ain" = "anfs_ain")) %>%
-  left_join(anfs_record, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>%
-  left_join(anfs_record, by = c("ain_2025_09" = "anfs_ain"), suffix = c("", "_c")) %>%
+  left_join(anfs_sales_records, by = c("lac_ain" = "anfs_ain")) %>%
+  left_join(anfs_sales_records, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>%
+  left_join(anfs_sales_records, by = c("ain_2025_09" = "anfs_ain"), suffix = c("", "_c")) %>%
   # coalesce anfs sales columns into one field
   mutate(anfs_sold_combined = coalesce(anfs_sold,
                                  anfs_sold_b,
                                  anfs_sold_c, FALSE)) %>%
   # add source column
-  mutate(sold_source = ifelse(sold_after_eaton == TRUE & anfs_sold_combined == TRUE, "both",
-                              ifelse(sold_after_eaton == TRUE & anfs_sold_combined == FALSE, "lac",
-                                     ifelse(sold_after_eaton == FALSE & anfs_sold_combined == TRUE, "anfs",
-                                            "neither"))))
+  mutate(sold_source = ifelse(sold_after_eaton_lac == TRUE & anfs_sold_combined == TRUE, "both",
+                              ifelse(sold_after_eaton_lac == TRUE & anfs_sold_combined == FALSE, "lac",
+                                     ifelse(sold_after_eaton_lac == FALSE & anfs_sold_combined == TRUE, "anfs",
+                                            "neither"))),
+         # create final sold after eaton column
+         sold_after_eaton=case_when(sold_source!='neither'~TRUE, TRUE~FALSE))
 
 # check recoding worked
 sales_merged %>% filter(is.na(anfs_sold) & !is.na(anfs_sold_b)) %>% View()
 table(sales_merged$sold_source)
-sales_merged %>% group_by(sold_source,anfs_sold_combined,sold_after_eaton) %>% summarise(count=n())
+table(sales_merged$sold_after_eaton)
+# 106 + 242 + 29 = 377
+sales_merged %>% group_by(sold_source,anfs_sold_combined,sold_after_eaton_lac) %>% summarise(count=n())
 
 # check for dups again
-nrow(sales_merged) - nrow(sales_record)
+nrow(sales_merged) - nrow(lac_sales_records)
 # none extra
 
-#fifth, first clean up sales data tables from lac and anfs to merge later
+
+### PART 4 - CREATE FINAL DATAFRAME AND ADD OWNER NAME ####
+
+##### STEP 10: Clean up ANFS sales data with owner and sales info ######
 anfs_sales_clean <- anfs_sales %>%
-  mutate(last_sale_year_anfs = year(as.Date(sold_date)),
-         last_sale_month_anfs = month(as.Date(sold_date)),
-         last_sale_date_anfs = sold_date,
+  mutate(
+         last_sale_date_anfs=as.Date(sold_date, format = "%Y-%m-%d"),
+          last_sale_year_anfs = format(last_sale_date_anfs,"%Y"),
+         last_sale_month_anfs = format(last_sale_date_anfs,"%m"),
          sold_amount_anfs = contract_amt,
          owner_name_anfs = new_owner,
          address = property) %>%
@@ -190,14 +226,36 @@ anfs_sales_clean <- anfs_sales %>%
          last_sale_month_anfs,
          last_sale_date_anfs,
          sold_amount_anfs,
-         list_price, #unique to anfs, not in lac
-         owner_name_anfs,
-         address) #unique to anfs, not in lac
-  
-lac_sales_clean <- sales_final %>%
-  mutate(owner_name_lac = first_owner_name,
-         sold_amount_lac = last_sale_amount) %>%
-  rename(last_sale_year_lac = last_sale_year,
+         owner_name_anfs) 
+
+##### STEP 11: Clean up LAC sales data with owner and sales info ######
+# clean up name columns in sales_final
+lac_sales_final$second_owner_name <- na_if(lac_sales_final$second_owner_name, "")
+lac_sales_final$first_owner_name_overflow <- na_if(lac_sales_final$first_owner_name_overflow, "")
+
+lac_sales_clean <- lac_sales_final %>%
+  # clean owner name so it's in one field
+  mutate(owner_name_lac = case_when(
+    !is.na(first_owner_name_overflow) & is.na(second_owner_name) ~ paste(first_owner_name," (",first_owner_name_overflow,")"),
+    is.na(first_owner_name_overflow) & !is.na(second_owner_name) ~ paste(first_owner_name," & ",second_owner_name),
+    !is.na(first_owner_name_overflow) & !is.na(second_owner_name) ~ paste(first_owner_name," (",first_owner_name_overflow,")"," & ",second_owner_name),
+    is.na(first_owner_name_overflow) & is.na(second_owner_name) ~ first_owner_name,
+    TRUE ~NA)) %>%
+  # clean up extra spaces
+  mutate(owner_name_lac=gsub("\\s+", " ", owner_name_lac),
+         owner_name_lac=gsub("\\( ","(", owner_name_lac),
+         owner_name_lac=gsub("\\ )",")", owner_name_lac)) %>%
+  # clean up extra ands
+  mutate(owner_name_lac=gsub(" AND) &", ") &",owner_name_lac),
+         owner_name_lac=gsub(" AND &", " &",owner_name_lac))
+
+# check
+lac_sales_clean %>% select(contains("owner_name")) %>% View()
+         
+# date rename
+lac_sales_clean <- lac_sales_clean %>%                                                                                                                                              
+  rename(sold_amount_lac = last_sale_amount,
+         last_sale_year_lac = last_sale_year,
          last_sale_month_lac = last_sale_month,
          last_sale_date_lac = last_sale_date) %>%
   select(ain, 
@@ -205,11 +263,9 @@ lac_sales_clean <- sales_final %>%
          last_sale_month_lac,
          last_sale_date_lac,
          sold_amount_lac,
-         recording_date, #unique to lac, not in anfs
          owner_name_lac)
 
-#sixth, merge to final dataset to get merged information needed. 
-
+##### STEP 12: MERGE FINAL DATASET ######
 sales_updated <- sales_merged %>% 
   left_join(lac_sales_clean, by = c("lac_ain" = "ain")) %>%
   left_join(anfs_sales_clean, by = c("lac_ain" = "parcel"))
@@ -222,9 +278,9 @@ sales_updated_final <- sales_updated %>%
     last_sale_month = ifelse(sold_source == "anfs", 
                              last_sale_month_anfs,
                              last_sale_month_lac),
-    last_sale_date = ifelse(sold_source == "anfs", 
-                            last_sale_date_anfs,
-                            last_sale_date_lac),
+    last_sale_date = if_else(sold_source == "anfs", 
+                            as.Date(last_sale_date_anfs),
+                            as.Date(last_sale_date_lac)),
     sold_amount = ifelse(sold_source == "anfs", 
                          sold_amount_anfs,
                          sold_amount_lac),
@@ -232,22 +288,40 @@ sales_updated_final <- sales_updated %>%
                         owner_name_anfs,
                         owner_name_lac)
   ) %>% 
-  select(lac_ain, sold_after_eaton, anfs_sold, sold_source, 
+  select(lac_ain, 
+         sold_after_eaton, 
+         sold_source, 
          last_sale_year,
          last_sale_month, 
          last_sale_date,
          sold_amount,
-         owner_name,
-         recording_date,
-         list_price,
-         address)
+         owner_name)
 
 # check total sales that it increased from before ANFS data was added
 table(sales_updated_final$sold_source,useNA='always')
-# 104+239+32 = 375 TOTAL SALES in December 2025
+# 106+242+29 = 377 TOTAL SALES 
+table(sales_updated_final$sold_after_eaton,useNA='always')
+# 377
+
+##### STEP 13: *UPDATE* REMOVE DUPS AND CLEAN #####
+# check on duplicates
+dup_check <- sales_updated_final %>% count(lac_ain) %>% filter(n>1)
+sales_updated_final %>% filter(lac_ain %in% dup_check$lac_ain) %>% View()
+# case of a merged parcel where half of parcel was sold after January into merged parcel, think okay to count as sold
+# generally keep the instance where parcel marked as sold
+final_df <- sales_updated_final %>%
+  group_by(lac_ain) %>%
+  slice_max(sold_after_eaton,n=1, with_ties=FALSE) %>%
+  ungroup()
+# check
+nrow(final_df) - length(unique(final_df$lac_ain)) # no duplicates
+table(final_df$sold_after_eaton) # sold remains unchanged
+
+# rename column
+final_df <- final_df %>%
+  rename(ain=lac_ain)
 
 #### STEP 7: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
-
 # Export to postgres
 table_label <- paste0("rel_assessor_sales_", year, "_", month)
 schema <- "dashboard"
