@@ -149,7 +149,12 @@ anfs_missing <- anfs_sales %>%
 # check against prior damage records
 damage <- st_read(con_alt, query="SELECT * FROM data.rel_assessor_damage_level_sept2025")
 anfs_missing <- anfs_missing %>% left_join(damage,by=c("parcel"="ain_sept"))
+
 ###### *UPDATE running log of ANFS issues to fix #####
+# explore anfs ains that get no match in our crosswalks - likely commercial or deleted parcels or in some cases typos
+anfs_missing %>% filter(is.na(damage_category)) %>% View() 
+
+# update log of parcels that don't apply or that have typos
 # 5842020011  - 5842022011 - typo
 # 5841032019 - commercial
 # 5843022001 - deleted
@@ -306,7 +311,8 @@ table(sales_updated_final$sold_after_eaton,useNA='always')
 ##### STEP 13: *UPDATE* REMOVE DUPS AND CLEAN #####
 # check on duplicates
 dup_check <- sales_updated_final %>% count(lac_ain) %>% filter(n>1)
-sales_updated_final %>% filter(lac_ain %in% dup_check$lac_ain) %>% View()
+# view duplicate
+sales_updated_final %>% filter(lac_ain %in% dup_check$lac_ain) %>% View() 
 # case of a merged parcel where half of parcel was sold after January into merged parcel, think okay to count as sold
 # generally keep the instance where parcel marked as sold
 final_df <- sales_updated_final %>%
@@ -321,77 +327,33 @@ table(final_df$sold_after_eaton) # sold remains unchanged
 final_df <- final_df %>%
   rename(ain=lac_ain)
 
-#### STEP 7: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
+#### PART 5: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 # Export to postgres
-table_label <- paste0("rel_assessor_sales_", year, "_", month)
+table_label <- paste0("rel_assessor_sales_", year, "_", month, "_temp") # adding temp suffix here for QA and reference - remove in next update
 schema <- "dashboard"
-indicator <- "Relational table with information on sales date and ownership/documentation changes. Includes a flag for sales of properties that were likely listed after the fire"
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_sales.R "
-qa_filepath<-"  QA_sheet_rel_assessor_sales.docx "
-
-dbWriteTable(con_alt, Id(schema, table_label), sales_final,
-                         overwrite = FALSE, row.names = FALSE)
-
-
-# Add metadata
-column_names <- colnames(sales_final) # Get column names
-
-column_comments <- c('ain for current month- use to match to other tables',
-        ' true false field for if sale took place after 2-8-25--likely to have been listed after eaton fire',
-         'year of last sale',
-         'month of last sale in number format',
-         'owner name',
-         "owner name overflow",
-         "second owner name",
-         " This is the date of last change or correction of ownership",
-         "This element contains a code that describes the relationships between the recording and valuation dates",
-         "This element contains a one digit code which identifies the specific reason for a reappraisable or  non reappraisable status",
-        "Reason key for the last land value change",
-         "The percentage of property involved in a transfer of ownership. First two digits are percentage of property being transferred rounded to nearest whole. Third digit indicates the specific interest being transferred",
-         "A one-digit code that indicates whether or not property taxes are delinquent",
-         "If parcel is delinquent, this indicates the four digits of the year in which taxes first became delinquent",
-        "A key indicating whether the parcel value has been impaired and describing the impairment",
-         "This is the last sale date - Present for both verified and unverified sales",
-         "Verification key of last sale - only unverified sales appear on the Secured Basic File Abstract",
-         "Last unverified sale amount - If the sale is a verified sale (non-numeric character as indicated on the verifications key), the sale amount will not show",
-        "This is the second to last sale date - Present for both verified and unverified sales",
-        "Verification key of second to last sale - Only unverified sales appear on the Secured Basic File Abstract",
-        "Second to Last unverified sale amount - If the sale is a verified sale (non-numeric character as indicated on the verifications key), the sale amount will not show",
-        "This is the third to last sale date - Present for both verified and unverified sales",
-        "Verification key of third to last sale - Only unverified sales appear on the Secured Basic File Abstract",
-        "Third to last unverified sale amount - If the sale is a verified sale (non-numeric character as indicated on the verifications key), the sale amount will not show")
-
-add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
-
-#### STEP 7B: Add updates sales data from "Altadena Not for Sale" to pgadmin database ####
-# Export to postgres
-table_label <- paste0("rel_assessor_sales_updated_", year, "_", month)
-schema <- "dashboard"
-indicator <- "Relational table with information on sales date and ownership/documentation changes combined with sales data from Altadena Not For Sale. "
+indicator <- "Relational table with information on sales date and owner information using a combination of LAC assessor data and Altadena not for sale data
+We mark a property as sold if sale date was after 2-8-25 in either source. In cases where property is only marked as sold in ANFS data then we use the owner information and sales data from that file. In all other cases, we use LAC assessor"
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_sales.R "
 qa_filepath<-"  QA_Sheet_anfs_sales_data.docx "
 
-dbWriteTable(con_alt, Id(schema, table_label), sales_updated_final,
-             overwrite = FALSE, row.names = FALSE)
+# dbWriteTable(con_alt, Id(schema, table_label), final_df,
+#                          overwrite = FALSE, row.names = FALSE)
+
 
 # Add metadata
-column_names <- colnames(sales_updated_final) # Get column names
+column_names <- colnames(final_df) # Get column names
 
 column_comments <- c('ain for current month- use to match to other tables',
-                     ' true false field for if sale took place after 1-8-25--likely to have been listed after eaton fire',
-                     ' true false field for if sale is recorded by group: Altadena Not For Sale', 
-                     ' flag if la county, altadena not for sale, both, or neither recorded the sale. Default was to use relative data from la county but anfs if only they recorded the information.',
-                     'year of last sale',
-                     'month of last sale in number format',
-                     " This is the date of last change or correction of ownership",
-                     'amount sold for',
-                     'owner name',
-                     "This is the last sale date - Present for both verified and unverified sales",
-                     "price the property is originally listed for",
-                     'address of property')
+        ' true false field for if sale took place after 2-8-25--likely to have been listed after eaton fire',
+        'source of sale information if sold, e.g., from LAC assessor, Altadena not for sale (ANFS) or both',
+         'year of last sale',
+         'month of last sale in number format',
+        'date of last sale',
+        'sold amount - note sold amount from LAC assessor might be inaccurate - unverified sales are recorded, meaning final sale price could be different in other sources',
+         'owner name - from lac assessor if source is lac assessor or both and from anfs if source of sale is anfs')
 
-add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
 
-#### STEP 8: close dbconnection (NO UPDATES NEEDED) ####
+#### PART 8: close dbconnection (NO UPDATES NEEDED) ####
 dbDisconnect(con_alt)
