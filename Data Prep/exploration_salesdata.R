@@ -27,6 +27,9 @@ lac_sales <-  st_read(con, query="SELECT * FROM dashboard.rel_assessor_sales_202
 
 lac_res <- st_read(con, query = "SELECT * FROM dashboard.rel_assessor_residential_2025_12")
 
+xwalk <- st_read(con, query = "SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
+
+
 #### download and import new sales data ####
 #First, I downloaded to the data from the URL link to here as a csv file: W:\Project\RDA Team\Altadena Recovery and Rebuild\Data\Altadena Not for Sale Data
 
@@ -45,10 +48,10 @@ anfs_sales <- anfs_sales %>%
   filter(!is.na(sold_date), sold_date != "") #filter out empty rows at the bottom. 
 
 
-dbWriteTable(con, DBI::Id(schema = "dashboard", table = "anfs_sales_data_01092026"), anfs_sales,
-  overwrite = TRUE,  
-  row.names = FALSE
-)
+# dbWriteTable(con, DBI::Id(schema = "dashboard", table = "anfs_sales_data_01092026"), anfs_sales,
+#   overwrite = FALSE,  
+#   row.names = FALSE
+# )
 
 # Comment on table and columns
 schema <- "dashboard"
@@ -72,7 +75,7 @@ column_comments <- c(
   "notes"
 )
 
-add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
 
 
 #### Goal 1: Evaluating where the higher # of sales comes from ####
@@ -86,8 +89,11 @@ lac_sales %>%
 anfs_afteroct7 <- anfs_sales %>%
   mutate(sold_date = as.Date(sold_date)) %>%
   filter(sold_date > as.Date("2025-10-07"))
-# A total of 379 are identified as sold and 85 of those properties are identified as sold after October 7th
-# 379- 85 = 294 (there are still 23 additional properties they have marked as sold even if accounting for Oct 7th as a cut off for data)
+
+nrow(anfs_afteroct7)
+nrow(anfs_sales)
+# A total of 358 are identified as sold and 85 of those properties are identified as sold after October 7th
+# 358- 85 = 273 (there are still 2 additional properties they have marked as sold even if accounting for Oct 7th as a cut off for data)
 
 #Question: Are they tracked undamaged properties? 
 
@@ -100,11 +106,36 @@ dmg_anfs_sales %>%
   count(damage_category)
 #The count reveals that only 343 of the properties marked as sold in the anfs data are significantly damaged so yes, they are including other properties but also have reported more properties sold that are significantly damaged than we have with assesor data
 
+# 10 NA properties for damage
+dmg_anfs_na <- dmg_anfs_sales %>% filter(is.na(damage_category)) 
+View(dmg_anfs_na) # one with double ain, fix that
+# create list with these
+dmg_anfs_na_list <- dmg_anfs_na$parcel
+dmg_anfs_na_list <- dmg_anfs_na_list[dmg_anfs_na_list != "5844012018,19"]
+dmg_anfs_na_list  <- c(dmg_anfs_na_list , "5844012018")
+dmg_anfs_na_list  <- c(dmg_anfs_na_list , "5844012019")
+# check these
+lac_sales_xwalk <- lac_sales %>% filter(sold_after_eaton == TRUE) %>%
+  left_join(xwalk, by=c("ain"="ain_2025_12")) %>%
+  filter(ain %in% dmg_anfs_na_list | ain_2025_01 %in% dmg_anfs_na_list | ain_2025_09 %in% dmg_anfs_na_list)
+# only one found a match
+# ones that don't merge are either commercial, deleted or typos in parcel number
+# https://portal.assessor.lacounty.gov/parceldetail/5841032019 # sold date recorded after 10/07 on portal and its commercial
+# 5842020011 does not turn up a record on assessor should be 5842022011 # we mark as sold
+# deleted parcel https://portal.assessor.lacounty.gov/parceldetail/5843022001 now 5843-022-058 which we mark as sold as well
+# 5845002015 commercial
+# 5841023009 deleted and now 5841023022 - we dont mark as sold, parcel could have been merged and we dont have the sales data for it as a result - should we correct this on our end and mark as sold?
+# 5844018036 is a bad AIN should be 5846018036 - sold in November
+# 5847020011 is a deleted parcel now 5847020027 - sold in October
+# 5482015020 should 5842015020 # we mark as sold
+# 5835038003 commercial https://portal.assessor.lacounty.gov/parceldetail/5835038003
+
 #Question: Are there any significantly damaged properties they've identified as sold before October 7th that we have not? 
 anfs_beforeoct7 <- dmg_anfs_sales %>% 
   filter(damage_category == 'Significant Damage')%>%
   mutate(sold_date = as.Date(sold_date)) %>%
   filter(sold_date < as.Date("2025-10-07"))
+
 #ANFS identified a total of 261 significantly damaged properties sold before October 7th and we have identified 10 more sold than they have. 
 #Which ones did we identify as sold and they did not? 
 discrepency_lac <- anti_join(lac_sales %>% filter(sold_after_eaton == TRUE), 
@@ -121,6 +152,7 @@ discrepency_anfs <- anti_join(anfs_beforeoct7,
 ## searching to see if address match but first I need sales data that has address
 ## View(lac_sales %>% filter(ain == "5829014016")) #we report as not sold
 ## View(lac_res %>% filter(ain_2025_12 == "5829014016")) #address we associated with this ain: 509 W Altadena so address DOES NOT MATCH
+# recording date on portal is 10-03-25 so likely a delay in the LAC assessor data
 ## public sale site says 509 W ALTADENA DR has been sold: https://www.zillow.com/homedetails/509-W-Altadena-Dr-Altadena-CA-91001/20909445_zpid/
 ## public sale site also says 509 ALTADENA DR has been sold: https://www.realtor.com/realestateandhomes-detail/509-W-Altadena-Dr_Altadena_CA_91001_M18287-76316
 
@@ -152,21 +184,33 @@ geom_disrepency_lac %>%
 
 #Assessment: area is not a factor. Likely it is a discrepency of different reporting to la county and some AIN variations
 
+# check our parcels that sold but aren't marked as sold by anfs
+discrepancy_lac_address <- lac_res %>% filter(ain_2025_12 %in% discrepency_lac$ain)
+# 5847028002 sold and listed again https://www.zillow.com/homedetails/1578-Morada-Pl-Altadena-CA-91001/20918644_zpid/
+# 5846022029 sold https://www.zillow.com/homedetails/1678-Midwick-Dr-Altadena-CA-91001/20918041_zpid/
+# 	5846011031 sold https://www.zillow.com/homedetails/2577-Boulder-Rd-Altadena-CA-91001/20917766_zpid/
+# our extra sales seem accurate
+
 #### Goal 2: QA ANFS data for significantly damaged properties sold ####
 #start with filtering for the properties that are significantly damaged AND have not been identified as sold by us 
 qa_filter_anfs <- dmg_anfs_sales %>% 
   filter(damage_category == 'Significant Damage') %>% 
   inner_join(lac_sales %>% filter(sold_after_eaton == FALSE), by = c("parcel" = "ain"))
 
-#from the qa list, I randomly picked the following 5 properties and checked if they are reported as sold on redfin, etc. 
+# check date of sales
+qa_filter_anfs_sales_data <- table(qa_filter_anfs$sold_date) %>% as.data.frame()
+# from the qa list, I randomly picked the following 5 properties and checked if they are reported as sold on redfin, etc. 
+# most after October
 
 # 1145 E Altadena Dr | 5844015012
 # Zillow reports it has been sold on 10/31/25 | https://www.zillow.com/homedetails/1145-E-Altadena-Dr-Altadena-CA-91001/20916907_zpid/
 # Redfin also reports that it has been sold 
+# sales date a little different - difference of 3 days
 
 # 416 E Altadena Drive | 5840005027
 # Zillow reports it has been sold on 12/10/25 | https://www.zillow.com/homedetails/416-E-Altadena-Dr-Altadena-CA-91001/20914934_zpid/
 # Realtor.com reports the same | https://www.realtor.com/realestateandhomes-detail/416-E-Altadena-Dr_Altadena_CA_91001_M20505-08674
+# sales date a little different by a day but sold
 
 # 2962 Emerson Way | 5833022015
 # Redfin reports sold on 11/14/25 | https://www.redfin.com/CA/Altadena/2962-Emerson-Way-91001/home/7254923
@@ -180,6 +224,9 @@ qa_filter_anfs <- dmg_anfs_sales %>%
 # Zillow reports it has been sold 10/27/25 | https://www.zillow.com/homedetails/900-E-Mount-Curve-Ave-Altadena-CA-91001/20916105_zpid/
 # Berkshire reports the same | https://www.bhhsdrysdale.com/ca/900-e-mount-curve-ave-altadena-91001/pid-407491796
 
+# check sold off market
+# 5846011033 sold - https://www.zillow.com/homedetails/Altadena-CA-91001/20917768_zpid/
+# 5846001005 - sold - https://www.zillow.com/homedetails/1085-E-Mendocino-St-Altadena-CA-91001/20917500_zpid/
 #Overall the conclusion is that the public sites report the same sales that the ANFS data does. 
 
 #### Goal 3: Code for a script to merge our sales data with their sales data ####
