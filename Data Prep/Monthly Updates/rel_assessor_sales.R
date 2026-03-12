@@ -96,8 +96,8 @@ check_sales <- lac_sales %>%
   group_by(last_sale_year,sold_after_eaton) %>%
   summarise(count=n())
 
-check_sales %>% filter(is.na(last_sale_year) & is.na(sold_after_eaton))
-# 30 with NA in check
+check_sales %>% filter(is.na(last_sale_year))
+# 30 with NA in check same as last update, assume not sold in line 81
 
 na_sale_date <- lac_sales %>%
   select(last_sale_date_orig, last_sale_year,recording_date, doc_reason_code, land_reason_key, everything()) %>%
@@ -124,7 +124,7 @@ lac_sales_final <- lac_sales %>%
 nrow(lac_sales_final) - length(unique(lac_sales_final$ain)) # should be 0
 nrow(lac_sales_final) - length(unique(xwalk$ain_2025_12)) # should be 0
 
-# check total sales that it increased
+# check total sales that it increased - flag to Elycia if it doesn't increase
 table(lac_sales_final$sold_after_eaton_lac, useNA='always')
 # 271 in December 2025
 
@@ -192,7 +192,7 @@ anfs_missing %>% filter(is.na(damage_category)) %>% View()
 # 5835038003 - commercial (doesn't apply)
 
 ## Don't apply because of typo or outdated AIN - All are manually
-## addressed when loading in anfs
+## addressed when loading in anfs in lines 147-152
 # 5843022001 - deleted (old ain from 2021) - should be: 5843022058 (manually fixed)
 # 5842020011  - 5842022011 - typo (manually fixed)
 # 5844018036 - 5846018036 - typo (manually fixed)
@@ -217,10 +217,11 @@ anfs_sales_records <- anfs_sales %>%
     anfs_ain = parcel) %>%
   select(anfs_ain, anfs_sold) 
 
-##### STEP 9: MERGE DATASET AND ADD SOURCE COLUMN #####
+##### STEP 9: *UPDATE* MERGE DATASET AND ADD SOURCE COLUMN #####
 # merge to anfs and add source column
 sales_merged <- lac_sales_records %>%
   # join anfs records based on each ain field date in the crosswalk, add suffix after 2nd join
+  # add prior ains from previous xwalks each update
   left_join(anfs_sales_records, by = c("lac_ain" = "anfs_ain")) %>%
   left_join(anfs_sales_records, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>%
   left_join(anfs_sales_records, by = c("ain_2025_09" = "anfs_ain"), suffix = c("", "_c")) %>%
@@ -270,9 +271,6 @@ anfs_sales_clean <- anfs_sales %>%
     owner_name_anfs) 
 
 ##### STEP 11: Clean up LAC sales data with owner and sales info ######
-
-lac_sales_final$second_owner_name <- na_if(lac_sales_final$second_owner_name, "")
-lac_sales_final$first_owner_name_overflow <- na_if(lac_sales_final$first_owner_name_overflow, "")
 
 lac_sales_clean <- lac_sales_final %>%
   # clean up name columns in sales_final
@@ -349,7 +347,7 @@ sales_updated_final <- sales_updated %>%
 table(sales_updated_final$sold_source,useNA='always')
 # 106+243+28 = 377 TOTAL SALES 
 table(sales_updated_final$sold_after_eaton,useNA='always')
-# 377
+# 377 - flag to Elycia if doesn't increase
 
 ##### STEP 13: *UPDATE* REMOVE DUPS AND CLEAN #####
 # check on duplicates
@@ -370,7 +368,7 @@ table(final_df$sold_after_eaton) # sold remains unchanged
 final_df <- final_df %>%
   rename(ain=lac_ain)
 
-#### PART 5: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
+#### PART 5: PUSH TO PGADMIN ####
 # Export to postgres
 table_label <- paste0("rel_assessor_sales_", year, "_", month, "_temp") # adding temp suffix here for QA and reference - remove in next update
 schema <- "dashboard"
