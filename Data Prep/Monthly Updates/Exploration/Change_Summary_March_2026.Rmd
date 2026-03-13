@@ -1,0 +1,153 @@
+---
+title: "Change_Summary_March_2026"
+output: html_document
+---
+
+Objective: Explore rebuild status changes from December 2025 to March 2026 and 
+identify any methodology refinements we should make. Focus primarily on the 
+16 properties that:
+1. Jumped to rebuild complete (essentially skipping an In Construction phase; n=2)
+2. Regressed from rebuild complete to some earlier phase (n=6)
+3. Newly designated as rebuilt and did not jump over construction (n=8)
+
+Key considerations:
+- Will review each property individually for permits and CalFire DINS data
+- May also review RedFin/Zillow type sites if also sold after Eaton
+- What methodology refinements can we make if any?
+- What impact would the methodology refinements have on other properties (if any)
+
+
+Other considerations:
+- From ANFS integration: 1578 Morada Pl, Altadena, CA 91001 has sold and is for sale 
+again for ~ $2M. We don't consider it rebuilt - what are we missing?
+see: https://www.zillow.com/homedetails/1578-Morada-Pl-Altadena-CA-91001/20918644_zpid/ 
+- Stepping back from these specific cases should make sure the "new" properties
+that didn't skip construction also look good
+
+
+```{r}
+# Add database connection and source script with functions for pushing to postgres
+source("W:\\RDA Team\\R\\credentials_source.R")
+library(tidyr)
+
+con <- connect_to_db("altadena_recovery_rebuild")
+options(scipen = 999)
+
+# get summary of changes
+sql_query <- "SELECT curr.*, prev.dashboard_label as prev_dashboard_label,
+CASE 
+        WHEN curr.dashboard_label = prev.dashboard_label THEN 'unchanged'
+        WHEN curr.dashboard_label = 'Repairs or Rebuild Complete' AND prev.dashboard_label != 'Repairs or Rebuild Complete' THEN 'new rebuild complete'
+        WHEN curr.dashboard_label != 'Repairs or Rebuild Complete' AND prev.dashboard_label = 'Repairs or Rebuild Complete' THEN 'reverted - QA to figure out why'
+        ELSE 'something else?'
+    END AS change_summary
+FROM dashboard.rel_parcel_rebuild_status_2026_03 curr
+LEFT JOIN dashboard.rel_parcel_rebuild_status_2025_12 prev ON curr.ain = prev.ain
+WHERE prev.dashboard_label = 'Repairs or Rebuild Complete' OR curr.dashboard_label = 'Repairs or Rebuild Complete';"
+
+rebuild_changes <- dbGetQuery(con=con, sql_query) %>%
+  mutate(qa_group = case_when(
+    change_summary=='new rebuild complete'& prev_dashboard_label == "In Construction" ~ "new",
+    change_summary=='new rebuild complete' & prev_dashboard_label != "In Construction" ~ "jumped",
+    change_summary=='reverted - QA to figure out why' ~ "reverted",
+    change_summary=='unchanged' ~ "unchanged",
+    .default = "something else"
+  ))
+
+calfire_query <- "SELECT calfire.*, xwalk.ain_2025_12, xwalk.status as xwalk_status FROM data.rel_assessor_damage_level calfire
+left join dashboard.crosswalk_assessor_2025_09_12 xwalk ON calfire.ain = xwalk.ain_2025_01;"
+calfire <- dbGetQuery(con, calfire_query)
+
+sales_query <- "SELECT ain, sold_after_eaton, last_sale_date, sale_two_date, sale_three_date FROM dashboard.rel_assessor_sales_2025_12;"
+sales <- dbGetQuery(con, sales_query)
+
+# Get permit details
+permit_query <- "SELECT wf.ain, wf.permit_number, wf.status as wf_status, wf.status_date as wf_status_date, det.applied_date, det.issued_date, det.expire_date, det.finalized_date, wf.workflow_item, det.type as permit_type, 
+det.status as permit_status, det.project_name, det.project_name_href, 
+gen.description as permit_description
+FROM dashboard.scraped_workflow_permit_data_2026_03 wf
+left join dashboard.scraped_detailed_permit_data_2026_03 det on wf.ain = det.ain and wf.permit_number = det.permit_number
+left join dashboard.scraped_general_permit_data_2026_03 gen on wf.ain = gen.ain and wf.permit_number = gen.permit_number;"
+
+permits <- dbGetQuery(con, permit_query)
+
+dbDisconnect(con)
+
+# Create one df with minimal columns and attach CalFire DINS and Sales data
+df <- rebuild_changes %>%
+  select(ain, starts_with("b2_"), total_permits, starts_with("bucket_"), qa_group) %>%
+  left_join(calfire, by=c("ain"="ain_2025_12"), suffix = c("", "_dmg")) %>%
+  left_join(sales, by="ain", suffix = c("", "_sales"))
+
+
+```
+
+Joining the 33 properties to CalFire and sales data to get a fuller picture. 
+
+Can see that only one has been sold. Confirmed against zillow that the home last sold in
+March 2025 ($553k) and is on the market again after full rebuild keeping original
+footprint/foundation ($1.649M). It's been on the market for 21 days (listed ~2/20/26). 
+reference: https://www.zillow.com/homedetails/3010-Highview-Ave-Altadena-CA-91001/67088026_zpid/
+
+```{r}
+df %>% filter(sold_after_eaton==TRUE) %>% select(ain, sold_after_eaton, qa_group)
+
+```
+
+Sales data is less likely to inform the rest so focusing next on the "jumped" category
+
+## Jumped: The 2 new rebuilds not previously "In Construction"
+
+Below is a summary of what was reviewed:
+- 5845014026 (prev. With Permit)
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5845014026 (damage not discernible from aerial view)
+  - Address: 958 MORADA PL, ALTADENA CA 91001-3114
+  - Damage: 2 structures; 1 major, 1 none
+  - Permits: 
+    - Permit descriptions indicate the garage was likely the structure with major damage
+    - Finalized dates suggest the garage was rebuilt/repaired on 1/14/26 with relevant electrical work finalized on 1/15/26
+  - Conclusion: The jump checks out. At the time of December scrape there were no inspections on file. First one appears 1/07/26
+- 5845015007 (prev. Without Permit)
+
+Both have damage data stating multiple structures were on the property; one structure had no damage and the remaining were destroyed or had major damage
+
+```{r}
+jumped <- df %>% filter(qa_group=="jumped")
+jumped %>%
+  select(ain, structure_count, damage_type_list, ends_with("_damage_count"))
+ 
+```
+
+Review permits for these two parcels to see if we can learn more about which structures were damaged.
+
+We can see 5845014026 
+
+
+```{r}
+jumped <- df %>% filter(qa_group=="jumped")
+jumped %>%
+  select(ain, structure_count, damage_type_list, ends_with("_damage_count")) %>%
+  left_join(permits, by="ain") %>%
+  View()
+```
+
+## The 8 new rebuilds that were prev. "In Construction" - new
+- 5842003002 
+- 5845005020 
+- 5846006027 
+- 5832014001 
+- 5832017002 
+- 5843019018
+- 5833017001 - confirmed rebuilt via Zillow: https://www.zillow.com/homedetails/3010-Highview-Ave-Altadena-CA-91001/67088026_zpid/
+- 5846022028
+
+## The 6 AINs that reverted from rebuild complete - reverted
+- 5844028003 (now "With Permit")
+- 5846017025 (now "In Construction")
+- 5846021004 (now "In Construction")
+- 5828018005 (now "In Construction")
+- 5829018039 (now "In Construction")
+- 5829020023 (now "In Construction")
+
+
+## There are 17 that remained rebuild completein Dec and March - unchanged 
