@@ -54,7 +54,6 @@ assessor_data %>% select(use_code, use_code_orig) %>% slice_sample(n=20)
 
 
 #### STEP 3:GETTING TOTAL UNITS (NO UPDATES) ####
-
 data_total_units <- assessor_data %>%
   mutate(total_units = rowSums(across(ends_with("_units"))),
          total_square_feet = rowSums(across(ends_with("_square_feet"))),
@@ -62,7 +61,6 @@ data_total_units <- assessor_data %>%
   mutate(total_units=total_units-landlord_units) # so we don't double count rental units
 
 #### STEP 4: GETTING RES_TYPE (NO UPDATES) ####
-
 rel_res_df  <- data_total_units  %>%
   mutate(
     res_type=case_when( # type of residential property
@@ -101,14 +99,20 @@ rel_res_df %>%
 # ain - 5841006015, in dashboard.assessor_data_universe_2025_01 - this parcel was not vacant. important to see how use codes change over time
 
 #### STEP 7: CLEAN UP DF AND ADD PARCELS WITH MISSING DATA: UPDATE ####
-final_res_data <- data_altadena_owner %>% 
+final_res_data <- rel_res_df %>% 
   # add address field for dashboard
   mutate(zip=gsub("0000","",zip)) %>%
   mutate(city_state=gsub(" CA", ", CA", city_state)) %>% 
-  mutate(address=paste(situs_house_no, direction, street_name, unit, city_state, zip)) %>%
+  # convert fractional address back to normal character
+  mutate(fraction_re=format(as.Date(fraction, format = "%d-%b"), "%m/%d"),
+         fraction_re=gsub("0","",fraction_re)) %>%
+  mutate(address=paste(situs_house_no, fraction_re,direction, street_name, unit, city_state, zip) %>%
+           # remove extra NAs
+         str_replace_all("\\bNA\\b", "") %>%
+           str_squish()) %>%
   mutate(address=gsub("\\s+", " ", address)) %>% 
   mutate(address=ifelse(address=="0 0", NA, address)) %>%
-  select(ain, residential, mixed_use, res_type, owner_renter, total_units, landlord_units, total_square_feet, total_bedrooms, address, use_code, zoning_code) %>%
+  select(ain, residential, mixed_use, res_type, total_units, landlord_units, total_square_feet, total_bedrooms, address, use_code, zoning_code) %>%
   rename(ain_2025_12 = ain)
 
 # Add missing parcels (UPDATE)
@@ -149,7 +153,7 @@ table(final_res_data$res_type,useNA='always')
 #### STEP 8: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres
-table_label <- paste0("rel_assessor_residential_", year, "_", month)
+table_label <- paste0("rel_assessor_residential_", year, "_", month, "_temp")
 schema <- "dashboard"
 indicator <- "Relational table table with summarized information and flags for current month parcels that were in Altadena in january 2025, selected based on crosswalk and keeping only the january 2025 parcels in Altadena. Only includes properties in either West or East Altadena proper."
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_residential.R "
