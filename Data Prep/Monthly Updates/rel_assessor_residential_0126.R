@@ -1,4 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_residential table for the Monthly Dashboard Updates ##
+## Used for original January 2026 launch ##
 ## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_assessor_residential.docx ##
 ## SCRIPT OUTPUT: rel_assessor_residential_YYYY_MM
 
