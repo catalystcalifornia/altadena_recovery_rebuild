@@ -71,7 +71,7 @@ left join dashboard.scraped_general_permit_data_2026_03 gen on wf.ain = gen.ain 
 
 permits <- dbGetQuery(con, permit_query)
 
-dbDisconnect(con)
+
 
 # Create one df with minimal columns and attach CalFire DINS and Sales data
 df <- rebuild_changes %>%
@@ -79,6 +79,9 @@ df <- rebuild_changes %>%
   left_join(calfire, by=c("ain"="ain_2025_12"), suffix = c("", "_dmg")) %>%
   left_join(sales, by="ain", suffix = c("", "_sales"))
 
+explore <- dbGetQuery(con, "SELECT * FROM dashboard.rel_parcel_rebuild_status_2026_03;")
+
+dbDisconnect(con)
 
 ```
 
@@ -108,8 +111,16 @@ Below is a summary of what was reviewed:
     - Finalized dates suggest the garage was rebuilt/repaired on 1/14/26 with relevant electrical work finalized on 1/15/26
   - Conclusion: The jump checks out. At the time of December scrape there were no inspections on file. First one appears 1/07/26
 - 5845015007 (prev. Without Permit)
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5845015007 (significant damage is visible)
+    - Indicates this parcel includes 3 SFR residences
+  - Address: 1019 NEW YORK DR, ALTADENA CA 91001-3117
+  - Damage: 3 structures; 2 destroyed, 1 no damage
+  - Permits:
+    - Permit type indicates some replacement or repair was needed on the roof
+  - Conclusion: Based on Assessor information: photographic evidence, land information (0300 use code), and building information (3 SFR subparts), we can conclude that this SHOULD NOT be marked rebuilt, and we should expect more permits.
 
-Both have damage data stating multiple structures were on the property; one structure had no damage and the remaining were destroyed or had major damage
+Both have damage data stating multiple structures were on the property; one structure had no damage and the remaining were destroyed or had major damage. Neither were associated with a project/project name (sometimes helpful in explaining context). So relying on Assessor data online and permit types and decriptions we
+conclude one property is more akin to "repair" and the other more to "rebuild."
 
 ```{r}
 jumped <- df %>% filter(qa_group=="jumped")
@@ -118,9 +129,11 @@ jumped %>%
  
 ```
 
-Review permits for these two parcels to see if we can learn more about which structures were damaged.
+Reviewing permits for these two parcels to see if we can learn more about which structures were damaged.
 
-We can see 5845014026 
+For 5845014026 we can see the permit type is "Residential Addition/Alteration Building Permit - County" and the permit description is "PARTIAL FIRE DAMAGE REPAIR TO EXISTING DETACHED GARAGE."
+
+For 5845015007, it's less explicit. We can see permit type is "Residential Repair/Replacement Building Permit - County" and that the permit description is related to roof replacement but there is no mention of fire damage or Eaton Fire. 
 
 
 ```{r}
@@ -133,21 +146,334 @@ jumped %>%
 
 ## The 8 new rebuilds that were prev. "In Construction" - new
 - 5842003002 
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5842003002
+  - Address: 923 ALTA VISTA DR, ALTADENA CA 91001-1736
+  - Damage: 2 structures; 1 destroyed, 1 minor
+  - Permits
+    - Permit Type: There is no rebuild permit in our table but there is one in EPIC-LA: Permit Number: UNC-BLDR250421004419 and in postgres (SELECT * FROM dashboard.scraped_general_permit_data_2026_03 where main_parcel='5842003002')
+    - Project name indicates Eaton fire rebuild for SFR and ADU
+    - Permits descriptions: some cover ADU and some cover SFR
+  - Conclusion: seems ok - just strange about the missing UNC-BLDR though the project name helps 
 - 5845005020 
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5845005020
+  - Address: 1053 E MENDOCINO ST, ALTADENA CA 91001-2562
+  - Damage: 3 structures; 2 destroyed, 1 no damage
+  - Permits
+    - Permit type is Residential Repair/Replacement Building Permit - County
+    - No project name
+    - Permit description indicates reroof of house only 
+  - Conclusion: Seems ok enough (for basic livability) - House is likely repaired/rebuilt but other structure not accounted for - how should we account for this?
 - 5846006027 
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5846006027
+  - Address: 2556 TANOBLE DR, ALTADENA CA 91001-2734
+  - Damage: 3 structures; 1 destroyed, 2 no damage
+  - Permits: 
+    - Permit type is Residential Repair/Replacement Building Permit - County
+    - No project name
+    - Permit description indicates roof repair but not Eaton fire or fire damage
+  - Conclusion: Seems ok enough - but doesn't capture full remediation. Based on Assessor images part of the main house roof had tarping and is likely the source of the permits. However the destroyed structure is possibly a detached garage or shed? The permit does not sound related to this work. Not sure how to account for this.
 - 5832014001 
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5832014001
+  - Address: 3046 GLENROSE AVE, ALTADENA CA 91001-4762
+  - Damage: 1 structure; 1 major
+  - Permits: 
+    - Permit type is Residential Addition/Alteration Building Permit - County
+    - Permit description and project name indicate the garage was likely the structure with major damage
+    - Finalized dates suggest the garage was rebuilt/repaired on 2/26/26 
+  - Conclusion: Seems ok - Based on above it sounds like the garage was attached to the main home but received all/most of the damage.
 - 5832017002 
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5832017002
+  - Address: 65 W PALM ST, ALTADENA CA 91001-4368
+  - Damage: 1 structure; 1 destroyed
+  - Permits
+    - Permit type is Residential New Construction Building Permit - County
+    - Permit description: mentions Eaton Fire rebuild
+    - Project name - none
+  - Conclusion: seems ok
 - 5843019018
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5843019018 (hard to discern)
+  - Address: 1065 E LOMA ALTA DR, ALTADENA CA 91001-1507
+  - Damage: 2 structures; 1 destroyed, 1 no damage
+  - Permits
+    - Permit type is Residential Addition/Alteration Building Permit - County
+    - Permit description says existing foundation repairs, no mention of fire damage
+    - Project name - none
+  - Conclusion: Hard to say but based on images it seems likely main house was no damage
 - 5833017001 - confirmed rebuilt via Zillow: https://www.zillow.com/homedetails/3010-Highview-Ave-Altadena-CA-91001/67088026_zpid/
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5833017001
+  - Address: 3010 HIGHVIEW AVE ALTADENA CA 91001-4812
+  - Damage: 1 structure; 1 destroyed
+  - Permits
+    - Permit type is Residential New Construction Building Permit - County
+    - Permit description indicated Eaton Fire rebuild
+    - Project name only indicates SFR rebuild
+  - Conclusion
 - 5846022028
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5846022028
+  - Address: 1688 MIDWICK DR, ALTADENA CA 91001-3302
+  - Damage: 2 structures; 1 destroyed, 1 no damage
+  - Permits
+    - Permit type is Residential New Construction Building Permit - County
+    - Permit description specifies Eaton Fire Rebuild for detached garage
+    - Project name mentions garage rebuild
+  - Conclusion: seems ok
+
+```{r}
+new <- df %>% filter(qa_group=="new")
+new %>%
+  select(ain, structure_count, damage_type_list, ends_with("_damage_count")) %>%
+  left_join(permits, by="ain") %>%
+  View()
+```
 
 ## The 6 AINs that reverted from rebuild complete - reverted
 - 5844028003 (now "With Permit")
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5844028003
+  - Address: 1632 GAYWOOD DR, ALTADENA CA 91001-1852
+  - Damage: 2 structures; 1 destroyed, 1 minor
+  - Permits
+    - Permit type is Residential New Construction Building Permit - County (similar to another property the UNC BLDR is not in the permits df but is in postgres)
+    - Permit description mentions Eaton Fire rebuild of detached garage
+    - Project name - mentions like for like rebuild only
+  - Conclusion: Not ok - should not revert all permits are finaled?
 - 5846017025 (now "In Construction")
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5846017025
+  - Address: 1704 BRAEBURN RD, ALTADENA CA 91001-2708
+  - Damage: 2 structures; 1 destroyed, 1 affected
+  - Permits
+    - Permit type is Residential Repair/Replacement Building Permit - County
+    - Permit description house only repairing tile and roof; doesn't mentioned eaton fire
+    - Project name - none
+    - Recently a permit for electrical work was added and is likely the reversion. However it sounds optional (updating amp panel)
+  - Conclusion: Not ok - should not revert.
 - 5846021004 (now "In Construction")
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5846021004
+  - Address: 2381 PORTER AVE, ALTADENA CA 91001-2723
+  - Damage: 2 structures; 1 destroyed, 1 affected
+  - Permits
+    - Permit type is a combination of 2 Residential Repair/Replacement Building Permit - County and 1 Residential New Construction Building Permit - County
+    - Permit description only 1 of the 3 rebuild permits mention Eaton fire like for like rebuild of garage
+    - Project name - none
+  - Conclusion: Seems ok - my guess is the two earlier permits were for the "affected" main house and the newest permit is for the "destroyed" garage which is still pending clearance. Though arguably there is not inspection for the newest permit so the inspection for the last one it maybe miscategorizing and this should be With Permits instead of In Construction
 - 5828018005 (now "In Construction")
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5828018005
+  - Address: 352 VENTURA ST, ALTADENA CA 91001-4632
+  - Damage: 2 structures; 1 destroyed, 1 affected
+  - Permits
+    - Permit type is Residential Repair/Replacement Building Permit - County and a CREB
+    - Permit description indicates CREB is a ADU rebuild like for like and the others don't mention fire just replacing windows and reroofing (House only)
+    - Project name - none for UNC--BLDR and CRED mentions ADU
+  - Conclusion: seems ok - similar to last one (affected is probably main house and ADU was destroyed) but a question of if it should be In Construction (inspection on any permit or just non-final build permits? If latter then should be With Permits not In Construction)
 - 5829018039 (now "In Construction")
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5829018039 (main home appears to be no damage)
+  - Address: 301 W MARIPOSA ST, ALTADENA CA 91001-4723
+  - Damage: 2 structures; 1 destroyed, 1 no damage
+  - Permits
+    - Permit type is Residential Repair/Replacement Building Permit - County AND Residential Addition/Alteration Building Permit - County
+    - Permit description - addition/alteration is voluntary seismic retrofit; repair/replace is the house roof
+    - Project name - none
+  - Conclusion: Not sure: seems to have reverted due to UNC-EXPR permit for solar roof. Doesn't seem related to Eaton but also only the house was worked on and it seems like another structure was destroyed but not rebuilt yet
 - 5829020023 (now "In Construction")
+  - Assessor: https://portal.assessor.lacounty.gov/parceldetail/5829020023
+  - Address: 3012 LINCOLN AVE, ALTADENA CA 91001-4535
+  - Damage: 14 structures; 2 destroyed, 12 no damage
+  - Permits
+    - Permit types are Residential Repair/Replacement Building Permit - County, Multifamily Repair/Replacement Building Permit - County, County Disaster Recovery Permit – Rebuild Project
+    - Permit description describe what's being rebuild or replaced but not that it's related to eaton/fire
+    - Project name - only creb mentions eaton fire rebuild
+  - Conclusion: Seems ok - likely repair complete before and now should be in progress for rebuild complete - though like others should say With Permits.
+```{r}
+reverted <- df %>% filter(qa_group=="reverted")
+reverted %>%
+  select(ain, structure_count, damage_type_list, ends_with("_damage_count")) %>%
+  left_join(permits, by="ain") %>%
+  View()
+```
 
 
 ## There are 17 that remained rebuild completein Dec and March - unchanged 
+Skipping for now.
+
+## Considerations to follow up on
+- Are we seeing Certificates of Occupancy yet?
+- Permit type (repair/replacement vs. addition/alteration vs. Residential New Construction Building Permit - County )
+- Permit descriptions?
+- Parcel use codes in relation to damage data - can we make any assumptions based on the number of structures in CalFires and the number of residences we can infer from use codes?
+- Residential New Construction Building Permit - County in combination with 1 destroyed structure? Possibly one condition for assessing repair from rebuilt completeness
+- If build permit is finaled and all structures accounted for then keep finaled?
+- Cases of reverting; should only look for inspection in new permit.
+- What are the different permit types we see across damage assessments
+- Diego's recommendations
+
+1. Checking out Certificate of Occupancy - are we seeing any yet?
+- Only one permit (under Project Name: 2025 Eaton Fire - Rebuild (Road Permits)) has a Certificate of Occupancy Field Review. Note: this is not a rebuild permit, it's a PWRP permit.
+
+- However: https://kathrynbarger.lacounty.gov/first-west-altadena-home-rebuilt-after-eaton-fire-receives-certificate-of-occupancy/
+The address is not mentioned but appears to be: 5828022008 (2479 GRANDEUR AVE, ALTADENA CA 91001-5548) 
+  - https://portal.assessor.lacounty.gov/parceldetail/5828022008
+  - UNC-BLDR permit: https://epicla.lacounty.gov/energov_prod/SelfService/#/permit/318c4c22-887b-401d-a28f-506b17140b08
+  - CREC plan: https://epicla.lacounty.gov/energov_prod/SelfService/#/plan/4bc6bf1c-3a5d-44b6-a636-5b8f364b7553
+  - Associated project: https://epicla.lacounty.gov/energov_prod/SelfService/#/project/92095b28-9704-4534-82cc-5d9653493189
+
+Conclusion: At this time, it appears that the system either does not track (or is delayed by months) in listing Certificate of Occupancy. The article seems to align to when the UNC-BLDR was finalized but the Certificate of Occupancy is not active in EPIC LA.
+
+``` {r}
+permits %>% filter(grepl("occupancy", workflow_item, ignore.case = TRUE)) %>% View()
+review <- explore %>%
+  left_join(dmg, by=c("ain"="ain_2025_12"))
+
+review %>% filter(dashboard_label=="Repairs or Rebuild Complete" & structure_count==1) %>% View()
+  
+```
+
+2. What do the different permit types correspond to? For example do CREBs and UNC-BLDR permits have differing permit types? Are those types associated with different damage assessments?
+
+CREBs are only related to permit type: County Disaster Recovery Permit – Rebuild Project. Whereas UNC-BLDR permits are only related to one of three other permit types: Residential Addition/Alteration Building Permit - County, Residential New Construction Building Permit - County, Residential Repair/Replacement Building Permit - County. So far there is no known overlap of permit types between CREB and BLDR permits
+
+When accounting for variety of damage across structures on a property we see that CREB/County Disaster Recovery Permit – Rebuild Project and BLDR/Residential New Construction Building Permit - County permit types account for over 99% of cases where only one type of damage was captured (which means all structures were destroyed or all structures were majorly damaged). When multiple damage types are documented on a property we see prevalence drop to 67%. 
+
+```{r}
+permit_types <- permits %>%
+  select(ain, permit_number, issued_date, expire_date, finalized_date, permit_type, 
+         permit_status, project_name, permit_description) %>% 
+  unique() %>%
+  mutate(is_build_permit = ifelse(grepl("^(CREB|UNC-BLDR)", permit_number),1, 0),
+         is_creb = ifelse(grepl("^CREB", permit_number),1, 0),
+         is_bldr = ifelse(grepl("^UNC-BLDR", permit_number),1, 0),
+         is_bldr_a = ifelse(grepl("^Residential New", permit_type),1, 0),
+         is_bldr_b = ifelse(grepl("^Residential Repair", permit_type),1, 0),
+         is_bldr_c = ifelse(grepl("^Residential Addition", permit_type),1, 0)
+         ) %>%
+  filter(is_build_permit==1) %>%
+  mutate(
+    build_type = case_when(
+      is_creb==1 ~ "creb",
+      is_bldr==1 ~ "bldr",
+      .default="something else"),
+    permit_type2 = case_when(
+      is_creb==1 | is_bldr_a==1 ~ "rebuild",
+      is_bldr_b==1 ~ "repair",
+      is_bldr_c==1 ~ "addition",
+      .default = "something else"
+    )
+  ) %>% 
+  filter(permit_status!="Void")
+
+check <- as.data.frame(table(permit_types$build_type, permit_types$permit_type, useNA="always")) %>%
+  pivot_wider(names_from=Var1, values_from=Freq)
+check
+
+# table(permit_types$permit_status, useNA="always")
+
+dmg <- calfire %>%
+  select(ain, ain_2025_12, damage_category, structure_count, ends_with("count"), 
+         damage_type_count, mixed_damage, damage_type_list) %>% 
+  filter(!is.na(ain_2025_12)) %>%
+  rowwise() %>%
+  mutate(more_dmg_count = sum(destroyed_damage_count, major_damage_count, na.rm=TRUE),
+         less_dmg_count = sum(affected_damage_count, minor_damage_count, na.rm=TRUE)) %>%
+  ungroup() %>%
+  mutate(overall = case_when(damage_type_count==1 & structure_count==1 ~ "Single/Only structure destroyed",
+                             damage_type_count==1 & structure_count>1 ~ "Multiple/All structures destroyed",
+                             damage_type_count> 1 & (more_dmg_count/structure_count>.5) ~ "Most structures have higher damage",
+                             damage_type_count> 1 & (less_dmg_count/structure_count>.5) ~ "Most structures have lower damage",
+                             damage_type_count> 1 & (no_damage_count/structure_count>.5) ~ "Most structures have no damage",
+                             .default="something else")) %>%
+  mutate(structure_category = case_when(
+    structure_count==1 ~"one structure",
+    structure_count==2 ~ "two structures",
+    structure_count >2 ~ "multiple structures",
+    .default="something else"
+  ))
+
+table(dmg$overall)
+table(dmg$structure_category)
+table(dmg$structure_category, dmg$overall)
+
+permits_dmg <- permit_types %>% 
+  left_join(dmg, by=c("ain"="ain_2025_12"))
+
+check2 <- as.data.frame(table(permits_dmg$permit_type, permits_dmg$mixed_damage)) %>%
+  pivot_wider(names_from=Var1, values_from=Freq)
+check2
+
+
+n_distinct(permits_dmg$ain) # 2649
+nrow(permits_dmg) #3410
+
+check3 <- permits_dmg %>%
+  select(ain, is_creb, is_bldr, is_bldr_a, is_bldr_b, is_bldr_c) %>%
+  group_by(ain) %>%
+  summarise(
+    n_creb=sum(is_creb, na.rm=TRUE),
+    n_bldr=sum(is_bldr, na.rm=TRUE),
+    n_bldr_a=sum(is_bldr_a, na.rm=TRUE),
+    n_bldr_b=sum(is_bldr_b, na.rm=TRUE),
+    n_bldr_c=sum(is_bldr_c, na.rm=TRUE)) %>%
+  left_join(select(dmg, ain_2025_12, structure_count, mixed_damage, damage_type_list, more_dmg_count, less_dmg_count, overall), by=c("ain"="ain_2025_12")) %>%
+  rowwise() %>%
+  mutate(total_build = sum(n_creb, n_bldr_a, na.rm=TRUE)) %>%
+  ungroup()
+
+table(check3$damage_type_list)
+
+check3a <- as.data.frame(table(check3$mixed_damage, check3$total_build)) %>%
+  pivot_wider(names_from=Var1, values_from=Freq) %>%
+  rename(n_build_permits = Var2)
+check3b <- as.data.frame(table(check3$mixed_damage, check3$n_bldr_b)) %>%
+  pivot_wider(names_from=Var1, values_from=Freq) %>%
+  rename(n_repair_permits = Var2)
+check3c <- as.data.frame(table(check3$mixed_damage, check3$n_bldr_c)) %>%
+  pivot_wider(names_from=Var1, values_from=Freq) %>%
+  rename(n_add_permits = Var2)
+# 
+# check3d <- as.data.frame(table(check3$structure_count, check3$total_build)) %>%
+#   pivot_wider(names_from=Var1, values_from=Freq, names_prefix = "n_structure_") %>%
+#   rename(n_build_permits = Var2)
+
+check4 <- check3 %>% filter(n_bldr_b>=1 | n_bldr_c >= 1)
+```
+
+In a similar vein, let's look at what permit descriptions and project names are used in repair and addition permits vs explicit rebuild permits.
+
+For rebuilds, the "rebuild" keyword is the most prevalent/consistently used. Though there are still 128 (4%) of rebuild permits that don't match. If we combine all 3 keywords (fire, eaton, rebuild) we find the 60 permits (1.9%) don't match any. Added some additional keywords which account for all but 44 permits. We should continue looking to see if the "new" keyword is just indicative or a replaced structure or if it's new in the "optional" sense. Also a question of relocation of houses and how that should be interpreted.
+
+For repairs, no project names are used. Relevant keywords seem to be any of: tearoff, tear off, change out, remodel, remove, removal, replace, replacement, repair, demo.
+
+```{r}
+# permit_types_concat <- permit_types %>%
+#   group_by(permit_type2) %>%
+#   summarise(all_projects = paste(project_name, collapse = "; "),
+#             all_desc = paste(permit_description, collapse="; "))
+
+rebuild_keywords <- c("fire", "eaton", "rebuild", "sb9", "sb-9", "sb 9", "disaster", 
+                      "rebuit", "crec", "like for li", "like-for-li")
+pattern <- paste(rebuild_keywords, collapse = "|")
+
+rebuilds <- permit_types %>% 
+  filter(permit_type2=="rebuild") %>%
+  mutate(has_keyword = grepl(pattern, 
+                             paste(project_name, permit_description), 
+                             ignore.case = TRUE)) 
+  
+table(rebuilds$has_keyword)
+
+check_no_keywords_rebuild <- rebuilds %>% filter(has_keyword==FALSE)
+
+repair_keywords <- c("tearoff", "tear off", "change out", "remodel", "remov", 
+                     "replac", "repair", "demo", "re roof", "reroof",
+                     "sheath", "install", "renovation", "remediation")
+pattern <- paste(repair_keywords, collapse = "|")
+repairs <- permit_types %>% filter(permit_type2=="repair") %>%
+  mutate(has_keyword = grepl(pattern, 
+                             paste(project_name, permit_description), 
+                             ignore.case = TRUE)) 
+
+table(repairs$has_keyword)
+
+check_no_keywords_repair <- repairs %>% filter(has_keyword==FALSE)
+
+
+adds <- permit_types %>% filter(permit_type2=="addition") 
+
+```
