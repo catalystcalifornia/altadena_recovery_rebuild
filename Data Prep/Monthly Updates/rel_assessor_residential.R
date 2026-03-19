@@ -155,12 +155,12 @@ table(final_res_data$res_type,useNA='always')
 # Export to postgres
 table_label <- paste0("rel_assessor_residential_", year, "_", month, "_temp")
 schema <- "dashboard"
-indicator <- "Relational table table with summarized information and flags for current month parcels that were in Altadena in january 2025, selected based on crosswalk and keeping only the january 2025 parcels in Altadena. Only includes properties in either West or East Altadena proper."
+indicator <- "Relational table table with summarized assessor information and flags for current month parcels that were in Altadena in january 2025, selected based on crosswalk and keeping only the january 2025 parcels in Altadena. Only includes properties in either West or East Altadena proper."
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_residential.R "
 qa_filepath<-"  QA_sheet_rel_assessor_residential.docx "
 
-dbWriteTable(con_alt, Id(schema, table_label), final_res_data,
-             overwrite = FALSE, row.names = FALSE)
+# dbWriteTable(con_alt, Id(schema, table_label), final_res_data,
+#              overwrite = FALSE, row.names = FALSE)
 
 
 # Add metadata
@@ -170,7 +170,6 @@ column_comments <- c('Assessor ID number for current month- use this to match to
                      'Flag for whether property is a residential use (e.g., use code starting with 0)',
                      'Flag for whether property is mixed residential-commercial (use code starting with 1 but with a residential combo indicated in 3rd character)',
                      'Residential type -- either single-family, multifamily, mixed use, condominium, boarding house',
-                     'Housing tenure-ownerships -- either homeowner (indicated by homeowner exemption), renter, trust owned, corporation owned, sold to state, government owned, other ownership, or owner likely but with no exemption. For more detailed methodology of choices see R script',
                      'Total rental units on the property -- use caution when interpreting for mixed use - can include commercial',
                      'Total square feet of buildings on property',
                      'Total bedrooms on property',
@@ -178,7 +177,7 @@ column_comments <- c('Assessor ID number for current month- use this to match to
                      'Current use code if not available in current data prior use code',
                      'Zoning code for the property')
 
-add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
 #### STEP 9: close dbconnection (NO UPDATES NEEDED) ####
 dbDisconnect(con_alt)
