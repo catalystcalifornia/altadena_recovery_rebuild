@@ -192,7 +192,12 @@ final_df<- data_owner %>%
   # remove 0 from start of PO Boxes
   mutate(owner_address=str_remove(owner_address, "^0 ")) %>%
   select(ain, owner_name, owner_renter, owner_address, sold_source) %>%
-  rename(ain_2025_12 = ain)
+  rename(ain_2025_12 = ain) %>%
+  # make owner address unavailable when sold source is anfs, we only have site address from anfs not owner contact
+  mutate(owner_address=case_when(
+    sold_source=='anfs' ~ 'Not Available',
+    TRUE ~ owner_address
+  ))
 
 # check for duplicates
 nrow(final_df)-length(unique(final_df$ain_2025_12)) # should be 0 difference
