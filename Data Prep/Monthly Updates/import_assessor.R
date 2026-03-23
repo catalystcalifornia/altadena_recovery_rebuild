@@ -53,7 +53,7 @@ print(extracted_files)
 # [13] "D:/temp_extract/Assessor Data/March 2026/DS04 Part 3.csv"         
 
 # Define file locations we'll need
-shp_path <- sprintf("D:/temp_extract/Assessor Data/Assr Data %s/parcel.shp", assessor_date_clean)
+shp_path <- grep("parcel.shp$", extracted_files, value=TRUE)
 
 
 # April Update
@@ -80,9 +80,6 @@ city_perimeters <- st_read(con, query='select name, geom as geometry from data.t
   filter(name == "Altadena") %>%
   st_transform(2229)
 st_crs(city_perimeters)$epsg # 2229
-
-# altadena_shp <- city_perimeters %>% filter(name=="Altadena")
-# pasadena_shp <- city_perimeters %>% filter(name=="Pasadena")
 
 # intersection
 if (shp_path %in% extracted_files) {
