@@ -7,7 +7,6 @@ library(data.table)
 library(sf)
 library(mapview)
 library(stringr)
-# library(readxl)
 
 options(scipen = 999) # turn off scientific notation for batch queries
 
@@ -16,10 +15,12 @@ source("Data Prep\\assessor_data_functions.R")
 
 con <- connect_to_db("altadena_recovery_rebuild")
 
-# Zipped assessor data downloaded to D: drive from EMG's OneDrive
-assessor_date <- "20251201" # Update
+# Zipped assessor data downloaded to D: drive from EMG's OneDrive - should match date suffix in Sharepoint
+assessor_date <-"2026-03-02"
+assessor_date_clean <- gsub("-", "", assessor_date) # Update
 
-assessor_data_folder <- "D:/Assessor Data FULL/OneDrive_2025_12_15.zip"
+temp_data_migration_folder <- "Cold Data Migration - D Drive" # for rds data migration
+assessor_data_folder <- sprintf("D:/%s/Assessor Data FULL/OneDrive_%s.zip", temp_data_migration_folder, assessor_date)
 temp_extract_dir <- "D:/temp_extract/Assessor Data/"
 
 # clear temp_extract first if it exists
@@ -37,13 +38,34 @@ unzipped_result <- system(paste0('powershell "Expand-Archive -Path \\"', assesso
 extracted_files <- list.files(temp_extract_dir, recursive = TRUE, full.names = TRUE)
 print(extracted_files)
 
-# Define file locations we'll need
-shp_path <- paste0("D:/temp_extract/Assessor Data/Assr Data ", assessor_date, "/parcel.shp")
+# [1] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.cpg"                              
+# [2] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.dbf"                              
+# [3] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.prj"                              
+# [4] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.sbn"                              
+# [5] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.sbx"                              
+# [6] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shp"                              
+# [7] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shp.HAS026961.21100.17200.sr.lock"
+# [8] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shp.HAS026961.21100.rd.lock"      
+# [9] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shp.xml"                          
+# [10] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shx"                              
+# [11] "D:/temp_extract/Assessor Data/March 2026/DS04 Part 1.csv"                                            
+# [12] "D:/temp_extract/Assessor Data/March 2026/DS04 Part 2.csv"                                            
+# [13] "D:/temp_extract/Assessor Data/March 2026/DS04 Part 3.csv"         
 
-# Dec update
-csv_1 <- "D:/temp_extract/Assessor Data/DS04 Part 1.csv"
-csv_2 <- "D:/temp_extract/Assessor Data/DS04 Part 2.csv"
-csv_3 <- "D:/temp_extract/Assessor Data/DS04 Part 3.csv"
+# Define file locations we'll need
+shp_path <- sprintf("D:/temp_extract/Assessor Data/Assr Data %s/parcel.shp", assessor_date_clean)
+
+
+# April Update
+# should also work for future updates (won't need to manually update filepaths if they change) 
+csv_1 <- grep("DS04 Part 1.csv", extracted_files, value=TRUE)
+csv_2 <- grep("DS04 Part 2.csv", extracted_files, value=TRUE)
+csv_3 <- grep("DS04 Part 3.csv", extracted_files, value=TRUE)
+
+# # Dec update
+# csv_1 <- "D:/temp_extract/Assessor Data/DS04 Part 1.csv"
+# csv_2 <- "D:/temp_extract/Assessor Data/DS04 Part 2.csv"
+# csv_3 <- "D:/temp_extract/Assessor Data/DS04 Part 3.csv"
 
 # Pre Dec Update
 # csv_1 <- "D:/temp_extract/Assessor Data/DS04 Part 1.csv"
