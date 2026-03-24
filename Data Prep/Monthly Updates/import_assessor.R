@@ -93,12 +93,18 @@ if (shp_path %in% extracted_files) {
   print("shp file path has changed - compare shp_path to extracted_files list and update accordingly")
 }
 
-length(unique(shp_intersect$AIN)) # 54868
+length(unique(shp_intersect$AIN)) 
 table(shp_intersect$matched_name, useNA = "ifany")
+
+# March 2026
+# Altadena 
+# 14528 (580 more)
+
+# December 2025
 # Altadena                  Pasadena              Pasadena; Altadena
 # 13948 (3 fewer)             40339 (3 fewer)           581
 
-# jan results
+# jan 2025 results
 # length(unique(jan_intersect$AIN)) # 54874
 # table(jan_intersect$matched_name, useNA = "ifany")
 # # Altadena           Pasadena        Pasadena; Altadena
@@ -109,15 +115,16 @@ colnames(shp_intersect) <- tolower(colnames(shp_intersect))
 shp_intersect_3310 <- st_transform(shp_intersect, 3310)
 
 # # export results
-data_vintage <- "November 2025"
-date_ran <- as.character(Sys.Date()) # "2025-12-09"
-curr_year <-  "2025" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
-curr_month <- "12" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+data_vintage_month <- "03"
+data_vintage_year <- "2026"
+date_ran <- as.character(Sys.Date()) 
+update_year <-  "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
+update_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
 source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
 qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_import_assessor_data.docx"
 schema <- "dashboard"
-indicator <- paste(data_vintage, "Parcels that intersect Altadena 2023 place tiger lines.")
-shp_table_name <- paste("assessor_parcels_universe", curr_year, curr_month, sep="_")
+indicator <- sprintf("%s/%s Parcels that intersect Altadena 2023 place tiger lines.", data_vintage_month, data_vintage_year)
+shp_table_name <- paste("assessor_parcels_universe", update_year, update_month, sep="_")
 
 # export_shpfile(con=con,
 #                df=shp_intersect_3310,
@@ -138,14 +145,13 @@ st_crs(shp_intersect)$epsg # 3310
 
 
 ##### Step 2: Filter Jan CSVs #####
-# Filter Jan csv data for AINs found in Step 1 #
+# Filter csv data for AINs found in Step 1 #
 shp_ain_universe <- shp_intersect %>% st_drop_geometry() %>% select(ain) %>% pull()
 
-# December
 csv_1_ain_filter <- batch_filter_csv_data(
   csv_file=csv_1,
   target_list = shp_ain_universe,
-  filter_column="AIN",
+  filter_column="ï»¿AIN", # AIN, sometimes has encoding typos
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
@@ -153,7 +159,7 @@ csv_1_ain_filter <- batch_filter_csv_data(
 csv_2_ain_filter <- batch_filter_csv_data(
   csv_file=csv_2,
   target_list = shp_ain_universe,
-  filter_column="AIN",
+  filter_column="ï»¿AIN",
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
@@ -161,7 +167,7 @@ csv_2_ain_filter <- batch_filter_csv_data(
 csv_3_ain_filter <- batch_filter_csv_data(
   csv_file=csv_3,
   target_list = shp_ain_universe,
-  filter_column="AIN",
+  filter_column="ï»¿AIN",
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
@@ -174,7 +180,7 @@ csv_ains_combined <- rbind(csv_1_ain_filter,
 colnames(csv_ains_combined) <- tolower(gsub(" ", "_", colnames(csv_ains_combined)))
 
 csv_ains_combined <- csv_ains_combined %>%
-  # rename(ain = `ï»¿ain`) %>%
+  rename(ain = `ï»¿ain`) %>%
   mutate(ain=as.character(ain))
 
 length(unique(csv_ains_combined$ain)) # 13934
@@ -182,11 +188,11 @@ length(unique(csv_ains_combined$ain)) # 13934
 # check last sale date
 max(as.Date(as.character(csv_ains_combined$last_sale_date),
             format = "%Y%m%d"),
-    na.rm = TRUE) # 10-7-2025 updated
+    na.rm = TRUE) # "2025-12-31" updated but seems somewhat outdated for March?
 
 ### Export to postgres
-csv_table_name <- paste("assessor_data_universe", curr_year, curr_month, sep="_")
-indicator <- paste("Assessor data from", data_vintage, "that matches Altadena and Pasadena parcels in", shp_table_name, "table.")
+csv_table_name <- paste("assessor_data_universe", update_year, update_month, sep="_")
+indicator <- sprintf("Assessor data from %s/%s that matches Altadena and Pasadena parcels in %s table.", data_vintage_month, data_vintage_year, shp_table_name)
 dbWriteTable(con, Id(schema, csv_table_name), csv_ains_combined,
              overwrite = FALSE, row.names = FALSE)
 dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", csv_table_name, " IS '", indicator, "
@@ -230,25 +236,31 @@ mismatch_1 <- data.frame(ain=setdiff(shp_ain, csv_ain$ain)) %>%
 mapview(mismatch_1, col.regions="red")
 
 # number of mismatch 1
-nrow(mismatch_1) # 14
+nrow(mismatch_1) # 12
+sort(mismatch_1$ain)
 
 # look up on assessor portal: https://portal.assessor.lacounty.gov/parceldetail/[ain]
 # denote parcel status (e.g., no result if none/doesn't exist in portal, Shell, Deleted, etc.)
 # prioritize residential and non-vacant if updating script
-# "5863003900" - 010v/shell - https://portal.assessor.lacounty.gov/parceldetail/5863003900 <- leftover/mapsearch shows same AIN
-# "5831016035" - no response - https://portal.assessor.lacounty.gov/parceldetail/5831016035
-# "5831016036" - no response - https://portal.assessor.lacounty.gov/parceldetail/5831016036
-# "5839016025" - 0100/shell - https://portal.assessor.lacounty.gov/parceldetail/5839016025 <-- leftover / mapsearch shows same AIN
-# "5839016026" - no response - https://portal.assessor.lacounty.gov/parceldetail/5839016026 <-- leftover / mapsearch shows same AIN
-# "5841023022" - no response - https://portal.assessor.lacounty.gov/parceldetail/5841023022 
-# "5830015029" - 0100/active - https://portal.assessor.lacounty.gov/parceldetail/5830015029 (note: misfortune and calamity is NA)
-# "5842013027" - 010v/active - https://portal.assessor.lacounty.gov/parceldetail/5842013027
-# "5843023069" - no response - https://portal.assessor.lacounty.gov/parceldetail/5843023069
-# "5843023070" - no response - https://portal.assessor.lacounty.gov/parceldetail/5843023070
-# "5842008018" - no response - https://portal.assessor.lacounty.gov/parceldetail/5842008018 <-- matched calfire - destroyed residence
-# "5842008017" - no response - https://portal.assessor.lacounty.gov/parceldetail/5842008017 <-- leftover / mapsearch shows same AIN (looks to be part of 5842008018)
-# "5827014035" - no response - https://portal.assessor.lacounty.gov/parceldetail/5827014035 <-- matched calfire - no damage 
-# "5827014036" - no response - https://portal.assessor.lacounty.gov/parceldetail/5827014036 <-- leftover / mapsearch shows same AIN (looks to be part of 5827014035)
+
+# "5827014035" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5827014035 <-- matched calfire - no damage 
+# "5827014036" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5827014036 <-- leftover / mapsearch shows same AIN (looks to be part of 5827014035) 
+
+# (no longer in mismatch) "5830015029" - 0100/active - https://portal.assessor.lacounty.gov/parceldetail/5830015029 (note: misfortune and calamity is NA) 
+# "5831016035" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5831016035 <-- matched calfire
+# "5831016036" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5831016036 <-- matched calfire
+# "5839016025" - 0100/shell (same) - https://portal.assessor.lacounty.gov/parceldetail/5839016025 <-- leftover / mapsearch shows same AIN 
+# "5839016026" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5839016026 <-- leftover / mapsearch shows same AIN 
+
+# (no longer in mismatch) "5841023022" - no response - https://portal.assessor.lacounty.gov/parceldetail/5841023022 
+# (NEW in mismatch) "5841007024" - no response - https://portal.assessor.lacounty.gov/parceldetail/5841007024 <-- matched calfire
+# "5842008017" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5842008017 <-- leftover / mapsearch shows same AIN (looks to be part of 5842008018) 
+# "5842008018" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5842008018 <-- matched calfire - destroyed residence
+# (no longer in mismatch) "5842013027" - 010v/active - https://portal.assessor.lacounty.gov/parceldetail/5842013027 
+# "5843023069" - 0101/shell (updated; has response) - https://portal.assessor.lacounty.gov/parceldetail/5843023069 <- matched calfire
+# "5843023070" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5843023070 <-- matched calfire; looks like it should be 5843023037 - https://portal.assessor.lacounty.gov/parceldetail/5843023037
+
+# "5863003900" - 010v/shell (same) - https://portal.assessor.lacounty.gov/parceldetail/5863003900 <- leftover/mapsearch shows same AIN
 
 # see if there are any calfire points that intersect
 calfire <- st_read(con, query="SELECT * FROM data.eaton_fire_dmg_insp_3310")
@@ -260,9 +272,13 @@ calfire_matches <- st_intersection(mismatch_1, calfire) %>%
 unique(calfire_matches$ain)
 
 
-matched <-  mismatch_1 %>% filter(ain %in% unique(calfire_matches$ain)) # 10 
-leftover <- mismatch_1 %>% filter(!(ain %in% unique(calfire_matches$ain))) # 5
+matched <-  mismatch_1 %>% filter(ain %in% unique(calfire_matches$ain)) # 7
+sort(matched$ain)
+# "5827014035" "5831016035" "5831016036" "5841007024" "5842008018" "5843023069" "5843023070"
 
+leftover <- mismatch_1 %>% filter(!(ain %in% unique(calfire_matches$ain))) # 5
+sort(leftover$ain)
+# "5827014036" "5839016025" "5839016026" "5842008017" "5863003900"
 
 mapview(matched, col.regions="green", color ="green") + 
   mapview(leftover, col.regions="red", color ="red")
@@ -313,19 +329,19 @@ table(all_csv_results$city_state, useNA = "ifany")
 
 # # export results to csv (keeping all columns for QA)
 # write.csv(all_csv_results,
-#           file=paste0("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_", curr_year, "_", curr_month, ".csv"),
+#           file=paste0("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_", update_year, "_", update_month, ".csv"),
 #           row.names=FALSE,
 #           fileEncoding = "UTF-8")
 
 # import
-all_csv_results <- read.csv(paste0("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_", curr_year, "_", curr_month, ".csv"))
+all_csv_results <- read.csv(paste0("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data Prepped/csv_city_matches_", update_year, "_", update_month, ".csv"))
 
 # compare to shp ain universe
 # in csv, but not in shp - prioritize residential and non-vacant
-mismatch_2 <- data.frame(ain=setdiff(all_csv_results$ain, shp_ain_universe)) %>% # 182
+mismatch_2 <- data.frame(ain=setdiff(all_csv_results$ain, shp_ain_universe)) %>% # 20
   left_join(all_csv_results, by="ain") 
 
-table(mismatch_2$use_code) # Note: 146 are residential and non-vacant
+table(mismatch_2$use_code) # Note: 16 are residential and non-vacant
 
 # check if these are in .shp (to cross out possibility they are outside the city perimeters)
 csv_ains_combined <- mismatch_2 %>% select(ain) %>% pull()
@@ -334,8 +350,10 @@ check_ <- batch_filter_shapefile(shp_path=shp_path, target_ains=csv_ains_combine
 
 mismatch_2 <- mismatch_2 %>%
   mutate(shp_match = ifelse(ain %in% check_$AIN, 1,0)) %>%
-  filter(shp_match==0) # 13 with relevant use codes
+  filter(shp_match==0) # 9 with relevant use codes
 
+sort(mismatch_2$ain)
+# 5827014022 5831016032 5831016033 5839016004 5839016012 5841007016 5841007017 5842008010 5843023016 5843023037
 # 5827014022 5830015015 5831016032 5831016033 5839016004 5839016012 5841023009 5841023010 5842008010 5842013003 5843023016 5843023037 5847020011
 
 table(mismatch_2$use_code, useNA = "ifany")
