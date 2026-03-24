@@ -281,7 +281,8 @@ batch_filter_csv_data <- function(csv_file,
   rm(header_line)
   gc()
   
-  cat("Column names found:", length(col_names), "columns\n")
+  cat("# of column names found:", length(col_names), "columns\n")
+  cat("Column names found that contain filter_column:", grep(filter_column, col_names, value = TRUE))
   
   # Verify required columns
   if (!filter_column %in% col_names) {
