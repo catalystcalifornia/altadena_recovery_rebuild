@@ -16,8 +16,8 @@ source("Data Prep\\assessor_data_functions.R")
 con <- connect_to_db("altadena_recovery_rebuild")
 
 # Zipped assessor data downloaded to D: drive from EMG's OneDrive - should match date suffix in Sharepoint
-assessor_date <-"2026-03-02"
-assessor_date_clean <- gsub("-", "", assessor_date) # Update
+assessor_date <-"2026-03-02" # Update
+assessor_date_clean <- gsub("-", "", assessor_date) 
 
 temp_data_migration_folder <- "Cold Data Migration - D Drive" # for rds data migration
 assessor_data_folder <- sprintf("D:/%s/Assessor Data FULL/OneDrive_%s.zip", temp_data_migration_folder, assessor_date)
@@ -115,11 +115,11 @@ colnames(shp_intersect) <- tolower(colnames(shp_intersect))
 shp_intersect_3310 <- st_transform(shp_intersect, 3310)
 
 # # export results
-data_vintage_month <- "03"
+data_vintage_month <- "03" 
 data_vintage_year <- "2026"
 date_ran <- as.character(Sys.Date()) 
-update_year <-  "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
-update_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+update_year <-  "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year of dashboard update
+update_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month of dashboard update
 source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
 qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_import_assessor_data.docx"
 schema <- "dashboard"
@@ -147,6 +147,8 @@ st_crs(shp_intersect)$epsg # 3310
 ##### Step 2: Filter Jan CSVs #####
 # Filter csv data for AINs found in Step 1 #
 shp_ain_universe <- shp_intersect %>% st_drop_geometry() %>% select(ain) %>% pull()
+
+# add these AINs manually, the related
 
 csv_1_ain_filter <- batch_filter_csv_data(
   csv_file=csv_1,
@@ -220,7 +222,7 @@ sql_recode <- paste("UPDATE", sql_csv_table_name,
 dbSendQuery(con, sql_recode)
 
 
-##### REVIEW: Two kinds of AIN mismatches between CSV and SHP files #####
+## REVIEW: Two kinds of AIN mismatches between CSV and SHP files ##
 # For permit scraping we are primarily interested in mismatches where the associated 
 # use code starts with zero (residential) and does NOT end with V (vacant lot)
 
