@@ -87,103 +87,105 @@ if (file.exists(detailed_csv_filepath)) {
 closeAllConnections()
 gc() 
 
-# Set up parallel processing with batches to manage memory
-# Use fewer workers than cores to be respectful to the website
-plan(multisession, workers = 8)
-
-# Process in small batches to write incrementally and manage memory
-batch_size <- 50  # Adjust based on your memory constraints
-batches <- split(remaining, ceiling(seq_len(nrow(remaining)) / batch_size))
-
-first_write_this_session <- !file.exists(detailed_csv_filepath)
-
-# Function to scrape one permit
-scrape_one_permit <- function(row_data) {
-  permit_url <- paste0(base_url, row_data$permit_href, "/")
+if (nrow(remaining)> 0){
+  # Set up parallel processing with batches to manage memory
+  # Use fewer workers than cores to be respectful to the website
+  plan(multisession, workers = 8)
   
-  tryCatch({
-    message(paste("Scraping:", permit_url))
+  # Process in small batches to write incrementally and manage memory
+  batch_size <- 50  # Adjust based on your memory constraints
+  batches <- split(remaining, ceiling(seq_len(nrow(remaining)) / batch_size))
+  
+  first_write_this_session <- !file.exists(detailed_csv_filepath)
+  
+  # Function to scrape one permit
+  scrape_one_permit <- function(row_data) {
+    permit_url <- paste0(base_url, row_data$permit_href, "/")
     
-    results <- scrape_permits_detailed(
-      url = permit_url, 
-      url_suffix = url_location_suffix, 
-      ain = row_data$ain, 
-      permit_number = row_data$permit_number, 
-      wait_time = 30, 
-      max_retries = 1, 
-      retry_wait_time = 60
+    tryCatch({
+      message(paste("Scraping:", permit_url))
+      
+      results <- scrape_permits_detailed(
+        url = permit_url, 
+        url_suffix = url_location_suffix, 
+        ain = row_data$ain, 
+        permit_number = row_data$permit_number, 
+        wait_time = 30, 
+        max_retries = 1, 
+        retry_wait_time = 60
+      )
+      
+      Sys.sleep(1)  # Still be polite even in parallel
+      
+      return(list(
+        detailed = data.frame(results$permit_details),
+        workflow = data.frame(results$workflow),
+        success = TRUE
+      ))
+      
+    }, error = function(e) {
+      message(paste("Error scraping", row_data$permit_number, ":", e$message))
+      return(list(
+        detailed = data.frame(
+          permit_number = row_data$permit_number,
+          ain = row_data$ain,
+          response_status = "error",
+          error_message = e$message
+        ),
+        workflow = data.frame(),
+        success = FALSE
+      ))
+    })
+  }
+  
+  # Process each batch
+  for (i in seq_along(batches)) {
+    message(paste("\n=== Processing batch", i, "of", length(batches), "==="))
+    
+    current_batch <- batches[[i]]
+    
+    # Scrape this batch in parallel
+    batch_results <- future_map(
+      split(current_batch, seq_len(nrow(current_batch))),
+      scrape_one_permit,
+      .options = furrr_options(seed = TRUE),
+      .progress = TRUE
     )
     
-    Sys.sleep(1)  # Still be polite even in parallel
+    # Extract results from this batch
+    batch_detailed <- bind_rows(lapply(batch_results, function(x) x$detailed))
+    batch_workflow <- bind_rows(lapply(batch_results, function(x) x$workflow))
     
-    return(list(
-      detailed = data.frame(results$permit_details),
-      workflow = data.frame(results$workflow),
-      success = TRUE
-    ))
+    # Write this batch to CSV (append mode after first write)
+    write.table(batch_detailed, 
+                file = detailed_csv_filepath, 
+                sep = ",", 
+                row.names = FALSE, 
+                col.names = first_write_this_session,  # Headers only on first write
+                append = !first_write_this_session,    # Don't append on first write
+                fileEncoding = "UTF-8",
+                quote = TRUE,
+                qmethod = "double")
     
-  }, error = function(e) {
-    message(paste("Error scraping", row_data$permit_number, ":", e$message))
-    return(list(
-      detailed = data.frame(
-        permit_number = row_data$permit_number,
-        ain = row_data$ain,
-        response_status = "error",
-        error_message = e$message
-      ),
-      workflow = data.frame(),
-      success = FALSE
-    ))
-  })
-}
-
-# Process each batch
-for (i in seq_along(batches)) {
-  message(paste("\n=== Processing batch", i, "of", length(batches), "==="))
-  
-  current_batch <- batches[[i]]
-  
-  # Scrape this batch in parallel
-  batch_results <- future_map(
-    split(current_batch, seq_len(nrow(current_batch))),
-    scrape_one_permit,
-    .options = furrr_options(seed = TRUE),
-    .progress = TRUE
-  )
-  
-  # Extract results from this batch
-  batch_detailed <- bind_rows(lapply(batch_results, function(x) x$detailed))
-  batch_workflow <- bind_rows(lapply(batch_results, function(x) x$workflow))
-  
-  # Write this batch to CSV (append mode after first write)
-  write.table(batch_detailed, 
-              file = detailed_csv_filepath, 
-              sep = ",", 
-              row.names = FALSE, 
-              col.names = first_write_this_session,  # Headers only on first write
-              append = !first_write_this_session,    # Don't append on first write
-              fileEncoding = "UTF-8",
-              quote = TRUE,
-              qmethod = "double")
-  
-  write.table(batch_workflow, 
-              file = workflow_csv_filepath, 
-              sep = ",", 
-              row.names = FALSE, 
-              col.names = first_write_this_session,  # Headers only on first write
-              append = !first_write_this_session,    # Don't append on first write
-              fileEncoding = "UTF-8",
-              quote = TRUE,
-              qmethod = "double")
-  
-  # After first write, switch to append mode
-  first_write_this_session <- FALSE
-  
-  # Clear batch results from memory
-  rm(batch_results, batch_detailed, batch_workflow)
-  gc()
-  
-  message(paste("Batch", i, "written to CSV"))
+    write.table(batch_workflow, 
+                file = workflow_csv_filepath, 
+                sep = ",", 
+                row.names = FALSE, 
+                col.names = first_write_this_session,  # Headers only on first write
+                append = !first_write_this_session,    # Don't append on first write
+                fileEncoding = "UTF-8",
+                quote = TRUE,
+                qmethod = "double")
+    
+    # After first write, switch to append mode
+    first_write_this_session <- FALSE
+    
+    # Clear batch results from memory
+    rm(batch_results, batch_detailed, batch_workflow)
+    gc()
+    
+    message(paste("Batch", i, "written to CSV"))
+  }
 }
 
 # note: there's a chance that the scrape could be interrupted between writes to the detailed and workflow csvs

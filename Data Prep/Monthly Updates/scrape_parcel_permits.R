@@ -19,9 +19,11 @@ table_name <- paste("scraped_general_permit_data",
                     curr_month, # month
                     sep="_") 
 
-prev_month <- "09"
+prev_xwalk_month <- "09"
+curr_xwalk_month <- "12"
+curr_xwalk_year <- "2025"
 
-curr_xwalk_table <- paste0("dashboard.crosswalk_assessor_", prev_month, "_", curr_month, "_", curr_year) ### MUST UPDATE
+curr_xwalk_table <- paste0("dashboard.crosswalk_assessor_", curr_xwalk_year, "_", prev_xwalk_month, "_", curr_xwalk_month) ### MUST UPDATE
 
 
 # EPIC LA - LA County building permits (unincorporated cities only)
@@ -77,36 +79,39 @@ gc()
 
 first_write_this_session <- !file.exists(csv_filepath)
 
-for (row_ in 1:nrow(remaining)) { 
-  
-  row_ain <- remaining[row_, "ain"]
-  portal_url <- paste0(lac_permits_url, row_ain)
-  
-  message(paste(row_, ":", portal_url))
-  result <- scrape_permits_chromote(
-    url=portal_url, 
-    wait_time = 30,
-    ain = row_ain, 
-    max_retries = 1, 
-    retry_wait_time = 60)
-  
-  
-  # Write initial data (with header)
-  write.table(result,
-              file = csv_filepath,
-              sep = ",",
-              row.names = FALSE,
-              col.names = first_write_this_session,  # Headers only on first write
-              append = !first_write_this_session,    # Don't append on first write
-              fileEncoding = "UTF-8",
-              quote = TRUE,
-              qmethod = "double")
-  
-  # After first write, switch to append mode
-  first_write_this_session <- FALSE
-  
-  Sys.sleep(1)
+if (nrow(remaining)> 0){
+  for (row_ in 1:nrow(remaining)) { 
+    
+    row_ain <- remaining[row_, "ain"]
+    portal_url <- paste0(lac_permits_url, row_ain)
+    
+    message(paste(row_, ":", portal_url))
+    result <- scrape_permits_chromote(
+      url=portal_url, 
+      wait_time = 30,
+      ain = row_ain, 
+      max_retries = 1, 
+      retry_wait_time = 60)
+    
+    
+    # Write initial data (with header)
+    write.table(result,
+                file = csv_filepath,
+                sep = ",",
+                row.names = FALSE,
+                col.names = first_write_this_session,  # Headers only on first write
+                append = !first_write_this_session,    # Don't append on first write
+                fileEncoding = "UTF-8",
+                quote = TRUE,
+                qmethod = "double")
+    
+    # After first write, switch to append mode
+    first_write_this_session <- FALSE
+    
+    Sys.sleep(1)
+  }
 }
+
 
 final_data <- read.csv(csv_filepath,
                        encoding = "UTF-8",
