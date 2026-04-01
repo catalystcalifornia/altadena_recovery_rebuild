@@ -155,7 +155,7 @@ table(final_res_data$res_type,useNA='always')
 # Export to postgres
 table_label <- paste0("rel_assessor_residential_", year, "_", month, "_temp")
 schema <- "dashboard"
-indicator <- "Relational table table with summarized assessor information and flags for current month parcels that were in Altadena in january 2025, selected based on crosswalk and keeping only the january 2025 parcels in Altadena. Only includes properties in either West or East Altadena proper."
+indicator <- "Relational table with summarized assessor information and flags for current month parcels that were in Altadena in january 2025, selected based on crosswalk and keeping only the january 2025 parcels in Altadena. Only includes properties in either West or East Altadena proper."
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_residential.R "
 qa_filepath<-"  QA_sheet_rel_assessor_residential.docx "
 
