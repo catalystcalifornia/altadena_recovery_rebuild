@@ -7,14 +7,15 @@ library(future)
 
 source("W:\\RDA Team\\R\\credentials_source.R")
 source("Data Prep\\Monthly Updates\\scraping_functions.R")
+on.exit(cleanup_all_temp(), add = TRUE) # clean up temp files when script closes
 
 con <- connect_to_db("altadena_recovery_rebuild")
 schema <- "dashboard"
 
 # set some metadata for exporting results
 date_ran <- as.character(Sys.Date())
-curr_year <- strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
-curr_month <- strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+curr_year <- "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
+curr_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
 
 general_table_name <- paste("scraped_general_permit_data", 
                             curr_year, # year
@@ -185,6 +186,7 @@ if (nrow(remaining)> 0){
     gc()
     
     message(paste("Batch", i, "written to CSV"))
+    check_temp_size()
   }
 }
 
