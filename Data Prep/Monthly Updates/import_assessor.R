@@ -195,12 +195,12 @@ max(as.Date(as.character(csv_ains_combined$last_sale_date),
 ### Export to postgres
 csv_table_name <- paste("assessor_data_universe", update_year, update_month, sep="_")
 indicator <- sprintf("Assessor data from %s/%s that matches Altadena and Pasadena parcels in %s table.", data_vintage_month, data_vintage_year, shp_table_name)
-dbWriteTable(con, Id(schema, csv_table_name), csv_ains_combined,
-             overwrite = FALSE, row.names = FALSE)
-dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", csv_table_name, " IS '", indicator, "
-            Data imported on ", date_ran, ".",
-                        "QA DOC: ", qa_filepath,
-                        " Source: ", source, "'"))
+# dbWriteTable(con, Id(schema, csv_table_name), csv_ains_combined,
+#              overwrite = FALSE, row.names = FALSE)
+# dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", csv_table_name, " IS '", indicator, "
+#             Data imported on ", date_ran, ".",
+#                         "QA DOC: ", qa_filepath,
+#                         " Source: ", source, "'"))
 
 
 
@@ -235,44 +235,43 @@ mismatch_1 <- data.frame(ain=setdiff(shp_ain, csv_ain$ain)) %>%
   st_as_sf(sf_column_name="geom",
            crs=st_crs(shp_intersect)) 
 
-mapview(mismatch_1, col.regions="red")
-
 # number of mismatch 1
 nrow(mismatch_1) # 12
 sort(mismatch_1$ain)
 
-# look up on assessor portal: https://portal.assessor.lacounty.gov/parceldetail/[ain]
+# visually confirm shapes are fully in Altadena
+mapview(city_perimeters, col.regions="lightgrey") + mapview(mismatch_1, col.regions="red")
+
+## get parcel status manually from assessor portal: https://portal.assessor.lacounty.gov/parceldetail/[ain]
 # denote parcel status (e.g., no result if none/doesn't exist in portal, Shell, Deleted, etc.)
 # prioritize residential and non-vacant if updating script
 
-# "5827014035" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5827014035 <-- matched calfire - no damage 
-# "5827014036" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5827014036 <-- leftover / mapsearch shows same AIN (looks to be part of 5827014035) 
-
-# (no longer in mismatch) "5830015029" - 0100/active - https://portal.assessor.lacounty.gov/parceldetail/5830015029 (note: misfortune and calamity is NA) 
+## No responses - should figure these out
 # "5831016035" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5831016035 <-- matched calfire
 # "5831016036" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5831016036 <-- matched calfire
-# "5839016025" - 0100/shell (same) - https://portal.assessor.lacounty.gov/parceldetail/5839016025 <-- leftover / mapsearch shows same AIN 
 # "5839016026" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5839016026 <-- leftover / mapsearch shows same AIN 
-
-# (no longer in mismatch) "5841023022" - no response - https://portal.assessor.lacounty.gov/parceldetail/5841023022 
-# (NEW in mismatch) "5841007024" - no response - https://portal.assessor.lacounty.gov/parceldetail/5841007024 <-- matched calfire
-# "5842008017" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5842008017 <-- leftover / mapsearch shows same AIN (looks to be part of 5842008018) 
-# "5842008018" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5842008018 <-- matched calfire - destroyed residence
-# (no longer in mismatch) "5842013027" - 010v/active - https://portal.assessor.lacounty.gov/parceldetail/5842013027 
-# "5843023069" - 0101/shell (updated; has response) - https://portal.assessor.lacounty.gov/parceldetail/5843023069 <- matched calfire
+# (NEW) "5841007024" - no response - https://portal.assessor.lacounty.gov/parceldetail/5841007024 <-- matched calfire
 # "5843023070" - no response (same) - https://portal.assessor.lacounty.gov/parceldetail/5843023070 <-- matched calfire; looks like it should be 5843023037 - https://portal.assessor.lacounty.gov/parceldetail/5843023037
 
+## Shells - not sure we can do anything with these - no associated addresses
+# "5827014035" - 0100/shell - https://portal.assessor.lacounty.gov/parceldetail/5827014035 <-- matched calfire - no damage 
+# "5827014036" - 0100/shell - https://portal.assessor.lacounty.gov/parceldetail/5827014036 <-- leftover / mapsearch shows same AIN (looks to be part of 5827014035) 
+# "5839016025" - 0100/shell (same) - https://portal.assessor.lacounty.gov/parceldetail/5839016025 <-- leftover / mapsearch shows same AIN 
+# "5842008017" - 0100/shell - https://portal.assessor.lacounty.gov/parceldetail/5842008017 <-- leftover / mapsearch shows same AIN (looks to be part of 5842008018) 
+# "5842008018" - 0100/shell - https://portal.assessor.lacounty.gov/parceldetail/5842008018 <-- matched calfire - destroyed residence
+# "5843023069" - 0101/shell (updated; has response) - https://portal.assessor.lacounty.gov/parceldetail/5843023069 <- matched calfire
 # "5863003900" - 010v/shell (same) - https://portal.assessor.lacounty.gov/parceldetail/5863003900 <- leftover/mapsearch shows same AIN
 
+# Previous mismatches (no longer show up in mismatch_1):
+# "5830015029" - 0100/active - https://portal.assessor.lacounty.gov/parceldetail/5830015029 (note: misfortune and calamity is NA) 
+# "5841023022" - no response - https://portal.assessor.lacounty.gov/parceldetail/5841023022 
+# "5842013027" - 010v/active - https://portal.assessor.lacounty.gov/parceldetail/5842013027 
+
 # see if there are any calfire points that intersect
-calfire <- st_read(con, query="SELECT * FROM data.eaton_fire_dmg_insp_3310")
+calfire <- st_read(con, query="SELECT din_id, apn_parcel, damage, street_number, street_name, street_type, street_suffix, city, state, zip_code, geom FROM data.eaton_fire_dmg_insp_3310")
 
 calfire_matches <- st_intersection(mismatch_1, calfire) %>%
   select(ain, apn_parcel, damage, everything())
-
-# Review matches and check if APN is correct AIN (using assessor portal map): https://portal.assessor.lacounty.gov/mapsearch
-unique(calfire_matches$ain)
-
 
 matched <-  mismatch_1 %>% filter(ain %in% unique(calfire_matches$ain)) # 7
 sort(matched$ain)
@@ -285,6 +284,30 @@ sort(leftover$ain)
 mapview(matched, col.regions="green", color ="green") + 
   mapview(leftover, col.regions="red", color ="red")
 
+mismatch1_damaged <- calfire_matches %>% 
+  st_drop_geometry() %>% 
+  # filter for those with "Destroyed (>50%)" since these will be in the universe
+  filter(damage=="Destroyed (>50%)") %>%
+  select(ain, apn_parcel, damage, street_number, street_name, street_type, 
+         street_suffix, city, state, zip_code)
+
+# Review matches with significant damage and check if APN is more accurate (using assessor portal map): 
+# https://portal.assessor.lacounty.gov/mapsearch
+mismatch1_damaged$apn_parcel # 8
+# apn from calfire / assessor shp AIN
+# "5843023037" / "5843023070" - 0101 - https://portal.assessor.lacounty.gov/parceldetail/5843023037
+# "5843023016" / "5843023069" - 0101 (pending delete) - https://portal.assessor.lacounty.gov/parceldetail/5843023016
+# "5831016032" / "5831016036" - 0100 - https://portal.assessor.lacounty.gov/parceldetail/5831016032
+# "5831016033" / "5831016035" - 0100 - https://portal.assessor.lacounty.gov/parceldetail/5831016033
+# "5843023016" / "5843023069" - 0101 (pending delete) - https://portal.assessor.lacounty.gov/parceldetail/5843023016
+# "5831016032" / "5831016036" - 0100 - https://portal.assessor.lacounty.gov/parceldetail/5831016032
+# "5841007017" / "5841007024" - 0100 - https://portal.assessor.lacounty.gov/parceldetail/5841007017
+# "5842008010" / "5842008018" - 0100 (pending delete) - https://portal.assessor.lacounty.gov/parceldetail/5842008010
+
+# above confirms that apn_parcel is likely the better ain, 
+# we should check that these are in the csv
+check <- all_csv_results %>% filter(ain %in% mismatch1_damaged$apn_parcel) #6
+n_distinct(mismatch1_damaged$apn_parcel) #6
 
 ### 2. Get AINs from CSVs (based on situs city_state filter), and review which ones are not in the SHP ain universes
 city_list <- c("Altadena")
@@ -341,23 +364,34 @@ all_csv_results <- read.csv(paste0("W:/Project/RDA Team/Altadena Recovery and Re
 # compare to shp ain universe
 # in csv, but not in shp - prioritize residential and non-vacant
 mismatch_2 <- data.frame(ain=setdiff(all_csv_results$ain, shp_ain_universe)) %>% # 20
-  left_join(all_csv_results, by="ain") 
+  left_join(all_csv_results, by="ain") %>%
+  mutate(mismatch1_apn = ifelse(ain %in% mismatch1_damaged$apn_parcel, TRUE, FALSE)) %>%
+  select(ain, mismatch1_apn, everything())
 
-table(mismatch_2$use_code) # Note: 16 are residential and non-vacant
+table(mismatch_2$mismatch1_apn, mismatch_2$use_code) # mismatch 2 includes all the shp ains that matched to damaged structures in calfire data
+table(mismatch_2$use_code) # Note: There are 10 (in addition to the 6 from mismatch1) that are residential and non-vacant
 
-# check if these are in .shp (to cross out possibility they are outside the city perimeters)
-csv_ains_combined <- mismatch_2 %>% select(ain) %>% pull()
+check <- mismatch_2 %>% filter(mismatch1_apn==FALSE & grepl("^0", use_code) & !grepl("V$", use_code))
+check2 <- check %>% mutate(ain=as.character(ain)) %>% left_join(calfire, by=c("ain"="apn_parcel"))
+# some match but have no damage. drop these and review what's left
+check3 <- check2 %>% filter(is.na(damage)) %>%
+  select(ain) %>%
+  mutate(ain=as.numeric(ain)) %>%
+  left_join(check)
 
-check_ <- batch_filter_shapefile(shp_path=shp_path, target_ains=csv_ains_combined, chunk_size = 10000, ain_column = "AIN")
+# going to review addresses manually to see what comes out in assessor
+# 5825003060 - AIN the same, no parcel change history, this looks possibly not impacted by Eaton - https://portal.assessor.lacounty.gov/parceldetail/5825003060
+# 5830004002 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5830004002
+# 5830004003 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5830004003
+# 5830004004 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5830004004
+# 5830004005 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5830004005
+# 5839016004 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5839016004
+# 5839016012 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5839016012
+# 5863003007 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5863003007
 
-mismatch_2 <- mismatch_2 %>%
-  mutate(shp_match = ifelse(ain %in% check_$AIN, 1,0)) %>%
-  filter(shp_match==0) # 9 with relevant use codes
+# conclusion - mismatch type 1 is more of a data quality concern. Mismatch 2 will give us a comprehensive list (includes mismatch1)
+# but these largely seem to be places in "Altadena" possibly past the fire perimeter. In other words, the ains and associated 
+# addresses are accurate and don't exist in CalFire because they were not impacted.
 
-sort(mismatch_2$ain)
-# 5827014022 5831016032 5831016033 5839016004 5839016012 5841007016 5841007017 5842008010 5843023016 5843023037
-# 5827014022 5830015015 5831016032 5831016033 5839016004 5839016012 5841023009 5841023010 5842008010 5842013003 5843023016 5843023037 5847020011
 
-table(mismatch_2$use_code, useNA = "ifany")
-
-# Note some of these look to overlap with some addresses that matched to Calfire data in mismatch_1
+# Resolve the SHP ains that matched to damaged CalFire APN parcels
