@@ -32,9 +32,6 @@ workflow_table_name <- paste("scraped_workflow_permit_data",
                              curr_month, # month
                              sep="_") 
 
-detailed_table_name <- paste0(detailed_table_name, "_parallel")
-workflow_table_name <- paste0(workflow_table_name, "_parallel")
-
 detailed_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", detailed_table_name, ".csv")
 workflow_csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", workflow_table_name, ".csv")
 
@@ -213,7 +210,7 @@ dbWriteTable(con, Id(schema=schema, table_name=detailed_table_name), final_detai
 
 dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", detailed_table_name, " IS
             'Detailed permit data for Altadena parcels with some or significant damage,
-            Data imported on ",date_ran, "
+            Data imported on ",date_ran, " using parallel process, 
             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
 
@@ -222,7 +219,7 @@ dbWriteTable(con, Id(schema=schema, table_name=workflow_table_name), final_workf
 
 dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", workflow_table_name, " IS
             'Extended detailed permit data that includes workflow items for Altadena parcels with some or significant damage,
-            Data imported on ",date_ran, "
+            Data imported on ",date_ran, " using parallel process, 
             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
 
