@@ -1,22 +1,26 @@
 
 library(tibble)
-transform_ain_to_2025_12 <- function(ain_vector, xwalk_df) {
+transform_ain_to_curr <- function(ain_vector, xwalk_df, curr_ain) {
+  # Get all AIN columns except the current one
+  historical_cols <- setdiff(names(xwalk_df)[grepl("^ain_", names(xwalk_df))], curr_ain)
+  
+  # Create lookup by pivoting all historical AIns to current AIN
   lookup <- xwalk_df %>%
-    select(starts_with("ain_")) %>%
+    select(all_of(c(curr_ain, historical_cols))) %>%
     pivot_longer(
-      cols = -ain_2025_12,
+      cols = all_of(historical_cols),
+      names_to = "vintage",
       values_to = "historical_ain"
     ) %>%
     filter(!is.na(historical_ain)) %>%
-    distinct(historical_ain, ain_2025_12) %>%
-    deframe()  # Creates a named vector for fast lookup
+    # Keep first match if duplicates exist
+    distinct(historical_ain, .keep_all = TRUE) %>%
+    select(historical_ain, current_ain = all_of(curr_ain)) %>%
+    deframe()
   
-  # Use lookup, return original if not found
-  result <- ifelse(ain_vector %in% names(lookup), 
-                   lookup[ain_vector], 
-                   ain_vector)
-  
-  return(result)
+  # Map to current AIN, keep original if not found
+  lookup[ain_vector] %>% 
+    replace(is.na(.), ain_vector[is.na(.)])
 }
 
 # # Usage:
