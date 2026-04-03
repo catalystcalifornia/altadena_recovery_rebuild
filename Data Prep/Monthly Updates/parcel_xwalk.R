@@ -183,7 +183,8 @@ cat(paste("Number of rows matches unique number of previous ains:", nrow(xwalk_s
 same_shape_diff_ain <- match_parcels_wide %>%
   filter(xwalk_type %in% c("same shape, diff ains, same counts"))
 
-# QA Check: if 0 expect a warning from below, e.g., "Returning more (or less) than 1 row per summarise() group was deprecated
+# QA Check: if 0 expect a warning from below, e.g., 
+# "Returning more (or less) than 1 row per summarise() group was deprecated
 nrow(same_shape_diff_ain) 
 
 xwalk_same_shape_diff_ain <- same_shape_diff_ain  %>%
@@ -208,7 +209,7 @@ xwalk_same_shape_diff_ain <- same_shape_diff_ain  %>%
          address_prev = address.x,
          address_curr = address.y)
 
-# March 2026 QA flag (same as Dec 2025; there are no same_shape_diff_ain cases so df is 0)
+# March/April 2026 QA flag there are 6 same_shape_diff_ain cases this update
 # Dec 2025 qa flag on below because dataframe yields 0, can still proceed:
 # `summarise()` has grouped output by 'dupe_id', 'xwalk_type'. You can override using the `.groups` argument.
 # Warning message:
@@ -245,7 +246,7 @@ xwalk_same_shape_diff_count_ain <- same_shape_diff_ain  %>%
          address_prev = address.x,
          address_curr = address.y)
 
-# March 2026 QA flag (same as Dec 2025; there are no same_shape_diff_ain cases so df is 0)
+# March 2026 QA flag (there are 3 same_shape_diff_ain cases - confirmed on Assessor that the new ain returns correct result
 # Dec 2025 qa flag on below because dataframe yields 0, can still proceed:
 # `summarise()` has grouped output by 'dupe_id', 'xwalk_type'. You can override using the `.groups` argument.
 # Warning message:
@@ -352,7 +353,14 @@ xwalk_df <- bind_rows(
 final_xwalk <- xwalk_df %>%
   left_join(prev_xwalk, by="ain_prev") %>%
   select(ain_2025_01, ain_prev, ain_curr, everything()) %>%
-  filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
+  filter(ain_2025_01 %in% parcel_universe$ain_2025_01) %>%
+  distinct()
+
+# March/April 2026 update - getting many to many warning. 
+# Check dupes
+final_xwalk %>% group_by(ain_2025_01) %>% filter(n()>1) %>% View() # 3
+final_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% View()
+final_xwalk %>% group_by(ain_curr) %>% filter(n()>1) %>% View()
 
 # check that all january ains are accounted for
 missing_jan_parcels <- parcel_universe %>% anti_join(final_xwalk, by=c("ain_2025_01"))
@@ -361,7 +369,9 @@ nrow(missing_jan_parcels) # should be zero
 ##### QA CHECK SHOULD BE ZERO #####
 
 ## Mar 2026 QA
-# Same as Dec 2025 - no edits needed
+# No missing jan parcels but possible flag on the same parcel below: the 5842008018 (https://portal.assessor.lacounty.gov/parceldetail/5842008018)
+# AIN is now a shell on assessor and the correct AIN is now the old one 5842008010 (https://portal.assessor.lacounty.gov/parceldetail/5842008010)
+# Might be better to resolve in the rel_ tables (see what's happening)
 ## Dec 2025 QA
 # https://portal.assessor.lacounty.gov/parceldetail/5842008010 - split into 5842008017 and 5842008018
 
@@ -483,7 +493,8 @@ length(unique(prev_xwalk$ain_2025_01))-length(unique(curr_xwalk$ain_2025_01))
 # gap of 0 added or dropped
 
 # test for instances where the new xwalk doesn't match the old xwalk-jan-prev month
-test_xwalk_result <- curr_xwalk %>% left_join(prev_xwalk %>% mutate(old=TRUE), by=c("ain_2025_01", prev_ain_date))
+test_xwalk_result <- curr_xwalk %>% 
+  left_join(prev_xwalk %>% mutate(old=TRUE), by=c("ain_2025_01", prev_ain_date))
 
 # not a match records -- 0 NA
 table(test_xwalk_result$old,useNA='always')
@@ -493,15 +504,28 @@ table(test_xwalk_result$old,useNA='always')
 
 # check method for parcels
 table(prev_xwalk$xwalk_type,useNA='always')
+# March 2026 after update to assessor import - same counts, makes sense we didn't change prev_xwalk
+# same shape, same ains, same counts       spatial intersect, 90% match       spatial intersect, ain match    spatial intersect, manual match
+#     5670                                  3                                  2                                  2
+# <NA> 
+#  0 
+
 # March 2026
 # 
 # same shape, same ains, same counts       spatial intersect, 90% match       spatial intersect, ain match    spatial intersect, manual match 
-# 5670                                  3                                  2                                  2 
+#     5670                                  3                                  2                                  2 
 # <NA> 
 #   0 
 
 table(curr_xwalk$xwalk_type,useNA='always')
 # lower need for spatial intersect--maybe because less change in files closer together or something else?
+
+# March 2026 after update to assessor import - some counts changed
+# same shape, diff ains, same counts    same shape, same ains, same counts       spatial intersect, 90% match 
+#   2                                         5668                                  2 
+# spatial intersect, ain match                               <NA> 
+#   6                                                         0 
+
 # March 2026
 # 
 # same shape, same ains, same counts       spatial intersect, 90% match       spatial intersect, ain match                               <NA> 
