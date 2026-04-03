@@ -211,7 +211,7 @@ dbWriteTable(con, Id(schema=schema, table_name=detailed_table_name), final_detai
 dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", detailed_table_name, " IS
             'Detailed permit data for Altadena parcels with some or significant damage,
             Data imported on ",date_ran, " using parallel process, 
-            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
+            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_permit_scrape_and_rebuild_", curr_year, "_", curr_month, ".docx", "
             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
 
 dbWriteTable(con, Id(schema=schema, table_name=workflow_table_name), final_workflow_data,
@@ -220,7 +220,7 @@ dbWriteTable(con, Id(schema=schema, table_name=workflow_table_name), final_workf
 dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", workflow_table_name, " IS
             'Extended detailed permit data that includes workflow items for Altadena parcels with some or significant damage,
             Data imported on ",date_ran, " using parallel process, 
-            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
+            QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_permit_scrape_and_rebuild_", curr_year, "_", curr_month, ".docx", "
             Source: https://epicla.lacounty.gov/energov_prod/SelfService/[permit_href]'"))
 
 dbDisconnect(con)

@@ -211,7 +211,7 @@ dbDisconnect(con)
 # dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", table_name, " IS
 #             'General permit data for Altadena parcels with some or significant damage,
 #             Data imported on ",date_ran, "
-#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_scrape.docx
+#             QA DOC: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_permit_scrape_and_rebuild_", curr_year, "_", curr_month, ".docx", "
 #             Source: https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=[ain]'"))
 # 
 # # 2. if any ains are associated with 100 permits

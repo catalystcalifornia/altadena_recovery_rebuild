@@ -758,7 +758,7 @@ table_name <- paste("rel_parcel_rebuild_status", curr_year, curr_month, sep="_")
 date_ran <- as.character(Sys.Date())
 indicator <- "Rebuild status for residential Altadena parcels based on scraped permit data from _2025_10 tables."
 source <- paste("Data imported on", date_ran, "- Multiple sources - see QA doc.")
-qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\monthly_updates\\QA_Sheet_monthly_rebuild.docx"
+qa_filepath <- sprintf("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\monthly_updates\\QA_permit_scrape_and_rebuild_%s_%s.docx", curr_year, curr_month)
 column_names <- colnames(final_types)
 column_comments <- c(
   "AIN - current",
@@ -806,10 +806,10 @@ column_comments <- c(
   "Current status - same as bucket_4_status",
   "Label for dashboard")
 
-# Now write the table
-dbWriteTable(con, Id(schema=schema, table=table_name), final_types,
-             overwrite = FALSE, row.names = FALSE)
-
+# # Now write the table
+# dbWriteTable(con, Id(schema=schema, table=table_name), final_types,
+#              overwrite = FALSE, row.names = FALSE)
+# 
 
 # add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
 
