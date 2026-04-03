@@ -96,7 +96,7 @@ if (shp_path %in% extracted_files) {
 length(unique(shp_intersect$AIN)) 
 table(shp_intersect$matched_name, useNA = "ifany")
 
-# March 2026
+# March 2026 (april 2026 update)
 # Altadena 
 # 14528 (580 more)
 
@@ -294,7 +294,7 @@ mismatch1_damaged <- calfire_matches %>%
 # Review matches with significant damage and check if APN is more accurate (using assessor portal map): 
 # https://portal.assessor.lacounty.gov/mapsearch
 mismatch1_damaged$apn_parcel # 8
-# apn from calfire / assessor shp AIN
+# apn from calfire / assessor shp AIN / use code/ assessor URL
 # "5843023037" / "5843023070" - 0101 - https://portal.assessor.lacounty.gov/parceldetail/5843023037
 # "5843023016" / "5843023069" - 0101 (pending delete) - https://portal.assessor.lacounty.gov/parceldetail/5843023016
 # "5831016032" / "5831016036" - 0100 - https://portal.assessor.lacounty.gov/parceldetail/5831016032
