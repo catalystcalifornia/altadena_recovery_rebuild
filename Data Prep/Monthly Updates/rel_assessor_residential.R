@@ -1,5 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_residential table for the Monthly Dashboard Updates ##
-## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_assessor_residential.docx ##
+## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_04.docx ##
 ## SCRIPT OUTPUT: rel_assessor_residential_YYYY_MM
 
 #### STEP 1: SET UP (UPDATE year and month) ####
@@ -17,40 +17,40 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
-year <- "2025"
-month <- "12"
+year <- "2026"
+month <- "04"
 
 #### STEP 2: PULL XWALKS AND DATA (UPDATE to latest data and xwalks) ####
 # get for CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2026_12_04")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
-assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2025_12") %>%
-  filter(ain %in% xwalk$ain_2025_12)
+assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2026_04") %>%
+  filter(ain %in% xwalk$ain_2026_04)
 
 # Check difference between new data and xwalk with jan universe in it
-nrow(assessor_data)-length(unique(xwalk$ain_2025_12))
-# 7 fewer parcels in assessor data
+nrow(assessor_data)-length(unique(xwalk$ain_2026_04))
+# 1 fewer parcel in assessor data
 
 # Check what's missing in current data
-missing_data <- xwalk %>% filter(!ain_2025_12 %in% assessor_data$ain)
+missing_data <- xwalk %>% filter(!ain_2026_04 %in% assessor_data$ain)
 View(missing_data)
 # we'll need the old residential type at minimum for filters to work in dashboard, other fields can stay blank
 # Update code before final steps
 # pull in previous xwalk for reference later
-xwalk_prev <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_01_09_2025") %>%
-  filter(ain_2025_09 %in% missing_data$ain_2025_09)
+xwalk_prev <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12") %>%
+  filter(ain_2025_12 %in% missing_data$ain_2025_12)
 
 #### STEP 2A: CHECK IF PADDING IS NEEDED IN USE CODE ####
 unique(nchar(assessor_data$use_code))
-# need to pad
+# don't need to pad
 
-assessor_data <- assessor_data %>%
-  mutate(use_code_orig = use_code,
-         use_code=str_pad(use_code_orig, width = 4, side = "left", pad = "0"))
-
-# check
-unique(nchar(assessor_data$use_code))
-assessor_data %>% select(use_code, use_code_orig) %>% slice_sample(n=20)
+# assessor_data <- assessor_data %>%
+#   mutate(use_code_orig = use_code,
+#          use_code=str_pad(use_code_orig, width = 4, side = "left", pad = "0"))
+# 
+# # check
+# unique(nchar(assessor_data$use_code))
+# assessor_data %>% select(use_code, use_code_orig) %>% slice_sample(n=20)
 
 
 #### STEP 3:GETTING TOTAL UNITS (NO UPDATES) ####
@@ -87,17 +87,20 @@ rel_res_df <- rel_res_df %>%
 
 # Check - should be 0 NA
 table(rel_res_df$residential,useNA="always")
-# Dec - TRUE - 5669 0 NA
+# Dec - TRUE - 5675 0 NA - went up because of the 6 parcels that were missing in 2025-12 data but are not missing now
 table(rel_res_df$mixed_use,useNA="always")
-# Dec - FALSE - 5669 0 NA
+# Dec - FALSE - 5675 0 NA
 
 # check for vacant parcels, but okay to keep in data if they change to vacant over time
-rel_res_df %>%
-  filter(str_detect(use_code, "V$") | str_detect(use_code, "X$") ) %>%
-  nrow()
-# Dec - 1 vacant
-# ain - 5841006015, in dashboard.assessor_data_universe_2025_01 - this parcel was not vacant. important to see how use codes change over time
+vacant <- rel_res_df %>%
+  filter(str_detect(use_code, "V$") | str_detect(use_code, "X$") )
 
+  nrow(vacant)
+# Dec - 1 vacant
+# Apr - 2 vacant
+# ain - 5841006015, in dashboard.assessor_data_universe_2025_01 - this parcel was not vacant. important to see how use codes change over time
+# ain - 5842013027 was 5842013003 in jan25 (based on current xwalk) and in dashboard.assessor_data_universe_2025_01 was not vacant
+  
 #### STEP 7: CLEAN UP DF AND ADD PARCELS WITH MISSING DATA: UPDATE ####
 final_res_data <- rel_res_df %>% 
   # add address field for dashboard
@@ -113,16 +116,16 @@ final_res_data <- rel_res_df %>%
   mutate(address=gsub("\\s+", " ", address)) %>% 
   mutate(address=ifelse(address=="0 0", NA, address)) %>%
   select(ain, residential, mixed_use, res_type, total_units, landlord_units, total_square_feet, total_bedrooms, address, use_code, zoning_code) %>%
-  rename(ain_2025_12 = ain)
+  rename(ain_2026_04 = ain)
 
 # Add missing parcels (UPDATE)
 final_missing_data <- missing_data %>% select(starts_with("ain"))%>% 
-  left_join(xwalk_prev %>% select(starts_with("ain"), starts_with("use_code")), by=c("ain_2025_09"="ain_2025_09"))
+  left_join(xwalk_prev %>% select(starts_with("ain"), starts_with("use_code")), by=c("ain_2025_12"="ain_2025_12"))
 
 final_missing_data <- final_missing_data %>%
-  mutate(use_code=ifelse(is.na(use_code_2025_09), use_code_2025_01,
-                         use_code_2025_09)) %>%
-  distinct(ain_2025_12,use_code) %>%
+  mutate(use_code=ifelse(is.na(use_code_2025_12), use_code_2025_09,
+                         use_code_2025_12)) %>%
+  distinct(ain_2026_04,use_code) %>%
   # add just some columns we might need, dont assume address, owner, or square feet is the same
   # type of residential property
   mutate(
@@ -142,22 +145,25 @@ final_missing_data <- final_missing_data %>%
 final_res_data <- bind_rows(final_res_data,final_missing_data)
 
 # check for duplicates
-nrow(final_res_data)-length(unique(final_res_data$ain_2025_12)) # should be 0 difference
+nrow(final_res_data)-length(unique(final_res_data$ain_2026_04)) # should be 0 difference
 
 # check for same number of rows as xwalk
-nrow(final_res_data)-length(unique(xwalk$ain_2025_12)) # should be 0 difference
+nrow(final_res_data)-length(unique(xwalk$ain_2026_04)) # should be 0 difference
 
 # check for NA res type - should be 0
 table(final_res_data$res_type,useNA='always')
+# April numbers - flag significant changes
+# Condominium   Multifamily Single-family          <NA> 
+#   64           316          5296             0 
 
 #### STEP 8: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
 # Export to postgres
-table_label <- paste0("rel_assessor_residential_", year, "_", month, "_temp")
+table_label <- paste0("rel_assessor_residential_", year, "_", month)
 schema <- "dashboard"
 indicator <- "Relational table with summarized assessor information and flags for current month parcels that were in Altadena in january 2025, selected based on crosswalk and keeping only the january 2025 parcels in Altadena. Only includes properties in either West or East Altadena proper."
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_residential.R "
-qa_filepath<-"  QA_sheet_rel_assessor_residential.docx "
+qa_filepath<-"  QA_sheet_rel_tables_update_2026_04.docx "
 
 # dbWriteTable(con_alt, Id(schema, table_label), final_res_data,
 #              overwrite = FALSE, row.names = FALSE)
@@ -170,6 +176,7 @@ column_comments <- c('Assessor ID number for current month- use this to match to
                      'Flag for whether property is a residential use (e.g., use code starting with 0)',
                      'Flag for whether property is mixed residential-commercial (use code starting with 1 but with a residential combo indicated in 3rd character)',
                      'Residential type -- either single-family, multifamily, mixed use, condominium, boarding house',
+                     'Total units -- use caution when interpreting for mixed use - can include commercial',
                      'Total rental units on the property -- use caution when interpreting for mixed use - can include commercial',
                      'Total square feet of buildings on property',
                      'Total bedrooms on property',
