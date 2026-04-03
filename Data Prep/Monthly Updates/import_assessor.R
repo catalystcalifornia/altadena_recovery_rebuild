@@ -400,7 +400,7 @@ check3 <- check2 %>% filter(is.na(damage)) %>%
 # However we should continue to review in future updates (capacity permitting).
 
 
-# Resolve the SHP ains that matched to damaged CalFire APN parcels
+##### Resolve the SHP ains that matched to damaged CalFire APN parcels #####
 # I'm going to save the original shp ain column as shp_ain and create a new ain column with the changes
 shp_intersect_3310 <- st_read(con, query=paste0("SELECT * FROM ", schema, ".", shp_table_name, ";"))
 mismatch_1_replacements <- mismatch1_damaged %>% select(ain, apn_parcel) %>% distinct()
@@ -414,14 +414,8 @@ shp_intersect_3310_clean <- shp_intersect_3310 %>%
 check <- shp_intersect_3310_clean %>% filter(shp_ain %in% mismatch_1_replacements$ain) %>% select(shp_ain, ain, everything())
 
 # re-export results
-data_vintage_month <- "03" 
-data_vintage_year <- "2026"
 date_ran <- as.character(Sys.Date()) 
-update_year <-  "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year of dashboard update
-update_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month of dashboard update
 source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
-qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_import_assessor_data.docx"
-schema <- "dashboard"
 indicator <- sprintf("%s/%s Parcels that intersect Altadena 2023 place tiger lines.", data_vintage_month, data_vintage_year)
 shp_table_name <- paste("assessor_parcels_universe", update_year, update_month, sep="_")
 
