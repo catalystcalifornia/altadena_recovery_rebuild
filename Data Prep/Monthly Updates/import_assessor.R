@@ -31,7 +31,7 @@ if (dir.exists(temp_extract_dir)) {
 # create empty temp_extract
 dir.create(temp_extract_dir, showWarnings = FALSE)
 
-# Don't need to rerun # Unzipped in a temporary D:/ folder "temp_extract" (fread wasn't working so I used PowerShell/terminal)
+# Unzipped in a temporary D:/ folder "temp_extract" (fread wasn't working so I used PowerShell/terminal)
 unzipped_result <- system(paste0('powershell "Expand-Archive -Path \\"', assessor_data_folder, '\\" -DestinationPath \\"',temp_extract_dir,'\\" -Force"'))
 
 # Confirm files extracted - by listing filenames in the temp folder
@@ -144,7 +144,7 @@ shp_intersect <- st_read(con, query=paste0("SELECT * FROM ", schema, ".", shp_ta
 st_crs(shp_intersect)$epsg # 3310
 
 
-##### Step 2: Filter Jan CSVs #####
+##### Step 2: Filter CSVs #####
 # Filter csv data for AINs found in Step 1 #
 shp_ain_universe <- shp_intersect %>% st_drop_geometry() %>% select(ain) %>% pull()
 
@@ -305,7 +305,7 @@ mismatch1_damaged$apn_parcel # 8
 # "5842008010" / "5842008018" - 0100 (pending delete) - https://portal.assessor.lacounty.gov/parceldetail/5842008010
 
 # above confirms that apn_parcel is likely the better ain, 
-# we should check that these are in the csv
+# we should check that these are in the csv - they are
 check <- all_csv_results %>% filter(ain %in% mismatch1_damaged$apn_parcel) #6
 n_distinct(mismatch1_damaged$apn_parcel) #6
 
@@ -371,13 +371,17 @@ mismatch_2 <- data.frame(ain=setdiff(all_csv_results$ain, shp_ain_universe)) %>%
 table(mismatch_2$mismatch1_apn, mismatch_2$use_code) # mismatch 2 includes all the shp ains that matched to damaged structures in calfire data
 table(mismatch_2$use_code) # Note: There are 10 (in addition to the 6 from mismatch1) that are residential and non-vacant
 
-check <- mismatch_2 %>% filter(mismatch1_apn==FALSE & grepl("^0", use_code) & !grepl("V$", use_code))
-check2 <- check %>% mutate(ain=as.character(ain)) %>% left_join(calfire, by=c("ain"="apn_parcel"))
-# some match but have no damage. drop these and review what's left
+check <- mismatch_2 %>% 
+  filter(mismatch1_apn==FALSE & grepl("^0", use_code) & !grepl("V$", use_code)) # 10
+check2 <- check %>% 
+  mutate(ain=as.character(ain)) %>% 
+  left_join(calfire, by=c("ain"="apn_parcel")) %>%
+  select(ain, damage, everything()) # 12 - all are NA or No Damage
+# review the NA damage for possibly missed parcels
 check3 <- check2 %>% filter(is.na(damage)) %>%
   select(ain) %>%
   mutate(ain=as.numeric(ain)) %>%
-  left_join(check)
+  left_join(check) # 8
 
 # going to review addresses manually to see what comes out in assessor
 # 5825003060 - AIN the same, no parcel change history, this looks possibly not impacted by Eaton - https://portal.assessor.lacounty.gov/parceldetail/5825003060
@@ -389,9 +393,124 @@ check3 <- check2 %>% filter(is.na(damage)) %>%
 # 5839016012 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5839016012
 # 5863003007 - similar to above - https://portal.assessor.lacounty.gov/parceldetail/5863003007
 
-# conclusion - mismatch type 1 is more of a data quality concern. Mismatch 2 will give us a comprehensive list (includes mismatch1)
-# but these largely seem to be places in "Altadena" possibly past the fire perimeter. In other words, the ains and associated 
-# addresses are accurate and don't exist in CalFire because they were not impacted.
+# Conclusion - mismatch type 1 is more of a data quality concern coming from Assessor's Office. 
+# Mismatch 2 will give us all of Mismatch 1 and more but on closer inspection the "more" covers
+# places where city is "Altadena" but were beyond the fire perimeter or considered out of the
+# way of fire damage. This means the NAs from CalFire don't currently appear to be data quality issues
+# However we should continue to review in future updates (capacity permitting).
 
 
 # Resolve the SHP ains that matched to damaged CalFire APN parcels
+# I'm going to save the original shp ain column as shp_ain and create a new ain column with the changes
+shp_intersect_3310 <- st_read(con, query=paste0("SELECT * FROM ", schema, ".", shp_table_name, ";"))
+mismatch_1_replacements <- mismatch1_damaged %>% select(ain, apn_parcel) %>% distinct()
+
+shp_intersect_3310_clean <- shp_intersect_3310 %>%
+  rename(shp_ain = ain) %>%
+  left_join(mismatch_1_replacements, by = c("shp_ain" = "ain")) %>%
+  mutate(ain = coalesce(apn_parcel, shp_ain)) %>%
+  select(-apn_parcel)
+
+check <- shp_intersect_3310_clean %>% filter(shp_ain %in% mismatch_1_replacements$ain) %>% select(shp_ain, ain, everything())
+
+# re-export results
+data_vintage_month <- "03" 
+data_vintage_year <- "2026"
+date_ran <- as.character(Sys.Date()) 
+update_year <-  "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year of dashboard update
+update_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month of dashboard update
+source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
+qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_import_assessor_data.docx"
+schema <- "dashboard"
+indicator <- sprintf("%s/%s Parcels that intersect Altadena 2023 place tiger lines.", data_vintage_month, data_vintage_year)
+shp_table_name <- paste("assessor_parcels_universe", update_year, update_month, sep="_")
+
+
+# export_shpfile(con=con,
+#                df=shp_intersect_3310_clean,
+#                schema=schema,
+#                table_name=shp_table_name,
+#                srid = "", geometry_type = "",
+#                geometry_column = "geom")
+# 
+# 
+# dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", shp_table_name, " IS '", indicator, "
+#             Data imported on ", date_ran,". ",
+#             "QA DOC: ", qa_filepath,
+#             " Source: ", source, "'"))
+
+##### Now we rerun step 2 on the new corrected ains #####
+shp_intersect <- st_read(con, query=paste0("SELECT * FROM ", schema, ".", shp_table_name, ";"))
+shp_ain_universe <- shp_intersect %>% st_drop_geometry() %>% select(ain) %>% pull()
+
+# add these AINs manually, the related
+csv_1_ain_filter <- batch_filter_csv_data(
+  csv_file=csv_1,
+  target_list = shp_ain_universe,
+  filter_column="ï»¿AIN", # AIN, sometimes has encoding typos
+  chunk_size = 10000,
+  debug_filter=TRUE,
+  exact_match=TRUE)
+
+csv_2_ain_filter <- batch_filter_csv_data(
+  csv_file=csv_2,
+  target_list = shp_ain_universe,
+  filter_column="ï»¿AIN",
+  chunk_size = 10000,
+  debug_filter=TRUE,
+  exact_match=TRUE)
+
+csv_3_ain_filter <- batch_filter_csv_data(
+  csv_file=csv_3,
+  target_list = shp_ain_universe,
+  filter_column="ï»¿AIN",
+  chunk_size = 10000,
+  debug_filter=TRUE,
+  exact_match=TRUE)
+
+# Combine results
+csv_ains_combined <- rbind(csv_1_ain_filter,
+                           csv_2_ain_filter,
+                           csv_3_ain_filter) # 14522
+
+colnames(csv_ains_combined) <- tolower(gsub(" ", "_", colnames(csv_ains_combined)))
+
+csv_ains_combined <- csv_ains_combined %>%
+  rename(ain = `ï»¿ain`) %>%
+  mutate(ain=as.character(ain))
+
+length(unique(csv_ains_combined$ain)) # 14522
+
+# check last sale date
+max(as.Date(as.character(csv_ains_combined$last_sale_date),
+            format = "%Y%m%d"),
+    na.rm = TRUE) # "2025-12-31" 
+
+### Export to postgres
+csv_table_name <- paste("assessor_data_universe", update_year, update_month, sep="_")
+indicator <- sprintf("Assessor data from %s/%s that matches Altadena and Pasadena parcels in %s table.", data_vintage_month, data_vintage_year, shp_table_name)
+dbWriteTable(con, Id(schema, csv_table_name), csv_ains_combined,
+             overwrite = FALSE, row.names = FALSE)
+dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", csv_table_name, " IS '", indicator, "
+            Data imported on ", date_ran, ".",
+                        "QA DOC: ", qa_filepath,
+                        " Source: ", source, "'"))
+
+
+
+##### QA Clean-up #####
+## Address double-encoding error in original data files
+sql_csv_table_name <- paste0(schema, ".", csv_table_name)
+# csv table
+sql_rename_col <- paste("ALTER TABLE", sql_csv_table_name, "RENAME COLUMN exemption_type to exemption_type_original;")
+dbSendQuery(con, sql_rename_col)
+
+sql_create_new_col <- paste("ALTER TABLE", sql_csv_table_name, "ADD COLUMN exemption_type VARCHAR(5);")
+dbSendQuery(con, sql_create_new_col)
+
+sql_set_values <- paste("UPDATE", sql_csv_table_name, "SET exemption_type = exemption_type_original;")
+dbSendQuery(con, sql_set_values)
+
+sql_recode <- paste("UPDATE", sql_csv_table_name, 
+                    "SET exemption_type = NULL WHERE exemption_type IN ('ÿ', 'Ã¿');")
+dbSendQuery(con, sql_recode)
