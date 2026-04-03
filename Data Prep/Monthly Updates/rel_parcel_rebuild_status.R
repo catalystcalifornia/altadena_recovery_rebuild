@@ -834,13 +834,74 @@ WHERE prev.dashboard_label = 'Repairs or Rebuild Complete' OR curr.dashboard_lab
                      prev_year, prev_month)
 
 check_rebuild_changes <- dbGetQuery(con=con, sql_query)
+calfire <- st_read(con, query="SELECT * FROM data.eaton_fire_dmg_insp_3310")
 dbDisconnect(con)
-qa_new <- check_rebuild_changes %>% filter(change_summary=='new rebuild complete') 
+
 qa_new_suspicious <- check_rebuild_changes %>% filter(change_summary=='new rebuild complete' & prev_dashboard_label != "In Construction")
+qa_new <- check_rebuild_changes %>% filter(change_summary=='new rebuild complete' & !(ain %in% qa_new_suspicious$ain)) 
 qa_reverted <- check_rebuild_changes %>% filter(change_summary=='reverted - QA to figure out why') 
 qa_unchanged <- check_rebuild_changes %>% filter(change_summary=='unchanged') 
 
 # April 2026 compared to Dec 2025
+## There are 18 new rebuilds (16 previously In Construction and 2 that were not)
+# Focusing on 2 not previously In Construction
+qa_new_suspicious$ain
+calfire %>% filter(apn_parcel %in% qa_new_suspicious$ain) %>% select(apn_parcel, everything()) %>% View()
+permits_deduped %>% filter(ain %in% qa_new_suspicious$ain) %>% select(ain, everything())  %>% View()
+# 5845014026 (prev. with permit): https://portal.assessor.lacounty.gov/parceldetail/5845014026 
+## has two structures and 2 permits: one had major damage (looks like main residence), one with no damage; 
+## From the aerial it doesn't appear to have 26-50% damage
+## In the permits it sounds like there was damage to the detached garage. In that case this is probably repaired 
+## Conclusion: Keep as is.
+
+# 5845015007 (prev. without permit): https://portal.assessor.lacounty.gov/parceldetail/5845015007
+## has 3 structures and 1 permit: 2 of 3 structures were destroyed and each structure is confirmed residence
+## Has one misc permit (not sufficient) arguably this permit should be misc_minor (e.g., repair/replacement of roof)
+## Conclusion: MANUAL REASSIGN to In Construction at least. I would argue this was minor repair for the 3rd structure (other two will require full rebuilds)
+
+# the 16 non-suspicious new rebuilt/repaired
+# used below to check for build permit types, there are many New Builds which I think is a good sign at a glance
+# might be worth it to check the AINs that only have repair/replacement or addition build types
+# not sure if that's needed now though
+structure_count <- calfire %>% filter(apn_parcel %in% qa_new$ain) %>% 
+  select(apn_parcel, everything()) %>% group_by(apn_parcel) %>% summarise(structure_count=n()) %>% ungroup()
+calfire %>% filter(apn_parcel %in% qa_new$ain) %>% select(apn_parcel, everything()) %>% View()
+permits_deduped %>% filter(ain %in% qa_new$ain) %>% select(ain, everything())  %>% View()
+structure_count %>% left_join(final_types, by = c("apn_parcel"="ain")) %>% View()
+
+## There are 4 AINs that reverted to In Construction
+qa_reverted$ain
+calfire %>% filter(apn_parcel %in% qa_reverted$ain) %>% select(apn_parcel, everything()) %>% View()
+permits_deduped %>% filter(ain %in% qa_reverted$ain) %>% select(ain, everything()) %>% View()
+
+# "5846021004": https://portal.assessor.lacounty.gov/parceldetail/5846021004
+## Has two structures and 4 permits: 1 Destroyed and 1 Affected
+## Latest permit is explicitly for an Eaton Fire Like For Like Rebuild (garage), 
+## Previous permits were repair/replacements so previous status was likely Repair and next will be Rebuilt
+## Conclusion: Keep as is
+
+# "5846017025": https://portal.assessor.lacounty.gov/parceldetail/5846017025
+## Has two structures and 2 permits: 1 Destroyed and 1 Affected
+## Last permit was repair/replacement for reroof, new one is electrical permit
+## Previous was probably repair of residence but destroyed structure is not rebuilt
+## Conclusion: Keep as is
+
+# "5829020023": https://portal.assessor.lacounty.gov/parceldetail/5829020023
+## Has 14 structures and 20 permits: 2 destroyed and 12 no damage
+## Last permits were repair/replacements likely for the 12 other structures (some are multiunit)
+## New permits are CREBs presumably for 2 destroyed structures
+## Conclusion: Keep as is
+
+# "5828018005": https://portal.assessor.lacounty.gov/parceldetail/5828018005
+## Has 2 structures and 3 permits: 1 destroyed, 1 affected
+## Last permits were repair/replacements - likely for affected structure
+## New permit is CREB presumably for destroyed structure
+## Conclusion: Keep as is
+
+## There are 19 that stayed rebuilt/repaired - will not manually review
+## However noting that MOST have multiple structures with varying damage levels so some could still revert
+calfire %>% filter(apn_parcel %in% qa_unchanged$ain) %>% select(apn_parcel, everything()) %>% View()
+permits_deduped %>% filter(ain %in% qa_unchanged$ain) %>% select(ain, everything()) %>% View()
 
 
 # March 2026 compared to Dec 2025
