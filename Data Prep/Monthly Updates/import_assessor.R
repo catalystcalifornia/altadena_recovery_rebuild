@@ -110,9 +110,6 @@ table(shp_intersect$matched_name, useNA = "ifany")
 # # Altadena           Pasadena        Pasadena; Altadena
 # # 13951              40342           581
 
-# clean up before export #
-colnames(shp_intersect) <- tolower(colnames(shp_intersect))
-shp_intersect_3310 <- st_transform(shp_intersect, 3310)
 
 # # export results
 data_vintage_month <- "03" 
@@ -232,7 +229,7 @@ csv_ain <- dbGetQuery(con, statement=paste0("SELECT * FROM ", schema, ".", csv_t
 ### 1. AINs from the SHP files that have no CSV match
 mismatch_1 <- data.frame(ain=setdiff(shp_ain, csv_ain$ain)) %>%
   left_join(shp_intersect,by="ain") %>%
-  st_as_sf(sf_column_name="geom",
+  st_as_sf(sf_column_name="geometry",
            crs=st_crs(shp_intersect)) 
 
 mapview(mismatch_1, col.regions="red")
@@ -241,6 +238,9 @@ mapview(mismatch_1, col.regions="red")
 nrow(mismatch_1) # 12
 sort(mismatch_1$ain)
 
+mismatch_1 %>%
+  mutate(in_any_assessor_csv = ain %in% csv_ains_combined) %>%
+  count(in_any_assessor_csv)
 # look up on assessor portal: https://portal.assessor.lacounty.gov/parceldetail/[ain]
 # denote parcel status (e.g., no result if none/doesn't exist in portal, Shell, Deleted, etc.)
 # prioritize residential and non-vacant if updating script
@@ -361,3 +361,120 @@ sort(mismatch_2$ain)
 table(mismatch_2$use_code, useNA = "ifany")
 
 # Note some of these look to overlap with some addresses that matched to Calfire data in mismatch_1
+mismatch_list <- c("5827014035", "5827014036", "5831016035", "5831016036", "5839016025", "5839016026", "5841007024", "5842008017", "5842008018", "5843023069", "5843023070", "5863003900")
+
+latlon_from_attrs <- shp_intersect %>%
+  filter(ain %in% mismatch_list) %>%
+  st_drop_geometry() %>%
+  select(
+    ain,
+    center_lat,
+    center_lon)
+
+library(tidygeocoder)
+library(dplyr)
+
+coords <- tibble(
+  ain = c(
+    "5863003900","5839016025","5839016026","5841007024",
+    "5831016035","5831016036","5827014036","5842008018",
+    "5842008017","5827014035","5843023069","5843023070"
+  ),
+  lat = c(
+    34.21593,34.18399,34.18383,34.19702,34.20617,34.20602,
+    34.18633,34.19705,34.19705,34.18633,34.19601,34.19558
+  ),
+  lon = c(
+    -118.1612,-118.1409,-118.1414,-118.1336,-118.1380,-118.1386,
+    -118.1571,-118.1282,-118.1282,-118.1571,-118.1172,-118.1176
+  )
+)
+
+addresses <- coords %>%
+  reverse_geocode(
+    lat = lat,
+    long = lon,
+    method = "osm"
+  )
+# > addresses
+# # A tibble: 12 x 4
+# ain          lat   lon address                                                                                       
+# <chr>      <dbl> <dbl> <chr>                                                                                         
+#   1 5863003900  34.2 -118. 4588, El Prieto Road, Altadena, Los Angeles County, California, 91001, United States          
+# 2 5839016025  34.2 -118. 476, Alameda Street, Altadena, Los Angeles County, California, 91001, United States           
+# 3 5839016026  34.2 -118. 2230, North Santa Anita Avenue, Altadena, Los Angeles County, California, 91001, United States
+# 4 5841007024  34.2 -118. 587, Punahou Street, Altadena, Los Angeles County, California, 91001, United States           
+# 5 5831016035  34.2 -118. 3552, Holly Slope Road, Altadena, Los Angeles County, California, 91001, United States        
+# 6 5831016036  34.2 -118. 3552, Holly Slope Road, Altadena, Los Angeles County, California, 91001, United States        
+# 7 5827014036  34.2 -118. 2337, North Grandeur Avenue, Altadena, Los Angeles County, California, 91001, United States   
+# 8 5842008018  34.2 -118. 3044, Mount Curve Avenue, Altadena, Los Angeles County, California, 91001, United States      
+# 9 5842008017  34.2 -118. 3044, Mount Curve Avenue, Altadena, Los Angeles County, California, 91001, United States      
+# 10 5827014035  34.2 -118. 2337, North Grandeur Avenue, Altadena, Los Angeles County, California, 91001, United States   
+# 11 5843023069  34.2 -118. 1612, Woodglen Lane, Altadena, Los Angeles County, California, 91001, United States           
+# 12 5843023070  34.2 -118. 2860, Windfall Avenue, Altadena, Los Angeles County, California, 91001, United States 
+
+addresses_v2 <- coords %>%
+  reverse_geocode(
+    lat = lat,
+    long = lon,
+    method = "arcgis"
+  )
+# > addresses_v2 #arcgis is more accurate for parcels so going with this one to look up on the assessor site
+# # A tibble: 12 x 4
+# ain          lat   lon address                                         
+# <chr>      <dbl> <dbl> <chr>                                           
+#   1 5863003900  34.2 -118. Owen Brown Gravesite, Altadena, CA, 91001, USA  
+# 2 5839016025  34.2 -118. 476 Alameda St, Altadena, CA, 91001, USA        # 5829-020-016
+# 3 5839016026  34.2 -118. 2230 Santa Anita Ave, Altadena, CA, 91001, USA  # 5839-016-004
+# 4 5841007024  34.2 -118. 577 Punahou St, Altadena, CA, 91001, USA        # 5841-007-016
+# 5 5831016035  34.2 -118. 3554 Hollyslope Rd, Altadena, CA, 91001, USA    # 5831-016-033
+# 6 5831016036  34.2 -118. 3552 Hollyslope Rd, Altadena, CA, 91001, USA    # 5831-016-032
+# 7 5827014036  34.2 -118. 2365 Grandeur Ave, Altadena, CA, 91001, USA     # 5827-014-022 but pending Delete
+# 8 5842008018  34.2 -118. 3044 N Mount Curve Ave, Altadena, CA, 91001, USA #5842-002-008
+# 9 5842008017  34.2 -118. 3044 N Mount Curve Ave, Altadena, CA, 91001, USA #same address
+# 10 5827014035  34.2 -118. 2365 Grandeur Ave, Altadena, CA, 91001, USA     #same address
+# 11 5843023069  34.2 -118. 1612 Woodglen Ln, Altadena, CA, 91001, USA      # 5843-023-016 but pending delete
+# 12 5843023070  34.2 -118. 2860 Windfall Ave, Altadena, CA, 91001, USA     # 5843-023-037
+
+#after looking up addresses this is the list of new AINs
+updated_ain <- c("5829020016", "5839016004", "5841007016", "5831016033", "5831016032", "5827014022", "5842002008", "5843023016", "5843023037")
+
+#check the updated against the assessor data
+check_assessor <- tibble(ain = updated_ain) %>%
+  mutate(
+    in_assessor_csv = ain %in% csv_ains_combined
+  )
+
+check_assessor
+#> check_assessor
+# A tibble: 9 x 2
+# ain        in_assessor_csv
+# <chr>      <lgl>          
+#   1 5829020016 FALSE          
+# 2 5839016004 TRUE           
+# 3 5841007016 TRUE           
+# 4 5831016033 TRUE           
+# 5 5831016032 TRUE           
+# 6 5827014022 TRUE           
+# 7 5842002008 FALSE          
+# 8 5843023016 TRUE           
+# 9 5843023037 TRUE  
+valid_updated_ain <- check_assessor %>%
+  filter(in_assessor_csv) %>%
+  pull(ain)
+# [1] "5839016004" "5841007016" "5831016033" "5831016032" "5827014022" "5843023016" "5843023037"
+
+library(readr)
+# read in csv w/ altadena data
+csv_2_df <- read_csv(csv_2, show_col_types = FALSE)
+
+# get the rows w/ the validated updated ain
+csv_2_updated_rows <- csv_2_df %>%
+  filter(`ï»¿AIN` %in% valid_updated_ain)
+
+# bind rows to orig csv 2
+csv_2_results_updated <- bind_rows(
+  csv_2_results,
+  csv_2_updated_rows
+) %>%
+  distinct(`ï»¿AIN`, .keep_all = TRUE)
