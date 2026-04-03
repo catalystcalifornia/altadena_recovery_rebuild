@@ -47,8 +47,11 @@ curr_xwalk_year <- "2026" # year
 curr_xwalk_month <- "04"
 prev_xwalk_month <- "12"
 schema <- "dashboard"
-curr_year <- "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
-curr_month <- "04" #strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+curr_year <- "2026" # current update year
+curr_month <- "04" # current update month
+prev_year <- "2025" # prev update year
+prev_month <- "12" # prev update month
+
 ain_curr <- sprintf("ain_%s_%s", curr_year, curr_month)
 
 # load data
@@ -676,17 +679,6 @@ check <- as.data.frame(table(check_final_creb$has_creb, check_final_creb$rebuild
 
 
 table(final_types$rebuild_status, useNA = "ifany")
-# Dec 2025
-# Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
-# 798                            1610                             19                            3226
-# Rebuild Complete 
-# 23 
-
-# Mar 2026
-# Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
-# 1181                            1765                             17                            2686
-# Rebuild Complete 
-# 27
 
 # Apr 2026
 # Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
@@ -694,18 +686,32 @@ table(final_types$rebuild_status, useNA = "ifany")
 # Repairs or Rebuild Complete 
 # 37
 
-table(final_types$dashboard_label, useNA = "ifany")
+# Mar 2026 (prelim)
+# Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
+# 1181                            1765                             17                            2686
+# Rebuild Complete 
+# 27
+
 # Dec 2025
-# Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications 
-# 19                                                  798                             23                          1610                           3226 
+# Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
+# 798                            1610                             19                            3226
+# Rebuild Complete 
+# 23 
+
+
+table(final_types$dashboard_label, useNA = "ifany")
+
+# Apr 2026
+# Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications
+# 16                                                  1338                             37                           1698                         2587
 
 # Mar 2026
 # Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications 
 # 17                                                  1181                            27                          1765                           2686 
 
-# Apr 2026
-# Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications
-# 16                                                  1338                             37                           1698                         2587
+# Dec 2025
+# Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications 
+# 19                                                  798                             23                          1610                           3226 
 
 # final row and duplicate check
 nrow(final_types)
@@ -718,7 +724,10 @@ completed <- final_types %>% filter(dashboard_label=='Repairs or Rebuild Complet
 rebuild_check <- combined_parcels_all %>% filter(ain %in% completed$ain)
 
 rebuild_check_full <- permits_deduped %>% filter(ain %in% completed$ain) %>% select(ain, permit_number, description, everything())
-### QA - SKIM THESE TWO VIEWS REBUILD_CHECK and REBUILD_CHECK_FULL to make sure those flagged as completed make sense based on types of permits or further refinement might be needed
+### QA - SKIM THESE TWO VIEWS REBUILD_CHECK and REBUILD_CHECK_FULL to make sure 
+### those flagged as completed make sense based on types of permits or further refinement might be needed
+# April 2026
+
 # looks better one parcel questionable still 	5846008016
 # HK 3/5/26: Agreed that 5846008016 looks questionable - doesn't seem related to fires but not sure if we can address 
 # HK 3/5/26: It falls under the case where there is only a misc permit and its finaled - don't notice a clear way to reclassify other than manually
@@ -811,23 +820,28 @@ dbDisconnect(con)
 ### Additional QA
 # Adding to see why some rebuild/repair statuses have reverted
 con <- connect_to_db("altadena_recovery_rebuild")
-sql_query <- "SELECT curr.*, prev.dashboard_label as prev_dashboard_label,
+sql_query <- sprintf("SELECT curr.*, prev.dashboard_label as prev_dashboard_label,
 CASE 
         WHEN curr.dashboard_label = prev.dashboard_label THEN 'unchanged'
         WHEN curr.dashboard_label = 'Repairs or Rebuild Complete' AND prev.dashboard_label != 'Repairs or Rebuild Complete' THEN 'new rebuild complete'
         WHEN curr.dashboard_label != 'Repairs or Rebuild Complete' AND prev.dashboard_label = 'Repairs or Rebuild Complete' THEN 'reverted - QA to figure out why'
         ELSE 'something else?'
     END AS change_summary
-FROM dashboard.rel_parcel_rebuild_status_2026_03 curr
-LEFT JOIN dashboard.rel_parcel_rebuild_status_2025_12 prev ON curr.ain = prev.ain
-WHERE prev.dashboard_label = 'Repairs or Rebuild Complete' OR curr.dashboard_label = 'Repairs or Rebuild Complete';"
+FROM dashboard.rel_parcel_rebuild_status_%s_%s curr
+LEFT JOIN dashboard.rel_parcel_rebuild_status_%s_%s prev ON curr.ain = prev.ain
+WHERE prev.dashboard_label = 'Repairs or Rebuild Complete' OR curr.dashboard_label = 'Repairs or Rebuild Complete';", 
+                     curr_year, curr_month,
+                     prev_year, prev_month)
 
 check_rebuild_changes <- dbGetQuery(con=con, sql_query)
 dbDisconnect(con)
-new <- check_rebuild_changes %>% filter(change_summary=='new rebuild complete') 
-new_suspicious <- check_rebuild_changes %>% filter(change_summary=='new rebuild complete' & prev_dashboard_label != "In Construction")
-reverted <- check_rebuild_changes %>% filter(change_summary=='reverted - QA to figure out why') 
-unchanged <- check_rebuild_changes %>% filter(change_summary=='unchanged') 
+qa_new <- check_rebuild_changes %>% filter(change_summary=='new rebuild complete') 
+qa_new_suspicious <- check_rebuild_changes %>% filter(change_summary=='new rebuild complete' & prev_dashboard_label != "In Construction")
+qa_reverted <- check_rebuild_changes %>% filter(change_summary=='reverted - QA to figure out why') 
+qa_unchanged <- check_rebuild_changes %>% filter(change_summary=='unchanged') 
+
+# April 2026 compared to Dec 2025
+
 
 # March 2026 compared to Dec 2025
 ## There are 10 new rebuilds (8 previously "In Construction", 2 not)
