@@ -66,6 +66,9 @@ curr_lead <- ain_lead %>%
 table(curr_lead$hi_lead_label,useNA='always')
 
 nrow(curr_lead) - nrow(parcels) # same count
+#Another quick duplicates check 
+# sum(duplicated(curr_lead$ain_2026_04)) should be 0
+
 
 #### STEP 4: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
