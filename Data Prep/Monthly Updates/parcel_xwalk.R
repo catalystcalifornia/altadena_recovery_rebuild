@@ -105,6 +105,9 @@ cat(paste("Number of duplicated shapes:", nrow(check)-1))
 cat(paste("Number of unduplicated shapes:", check$Freq[is.na(check$Var1)]))
 cat(paste("Number of shapes accounted for is the same as number of all parcels:", sum(check$Freq)==nrow(all_parcels)))
 
+# Additional QA (can check to see if any rows are missing an AIN or geom)
+cat(paste("Rows with missing AIN:", sum(is.na(all_parcels$ain))))
+cat(paste("Rows with missing geometry:", sum(is.na(all_parcels$geom_wkt))))
 
 # Make wider, to see if AINs match across the same shape (or something else)
 match_parcels_wide <- match_parcels %>%
@@ -141,6 +144,14 @@ match_parcels_wide <- match_parcels %>%
 check <- as.data.frame(table(match_parcels_wide$xwalk_type , useNA="always"))
 cat(paste("Number of undefined relationships between prev and curr parcel shapes (0 is good):", check$Freq[is.na(check$Var1)]))
 print(check)
+
+# Additional QA checking the 6 that are indicated to have diff ains 
+diff_ains <- match_parcels_wide %>% filter(xwalk_type == "same shape, diff ains, same counts")
+View(diff_ains)
+#Assessment: Only the last number of each ain is different so it may be a change from the LA County Assessor department and just renames but they are in fact the same parcels
+#Also searched the parcels on assessor portal, 5831016033 and 5831016032 report a parcel number change but the old AINs don't match what is in our df. 
+# 5842008018 does not indicate a parcel change and,
+# others I could not search, they didn't exist in the portal so are likely retired. 
 
 ##### Monthly Update if you see some status types from before missing--that's okay, they will just produce 0 data frames and code will still run  #######
 ## December note - with parcels limited to Altadena, this dropped other xwalk types, ran code anyways but dataframes yield 0
@@ -361,6 +372,20 @@ final_xwalk <- xwalk_df %>%
 final_xwalk %>% group_by(ain_2025_01) %>% filter(n()>1) %>% View() # 3
 final_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% View()
 final_xwalk %>% group_by(ain_curr) %>% filter(n()>1) %>% View()
+
+# Additional QA 
+# Check if dupes are in xwalk_df
+xwalk_df %>% group_by(ain_prev) %>% filter(n()>1) %>% nrow() #6
+# Check if dupes are in prev_xwalk
+prev_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% nrow() #2
+
+final_xwalk %>% 
+  group_by(ain_2025_01) %>% 
+  filter(n()>1) %>%
+  select(ain_2025_01, ain_prev, ain_curr, status) %>%  # include status column
+  arrange(ain_2025_01)
+#this shows that  5842008010  is matching to 5842008017 and 5842008018 and neither I can search in the portal so this could be a split parcel situation?
+
 
 # check that all january ains are accounted for
 missing_jan_parcels <- parcel_universe %>% anti_join(final_xwalk, by=c("ain_2025_01"))
