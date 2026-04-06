@@ -367,11 +367,11 @@ sales_updated_final <- sales_updated %>%
 
 # check total sales that it increased from before ANFS data was added
 table(sales_updated_final$sold_source,useNA='always')
-# 106+243+28 = 377 TOTAL SALES 
+# 106+243+28 = 377 TOTAL SALES from last update
 # 73   +  340    +  43 = 456 sales March/April 2026
 
-table(sales_updated_final$sold_after_eaton,useNA='always')
-# 377 - Dec/Jan flag to Elycia if doesn't increase
+table(sales_updated_final$sold_after_eaton,useNA='always') # flag to Elycia if doesn't increase
+# 377 - Dec/Jan 
 # 456 - March/April
 
 ##### STEP 13: *UPDATE* REMOVE DUPS AND CLEAN #####
@@ -399,7 +399,7 @@ final_df <- final_df %>%
 table_label <- paste0("rel_assessor_sales_", year, "_", month) 
 schema <- "dashboard"
 indicator <- "Relational table with information on sales date and owner information using a combination of LAC assessor data and Altadena not for sale data
-We mark a property as sold if sale date was after 2-8-25 in either source. In cases where property is only marked as sold in ANFS data then we use the owner information and sales data from that file. In all other cases, we use LAC assessor"
+We mark a property as sold if sale date was on or after 2-8-25 in either source. In cases where property is only marked as sold in ANFS data then we use the owner information and sales data from that file. In all other cases, we use LAC assessor"
 source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_sales.R "
 qa_filepath<-"  QA_Sheet_rel_tables_update_2026_04.docx "
 
