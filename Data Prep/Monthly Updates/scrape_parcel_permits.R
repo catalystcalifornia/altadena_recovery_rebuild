@@ -122,7 +122,7 @@ final_data <- read.csv(csv_filepath,
 con <- connect_to_db("altadena_recovery_rebuild")
 
 dbWriteTable(con, Id(schema=schema, table_name=table_name), final_data,
-             overwrite = FALSEE, row.names = FALSE)
+             overwrite = FALSE, row.names = FALSE)
 
 dbSendQuery(con, paste0("COMMENT ON TABLE ", schema, ".", table_name, " IS
             'General permit data for Altadena parcels with some or significant damage,
