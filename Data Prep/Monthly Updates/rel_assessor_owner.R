@@ -151,7 +151,8 @@ data_owner %>% count(owner_renter)
 # 9                      Renter occupied  512 # went down
 # 10                       Sold to state   31 # same
 # 11                         Trust owned  688 # went down
-# March/April Update
+
+# March/April 2026 Update
 # owner_renter    n
 # 1  Church, charity, or nonprofit owned   11 # down
 # 2                    Corporation owned  253 # up
@@ -212,7 +213,7 @@ final_df<- data_owner %>%
   ))
 
 # check for duplicates
-nrow(final_df)-length(unique(final_df$ain_2025_12)) # should be 0 difference
+nrow(final_df)-length(unique(final_df$ain_2026_04)) # should be 0 difference
 
 # check for same number of rows as xwalk
 nrow(final_df)-length(unique(xwalk$ain_2026_04)) # should be 0 difference
