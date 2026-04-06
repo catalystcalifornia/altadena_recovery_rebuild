@@ -87,17 +87,17 @@ rel_res_df <- rel_res_df %>%
 
 # Check - should be 0 NA
 table(rel_res_df$residential,useNA="always")
-# Dec - TRUE - 5675 0 NA - went up because of the 6 parcels that were missing in 2025-12 data but are not missing now
+# Dec 2025- TRUE - 5675 0 NA - went up because of the 6 parcels that were missing in 2025-12 data but are not missing now
 table(rel_res_df$mixed_use,useNA="always")
-# Dec - FALSE - 5675 0 NA
+# Dec 2025- FALSE - 5675 0 NA
 
 # check for vacant parcels, but okay to keep in data if they change to vacant over time
 vacant <- rel_res_df %>%
   filter(str_detect(use_code, "V$") | str_detect(use_code, "X$") )
 
   nrow(vacant)
-# Dec - 1 vacant
-# Apr - 2 vacant
+# Dec 2025 - 1 vacant
+# Apr 2026 - 2 vacant
 # ain - 5841006015, in dashboard.assessor_data_universe_2025_01 - this parcel was not vacant. important to see how use codes change over time
 # ain - 5842013027 was 5842013003 in jan25 (based on current xwalk) and in dashboard.assessor_data_universe_2025_01 was not vacant
   
