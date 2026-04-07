@@ -107,9 +107,25 @@ table(permits_substring$permit_sub_unc)
 # UNC-BLDC UNC-BLDF UNC-BLDG UNC-BLDM UNC-BLDR UNC-ELEC UNC-EXPR UNC-GRAD UNC-MECH UNC-PLMB UNC-PLSP UNC-SEWR UNC-SOLR 
 # 25      206      805       20    26859     6801      337      211     3882     4388      218     2668      764 
 
+# https://permits.lacounty.gov/permits/building-and-safety/
+# building permit types
+# UNC-BLDC - Commercial
+# UNC-BLDF - Multifamily
+# UNC-BLDG - Retaining Wall or Fence Permit
+# UNC-BLDM - Mixed use
+# UNC-BLDR - Residential
+# UNC-ELEC - Electrical
+# UNC-EXPR - Express - electrical, plumbing, temporary housing
+# UNC-GRAD - Grading
+# UNC-MECH - Mechanical
+# UNC-PLMB - Plumbing
+# UNC-PLSP - Pool/spa permit
+# UNC-SEWR - Sewer
+# UNC-SOLR - Solar
 
-# based on QA, flag ones that are just -- if these are the only repairs completed on a property they likely have more work to do
+# based on QA, flag ones that are just repairs or express permits -- if these are the only repairs completed on a property they likely have more work to do
 # UNC-BLDG UNC-ELEC UNC-EXPR UNC-GRAD UNC-MECH UNC-PLMB UNC-PLSP UNC-SEWR UNC-SOLR
+
 
 ##### 1. Prep data #####
 debris_transformed <- debris_usace %>% 
@@ -213,6 +229,10 @@ length(unique(permits_filtered_curr_ains$ain_curr))
 permits_filtered_curr_ains <- permits_filtered_curr_ains %>%
   rename(ain_scrape=ain,
          ain=ain_curr)
+
+# check for NAs in WF status data
+sum(is.na(permits_filtered_curr_ains$wf_status_date))
+sum(is.na(permits_filtered_curr_ains$wf_status))
 
 # get workflow items and add has_inspection (will use for the bucket 3 check - construction has started)
 workflow_all <- permits_filtered_curr_ains %>% 
