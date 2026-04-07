@@ -915,8 +915,8 @@ qa_unchanged <- check_rebuild_changes %>% filter(change_summary=='unchanged')
 ## There are 18 new rebuilds (16 previously In Construction and 2 that were not)
 # Focusing on 2 not previously In Construction
 qa_new_suspicious$ain
-calfire %>% filter(apn_parcel %in% qa_new_suspicious$ain) %>% select(apn_parcel, everything()) %>% View()
-permits_deduped %>% filter(ain %in% qa_new_suspicious$ain) %>% select(ain, everything())  %>% View()
+qa_new_suspicious_calfire <- calfire %>% filter(apn_parcel %in% qa_new_suspicious$ain) %>% select(apn_parcel, everything())
+qa_new_suspicious_permits <- permits_deduped %>% filter(ain %in% qa_new_suspicious$ain) %>% select(ain, everything()) 
 # 5845014026 (prev. with permit): https://portal.assessor.lacounty.gov/parceldetail/5845014026 
 ## has two structures and 2 permits: one had major damage (looks like main residence), one with no damage; 
 ## From the aerial it doesn't appear to have 26-50% damage
@@ -934,8 +934,34 @@ permits_deduped %>% filter(ain %in% qa_new_suspicious$ain) %>% select(ain, every
 # not sure if that's needed now though
 structure_count <- calfire %>% filter(apn_parcel %in% qa_new$ain) %>% 
   select(apn_parcel, everything()) %>% group_by(apn_parcel) %>% summarise(structure_count=n()) %>% ungroup()
-calfire %>% filter(apn_parcel %in% qa_new$ain) %>% select(apn_parcel, everything()) %>% View()
-permits_deduped %>% filter(ain %in% qa_new$ain) %>% select(ain, everything())  %>% View()
+qa_new_calfire <- calfire %>% filter(apn_parcel %in% qa_new$ain) %>% select(apn_parcel, everything())
+qa_new_permits <- permits_deduped %>% filter(ain %in% qa_new$ain) %>% select(ain, everything())
+# filtered qa_new_calfire for destroyed structures and checked for these in qa_new_permits
+qa_new_permits_destroyed <- qa_new_permits %>% filter(ain %in% (qa_new_calfire %>% 
+                                               filter(damage == "Destroyed (>50%)") %>%
+                                               pull(apn_parcel)))
+distinct(qa_new_permits_destroyed,ain) # 14
+# do they each have at least one new construction
+qa_new_permits_destroyed %>%
+  filter(type=='Residential New Construction Building Permit - County') %>%
+  distinct(ain) # 11
+
+setdiff(distinct(qa_new_permits_destroyed,ain),
+        qa_new_permits_destroyed %>%
+          filter(type=='Residential New Construction Building Permit - County') %>%
+          distinct(ain)) # 11)
+
+# These have no new construction - 
+# 1 5846006027 - minor structure destroyed
+# 2 5845005020 - mobile home and minor structures
+# 3 5843019018 - according to calfire main residence was fine, wondering if we should filter out these permits PWRP?
+
+# filtered qa_new_calfire for main residences with major damage and checked for these in qa_new_permits
+qa_new_permits_damaged_residence <- qa_new_permits %>% filter(ain %in% (qa_new_calfire %>% 
+                                                                  filter(damage == "Major (26-50%)" & grepl("Residence",structure_category)) %>%
+                                                                  pull(apn_parcel)))
+# 5832014001 unclear but only a single structure in calfire
+
 structure_count %>% left_join(final_types, by = c("apn_parcel"="ain")) %>% View()
 
 ## There are 4 AINs that reverted to In Construction
