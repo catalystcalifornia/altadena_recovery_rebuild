@@ -16,15 +16,10 @@ con <- connect_to_db("altadena_recovery_rebuild")
 # Key variables - tracking current and previous months and years
 # update with current year and month and previous time crosswalk was run
 date_ran <- as.character(Sys.Date())
-curr_year <- "2025" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
-curr_month <- "12" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
-prev_month <- "09" # ifelse(curr_month == "01", "12", sprintf("%02d", as.numeric(curr_month) - 1))
+curr_year <- "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
+curr_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+prev_month <- "12" # ifelse(curr_month == "01", "12", sprintf("%02d", as.numeric(curr_month) - 1))
 prev_year <- "2025" # ifelse(curr_month == "01", as.character(as.numeric(curr_year) - 1),  curr_year)
-# prev_prev_month <- ifelse(prev_month == "01", "12", 
-#                           sprintf("%02d", as.numeric(prev_month) - 1))
-# prev_prev_year <- ifelse(prev_month == "01", 
-#                          as.character(as.numeric(curr_year) - 1), 
-#                          prev_year)
 ##### STOP UPDATE 
 
 
@@ -35,11 +30,12 @@ curr_parcels_table <- paste("dashboard.assessor_parcels_universe", curr_year, cu
 curr_stats_table <- paste("dashboard.assessor_data_universe", curr_year, curr_month, sep="_")
 prev_parcels_table <- paste("dashboard.assessor_parcels_universe", prev_year, prev_month, sep="_")
 prev_stats_table <- paste("dashboard.assessor_data_universe", prev_year, prev_month, sep="_")
-prev_xwalk_table <-  "dashboard.crosswalk_assessor_01_09_2025" # paste("dashboard.crosswalk_assessor", prev_prev_month, prev_month, prev_year, sep="_")
+prev_xwalk_table <-  "dashboard.crosswalk_assessor_2025_09_12" # paste("dashboard.crosswalk_assessor", prev_prev_month, prev_month, prev_year, sep="_")
 parcel_universe <- dbGetQuery(con, "SELECT * from dashboard.parcel_universe_2025_01") # all significantly damaged, residential Jan parcels
 
 ###### MONTHLY UPDATE - Get universe of parcels ----
-## Revisit once new data comes in for now starting with january parcels - no script to QA crosswalk_assessor_01_09_2025 that's being pulled for now just using the parcel universe
+## Revisit once new data comes in for now starting with january parcels - 
+## no script to QA crosswalk_assessor_01_09_2025 that's being pulled for now just using the parcel universe
 # # # Prep: get the universe of shapes (jan res + sig dmg) and filter the prev crosswalk
 # prev_xwalk <- dbGetQuery(con, paste("SELECT ain_2025_01,", paste("ain", prev_year, prev_month, sep="_"), "AS ain_prev FROM", prev_xwalk_table)) %>%
 #   filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
@@ -53,21 +49,29 @@ prev_xwalk <- dbGetQuery(con, paste("SELECT ain_2025_01,", paste("ain", prev_yea
 # This pulls in the previous and current assessor parcels and data
 # get previous assessor parcels and add an identifier column
 # prev parcels should be based on the crosswalk filtered for residential and significantly damaged parcels
-parcels_prev <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
-                       FROM", prev_parcels_table, "parcels
-                       LEFT JOIN", prev_stats_table, "stats
-                       ON parcels.ain=stats.ain")) %>%
+parcels_prev_sql <- sprintf("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
+                       FROM %s parcels
+                       LEFT JOIN %s stats
+                       ON parcels.ain=stats.ain;", 
+                            prev_parcels_table, 
+                            prev_stats_table)
+
+parcels_prev <- st_read(con, query=parcels_prev_sql) %>%
   mutate(flag="prev") %>%
   mutate(area = st_area(geom))
 
-parcels_curr <- st_read(con, query=paste("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
-                       FROM", curr_parcels_table, "parcels
-                       LEFT JOIN", curr_stats_table, "stats
-                       ON parcels.ain=stats.ain")) %>%
+parcels_curr_sql <- sprintf("SELECT parcels.ain, parcels.geom, stats.use_code, stats.situs_house_no, stats.direction, stats.street_name, stats.unit, stats.city_state 
+                       FROM %s parcels
+                       LEFT JOIN %s stats
+                       ON parcels.ain=stats.ain;",
+                          curr_parcels_table,
+                          curr_stats_table)
+
+parcels_curr <- st_read(con, query=parcels_curr_sql) %>%
   mutate(flag="curr") %>%
   mutate(area = st_area(geom))
 
-# double check CRS of both of parcel shapes
+# double check CRS of both of parcel shapes are 3310
 cat(paste("Confirm EPSG of prev parcel shapes is 3310:", 
           ifelse(st_crs(parcels_prev)$epsg=="3310", "TRUE", paste("FALSE - EPSG is", st_crs(parcels_prev)$epsg))))
 cat(paste("Confirm EPSG of curr parcel shapes is 3310:", 
@@ -101,6 +105,9 @@ cat(paste("Number of duplicated shapes:", nrow(check)-1))
 cat(paste("Number of unduplicated shapes:", check$Freq[is.na(check$Var1)]))
 cat(paste("Number of shapes accounted for is the same as number of all parcels:", sum(check$Freq)==nrow(all_parcels)))
 
+# Additional QA (can check to see if any rows are missing an AIN or geom)
+cat(paste("Rows with missing AIN:", sum(is.na(all_parcels$ain))))
+cat(paste("Rows with missing geometry:", sum(is.na(all_parcels$geom_wkt))))
 
 # Make wider, to see if AINs match across the same shape (or something else)
 match_parcels_wide <- match_parcels %>%
@@ -137,6 +144,15 @@ match_parcels_wide <- match_parcels %>%
 check <- as.data.frame(table(match_parcels_wide$xwalk_type , useNA="always"))
 cat(paste("Number of undefined relationships between prev and curr parcel shapes (0 is good):", check$Freq[is.na(check$Var1)]))
 print(check)
+
+# Additional QA checking the 6 that are indicated to have diff ains 
+diff_ains <- match_parcels_wide %>% filter(xwalk_type == "same shape, diff ains, same counts")
+View(diff_ains)
+#Assessment: Only the last number of each ain is different so it may be a change from the LA County Assessor department and just renames but they are in fact the same parcels
+#Also searched the parcels on assessor portal, 5831016033 and 5831016032 report a parcel number change but the old AINs don't match what is in our df. 
+# 5842008018 does not indicate a parcel change and,
+# others I could not search, they didn't exist in the portal so are likely retired. 
+
 ##### Monthly Update if you see some status types from before missing--that's okay, they will just produce 0 data frames and code will still run  #######
 ## December note - with parcels limited to Altadena, this dropped other xwalk types, ran code anyways but dataframes yield 0
 
@@ -178,8 +194,9 @@ cat(paste("Number of rows matches unique number of previous ains:", nrow(xwalk_s
 same_shape_diff_ain <- match_parcels_wide %>%
   filter(xwalk_type %in% c("same shape, diff ains, same counts"))
 
-# QA Check
-nrow(same_shape_diff_ain) # if 0 expect an error below
+# QA Check: if 0 expect a warning from below, e.g., 
+# "Returning more (or less) than 1 row per summarise() group was deprecated
+nrow(same_shape_diff_ain) 
 
 xwalk_same_shape_diff_ain <- same_shape_diff_ain  %>%
   group_by(dupe_id,xwalk_type) %>%
@@ -203,7 +220,8 @@ xwalk_same_shape_diff_ain <- same_shape_diff_ain  %>%
          address_prev = address.x,
          address_curr = address.y)
 
-# Dec qa flag on below because dataframe yields 0, can still proceed:
+# March/April 2026 QA flag there are 6 same_shape_diff_ain cases this update
+# Dec 2025 qa flag on below because dataframe yields 0, can still proceed:
 # `summarise()` has grouped output by 'dupe_id', 'xwalk_type'. You can override using the `.groups` argument.
 # Warning message:
 #   Returning more (or less) than 1 row per `summarise()` group was deprecated in dplyr 1.1.0.
@@ -214,8 +232,8 @@ xwalk_same_shape_diff_ain <- same_shape_diff_ain  %>%
 same_shape_diff_count_ain <- match_parcels_wide %>%
   filter(xwalk_type %in% c("same shape, diff ains, needs closer look"))
 
-# QA Check
-nrow(same_shape_diff_ain) # if 0 expect an error below
+# QA Check: if 0 expect a warning from below, e.g., "Returning more (or less) than 1 row per summarise() group was deprecated
+nrow(same_shape_diff_ain) 
 
 xwalk_same_shape_diff_count_ain <- same_shape_diff_ain  %>%
   group_by(dupe_id,xwalk_type) %>%
@@ -239,7 +257,8 @@ xwalk_same_shape_diff_count_ain <- same_shape_diff_ain  %>%
          address_prev = address.x,
          address_curr = address.y)
 
-# Dec qa flag on below because dataframe yields 0, can still proceed:
+# March 2026 QA flag (there are 3 same_shape_diff_ain cases - confirmed on Assessor that the new ain returns correct result
+# Dec 2025 qa flag on below because dataframe yields 0, can still proceed:
 # `summarise()` has grouped output by 'dupe_id', 'xwalk_type'. You can override using the `.groups` argument.
 # Warning message:
 #   Returning more (or less) than 1 row per `summarise()` group was deprecated in dplyr 1.1.0.
@@ -345,16 +364,40 @@ xwalk_df <- bind_rows(
 final_xwalk <- xwalk_df %>%
   left_join(prev_xwalk, by="ain_prev") %>%
   select(ain_2025_01, ain_prev, ain_curr, everything()) %>%
-  # rename columns for export
-  rename_with(~ gsub("_prev$", paste("", prev_year, prev_month, sep="_"), .x)) %>%
-  rename_with(~ gsub("_curr$", paste("",curr_year, curr_month, sep="_"), .x)) %>%
-  filter(ain_2025_01 %in% parcel_universe$ain_2025_01)
+  filter(ain_2025_01 %in% parcel_universe$ain_2025_01) %>%
+  distinct()
+
+# March/April 2026 update - getting many to many warning. 
+# Check dupes
+final_xwalk %>% group_by(ain_2025_01) %>% filter(n()>1) %>% View() # 3
+final_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% View()
+final_xwalk %>% group_by(ain_curr) %>% filter(n()>1) %>% View()
+
+# Additional QA 
+# Check if dupes are in xwalk_df
+xwalk_df %>% group_by(ain_prev) %>% filter(n()>1) %>% nrow() #6
+# Check if dupes are in prev_xwalk
+prev_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% nrow() #2
+
+final_xwalk %>% 
+  group_by(ain_2025_01) %>% 
+  filter(n()>1) %>%
+  select(ain_2025_01, ain_prev, ain_curr, status) %>%  # include status column
+  arrange(ain_2025_01)
+#this shows that  5842008010  is matching to 5842008017 and 5842008018 and neither I can search in the portal so this could be a split parcel situation?
+
 
 # check that all january ains are accounted for
 missing_jan_parcels <- parcel_universe %>% anti_join(final_xwalk, by=c("ain_2025_01"))
-nrow(missing_jan_parcels)
+nrow(missing_jan_parcels) # should be zero
+
 ##### QA CHECK SHOULD BE ZERO #####
-## Dec QA
+
+## Mar 2026 QA
+# No missing jan parcels but possible flag on the same parcel below: the 5842008018 (https://portal.assessor.lacounty.gov/parceldetail/5842008018)
+# AIN is now a shell on assessor and the correct AIN is now the old one 5842008010 (https://portal.assessor.lacounty.gov/parceldetail/5842008010)
+# Might be better to resolve in the rel_ tables (see what's happening)
+## Dec 2025 QA
 # https://portal.assessor.lacounty.gov/parceldetail/5842008010 - split into 5842008017 and 5842008018
 
 # Step 7: Add records dropped and finalize table ------
@@ -377,35 +420,52 @@ xwalk_missing_parcels <- intersection %>%
 
 xwalk_missing_parcels <- xwalk_missing_parcels %>%
   left_join(prev_xwalk, by="ain_prev") %>%
-  select(ain_2025_01, ain_prev, ain_curr, everything()) %>%
-  # rename columns for export
-  rename_with(~ gsub("_prev$", paste("", prev_year, prev_month, sep="_"), .x)) %>%
-  rename_with(~ gsub("_curr$", paste("",curr_year, curr_month, sep="_"), .x))
+  select(ain_2025_01, ain_prev, ain_curr, everything()) 
+
 
 final_xwalk <- bind_rows(final_xwalk,xwalk_missing_parcels)
 
 # QA CHECK DUPLICATES and review them--multiple of the previous ains matching
-dup_matches_jan <- final_xwalk[final_xwalk$ain_2025_01 %in% final_xwalk$ain_2025_01[duplicated(final_xwalk$ain_2025_01)], ]
-dup_matches_prev <- final_xwalk[final_xwalk$ain_2025_09 %in% final_xwalk$ain_2025_09[duplicated(final_xwalk$ain_2025_09)], ]
-dup_matches_curr <- final_xwalk[final_xwalk$ain_2025_12 %in% final_xwalk$ain_2025_12[duplicated(final_xwalk$ain_2025_12)], ]
+dup_matches_jan <- final_xwalk %>%
+  group_by(ain_2025_01) %>%
+  filter(n()>1) %>%
+  ungroup()
+
+dup_matches_prev <- final_xwalk %>%
+  group_by(ain_prev) %>%
+  filter(n()>1) %>%
+  ungroup() # cat(sprintf("AIN prev date is: %s", paste0(prev_year, "_", prev_month)))
+
+dup_matches_curr <- final_xwalk %>%
+  group_by(ain_curr) %>%
+  filter(n()>1) %>%
+  ungroup()  # cat(sprintf("AIN curr date is: %s", paste0(curr_year, "_", curr_month)))
+
 # We know these parcels have been merged though the data on the portal seems to be delayed 
-# https://portal.assessor.lacounty.gov/parceldetail/5841023009
-# https://portal.assessor.lacounty.gov/parceldetail/5842008010
+# https://portal.assessor.lacounty.gov/parceldetail/5841023010 (marked deleted)
+# https://portal.assessor.lacounty.gov/parceldetail/5841023009 (marked deleted)
+# https://portal.assessor.lacounty.gov/parceldetail/5842008010 (still marked active but satellite image shows it's not split as 5842008017/5842008018)
 # MAKE SURE THIS DOESNT YIELD DUPLICATES IN RELATIONAL TABLES THOUGH
 
 # Step 8: Monthly Update - Final QA Check -----
 # Skim parcels that changed--if months are closer together this should be fewer in record
 # look at instances of parcel changes
-qa_parcel_change <- final_xwalk %>% filter(ain_2025_09!=ain_2025_12)
-# these all make sense based on assessor portal checks
+qa_parcel_change <- final_xwalk %>% filter(ain_prev!=ain_curr)
+# March 2025 - looks fine Assessor only has ain_prev: https://portal.assessor.lacounty.gov/parceldetail/5841007017 but satellite image matches ain_curr (5841007024)
+# Dec 2025 these all make sense based on assessor portal checks
 
 
 # Step 9: Export -------
 # Key variables - export variables
+# Set final ain names for export
+final_xwalk <- final_xwalk %>%
+  rename_with(~ gsub("_prev$", paste("", prev_year, prev_month, sep="_"), .x)) %>%
+  rename_with(~ gsub("_curr$", paste("",curr_year, curr_month, sep="_"), .x))
+
 schema <- 'dashboard'
 table_name <- paste("crosswalk_assessor", curr_year, prev_month, curr_month, sep = "_")
 indicator <- "Updated Crosswalk of Assessor AINs from prev(ious) to curr(ent) shapes based on significantly damaged residential parcels from January"
-qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\monthly_updates\\QA_parcel_xwalk.docx"
+qa_filepath <- sprintf("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\monthly_updates\\QA_parcel_xwalk_%s_%s.docx", curr_year, curr_month)
 
 
 source <- "Data Prep\\Monthly Updates\\parcel_xwalk.R"
@@ -433,17 +493,21 @@ add_table_comments(con=con, schema=schema,table_name=table_name,indicator = indi
 # Additional QA Checks -----
 # compare changes in prev and curr xwalk
 # prev xwalk
-prev_xwalk <- st_read(con, query="SELECT * from dashboard.crosswalk_assessor_01_09_2025")
+prev_xwalk <- dbGetQuery(con, sprintf("SELECT * from %s;", prev_xwalk_table))
 
 # new xwalk
-curr_xwalk <- st_read(con, query="SELECT * from dashboard.crosswalk_assessor_2025_09_12")
+curr_xwalk_table <- sprintf("dashboard.crosswalk_assessor_%s_%s_%s", curr_year, prev_month, curr_month)
+curr_xwalk <- dbGetQuery(con, sprintf("SELECT * from %s;", curr_xwalk_table))
 
 # what's in the old xwalk but missing in the new one by jan ains
 missing_jan <- prev_xwalk %>% anti_join(curr_xwalk, by=c("ain_2025_01"="ain_2025_01"))
+nrow(missing_jan)
 # none
 
-# what's in the old xwalk but missing in the new one by sept ains
-missing_sept <- prev_xwalk %>% anti_join(curr_xwalk, by=c("ain_2025_09"="ain_2025_09"))
+# what's in the old xwalk but missing in the new one by prev ains
+prev_ain_date <- sprintf("ain_%s_%s", prev_year, prev_month)
+missing_prev <- prev_xwalk %>% anti_join(curr_xwalk, by=prev_ain_date)
+nrow(missing_prev)
 # none
 
 nrow(curr_xwalk)
@@ -453,8 +517,9 @@ length(unique(prev_xwalk$ain_2025_01))
 length(unique(prev_xwalk$ain_2025_01))-length(unique(curr_xwalk$ain_2025_01))
 # gap of 0 added or dropped
 
-# test for instances where the new xwalk doesn't match the old xwalk-jan-sept
-test_xwalk_result <- curr_xwalk %>% left_join(prev_xwalk %>% mutate(old=TRUE), by=c("ain_2025_01"="ain_2025_01","ain_2025_09"="ain_2025_09"))
+# test for instances where the new xwalk doesn't match the old xwalk-jan-prev month
+test_xwalk_result <- curr_xwalk %>% 
+  left_join(prev_xwalk %>% mutate(old=TRUE), by=c("ain_2025_01", prev_ain_date))
 
 # not a match records -- 0 NA
 table(test_xwalk_result$old,useNA='always')
@@ -464,6 +529,29 @@ table(test_xwalk_result$old,useNA='always')
 
 # check method for parcels
 table(prev_xwalk$xwalk_type,useNA='always')
+# March 2026 after update to assessor import - same counts, makes sense we didn't change prev_xwalk
+# same shape, same ains, same counts       spatial intersect, 90% match       spatial intersect, ain match    spatial intersect, manual match
+#     5670                                  3                                  2                                  2
+# <NA> 
+#  0 
+
+# March 2026
+# 
+# same shape, same ains, same counts       spatial intersect, 90% match       spatial intersect, ain match    spatial intersect, manual match 
+#     5670                                  3                                  2                                  2 
+# <NA> 
+#   0 
+
 table(curr_xwalk$xwalk_type,useNA='always')
 # lower need for spatial intersect--maybe because less change in files closer together or something else?
 
+# March 2026 after update to assessor import - some counts changed
+# same shape, diff ains, same counts    same shape, same ains, same counts       spatial intersect, 90% match 
+#   2                                         5668                                  2 
+# spatial intersect, ain match                               <NA> 
+#   6                                                         0 
+
+# March 2026
+# 
+# same shape, same ains, same counts       spatial intersect, 90% match       spatial intersect, ain match                               <NA> 
+#   5669                                  1                                  7                                  0
