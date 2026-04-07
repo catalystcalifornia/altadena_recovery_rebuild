@@ -816,19 +816,19 @@ check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
 # UNC-SOLR
 # UNC-BLDG
 
-##### Manual update from April 2026 QA #####
-# We agreed to manually reassign 5845015007 to "In Construction" for the April 2026 update
-manual_reassign <- final_types %>%
-  filter(ain=='5845015007') %>%
-  mutate(dashboard_label="In Construction",
-         rebuild_status="Construction In Progress")
-
-final_types_drop <- final_types %>%
-  filter(!ain %in% manual_reassign$ain)
-
-final_types_clean <- rbind(final_types_drop, manual_reassign)
-table(final_types_clean$rebuild_status, useNA="always")
-table(final_types_clean$dashboard_label, useNA="always")
+# ##### Manual update from April 2026 QA - review on next update #####
+# # We agreed to manually reassign 5845015007 to "In Construction" for the April 2026 update
+# manual_reassign <- final_types %>%
+#   filter(ain=='5845015007') %>%
+#   mutate(dashboard_label="In Construction",
+#          rebuild_status="Construction In Progress")
+# 
+# final_types_drop <- final_types %>%
+#   filter(!ain %in% manual_reassign$ain)
+# 
+# final_types_clean <- rbind(final_types_drop, manual_reassign)
+# table(final_types_clean$rebuild_status, useNA="always")
+# table(final_types_clean$dashboard_label, useNA="always")
 
 ##### Export to postgres #####
 con <- connect_to_db("altadena_recovery_rebuild")
