@@ -781,12 +781,12 @@ prev_labels <- dbGetQuery(con, sprintf("SELECT * FROM %s.rel_parcel_rebuild_stat
                                          schema, prev_year, prev_month))
 
 check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
-  left_join(prev_labels %>% rename(prev_label=dashboard_label),by=c("ain"="ain")) %>%
+  left_join(prev_labels %>% rename(prev_label=dashboard_label), by=c("ain"="ain")) %>%
   mutate(change_summary=case_when(
     curr_label==prev_label ~ 'unchanged',
     curr_label == 'Repairs or Rebuild Complete' & prev_label != 'Repairs or Rebuild Complete' ~ 'new rebuild complete',
     curr_label != 'Repairs or Rebuild Complete' & prev_label == 'Repairs or Rebuild Complete' ~ 'reverted - QA to figure out why',
-    .default='something else?') %>%
+    .default='something else?')) %>%
   filter(prev_label == 'Repairs or Rebuild Complete' | curr_label == 'Repairs or Rebuild Complete')
 
 
@@ -817,8 +817,18 @@ check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
 # UNC-BLDG
 
 ##### Manual update from April 2026 QA #####
+# We agreed to manually reassign 5845015007 to "In Construction" for the April 2026 update
+manual_reassign <- final_types %>%
+  filter(ain=='5845015007') %>%
+  mutate(dashboard_label="In Construction",
+         rebuild_status="Construction In Progress")
 
+final_types_drop <- final_types %>%
+  filter(!ain %in% manual_reassign$ain)
 
+final_types_clean <- rbind(final_types_drop, manual_reassign)
+table(final_types_clean$rebuild_status, useNA="always")
+table(final_types_clean$dashboard_label, useNA="always")
 
 ##### Export to postgres #####
 con <- connect_to_db("altadena_recovery_rebuild")
@@ -876,9 +886,9 @@ column_comments <- c(
   "Label for dashboard")
 
 # # Now write the table
-# dbWriteTable(con, Id(schema=schema, table=table_name), final_types,
+# dbWriteTable(con, Id(schema=schema, table=table_name), final_types_clean,
 #              overwrite = FALSE, row.names = FALSE)
-# 
+
 
 # add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
 
