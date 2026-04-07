@@ -944,16 +944,16 @@ qa_reverted_calfire <- calfire %>% filter(apn_parcel %in% qa_reverted$ain) %>% s
 qa_reverted_permits <- permits_deduped %>% filter(ain %in% qa_reverted$ain) %>% select(ain, everything())
 
 # "5846021004": https://portal.assessor.lacounty.gov/parceldetail/5846021004
-## Has two structures and 4 permits: 1 Destroyed and 1 Affected
+## Has two structures and 4 permits: 1 Destroyed (garage) and 1 Affected (main)
 ## Latest permit is explicitly for an Eaton Fire Like For Like Rebuild (garage), 
 ## Previous permits were repair/replacements so previous status was likely Repair and next will be Rebuilt
-## Conclusion: Keep as is
+## Conclusion: Keep as is # EMG AGREED--though do we count differently if new permits are for garages only?
 
 # "5846017025": https://portal.assessor.lacounty.gov/parceldetail/5846017025
 ## Has two structures and 2 permits: 1 Destroyed and 1 Affected
 ## Last permit was repair/replacement for reroof, new one is electrical permit
-## Previous was probably repair of residence but destroyed structure is not rebuilt
-## Conclusion: Keep as is
+## Previous was probably repair of residence but destroyed structure (garage) is not rebuilt
+## Conclusion: Keep as is # EMG AGREED--though do we count differently if new permits are for garages only?
 
 # "5829020023": https://portal.assessor.lacounty.gov/parceldetail/5829020023
 ## Has 14 structures and 20 permits: 2 destroyed and 12 no damage
@@ -963,10 +963,10 @@ qa_reverted_permits <- permits_deduped %>% filter(ain %in% qa_reverted$ain) %>% 
 ## Conclusion: Keep as is # EMG AGREED
 
 # "5828018005": https://portal.assessor.lacounty.gov/parceldetail/5828018005
-## Has 2 structures and 3 permits: 1 destroyed, 1 affected
+## Has 2 structures and 3 permits: 1 destroyed (garage), 1 affected (main)
 ## Last permits were repair/replacements - likely for affected structure
-## New permit is CREB presumably for destroyed structure
-## Conclusion: Keep as is
+## New permit is CREB presumably for destroyed structure - for new ADU
+## Conclusion: Keep as is # EMG AGREED--though do we count differently if new permits are for garages only?
 
 ## There are 19 that stayed rebuilt/repaired - will not manually review
 ## However noting that MOST have multiple structures with varying damage levels so some could still revert
