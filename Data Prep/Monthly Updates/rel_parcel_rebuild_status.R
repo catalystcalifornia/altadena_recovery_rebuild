@@ -775,6 +775,23 @@ rebuild_check <- combined_parcels_all %>% filter(ain %in% completed$ain)
 
 rebuild_check_full <- permits_deduped %>% filter(ain %in% completed$ain) %>% select(ain, permit_number, description, everything())
 ### QA - SKIM THESE TWO VIEWS REBUILD_CHECK and REBUILD_CHECK_FULL to make sure 
+
+# # check against old labels for changes-finish updating this here so it works before export
+# prev_labels <- dbGetQuery(con, sprintf("SELECT * FROM %s.rel_parcel_rebuild_status_%s_%s;",
+#                                          schema, prev_year, prev_month)) 
+# 
+# check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
+#   left_join(prev_labels %>% rename(prev_label=dashboard_label),by=c("ain"="ain")) %>%
+#   mutate(change_summary=case_when(
+#     curr_label==prev_label THEN 'unchanged'
+#            WHEN curr.dashboard_label = 'Repairs or Rebuild Complete' AND prev.dashboard_label != 'Repairs or Rebuild Complete' THEN 'new rebuild complete'
+#            WHEN curr.dashboard_label != 'Repairs or Rebuild Complete' AND prev.dashboard_label = 'Repairs or Rebuild Complete' THEN 'reverted - QA to figure out why'
+#            ELSE 'something else?'
+#            END AS change_summary
+#   ) %>%
+#   filter(prev.dashboard_label = 'Repairs or Rebuild Complete' OR curr.dashboard_label = 'Repairs or Rebuild Complete';", 
+
+
 ### those flagged as completed make sense based on types of permits or further refinement might be needed
 # April 2026
 
@@ -800,6 +817,8 @@ rebuild_check_full <- permits_deduped %>% filter(ain %in% completed$ain) %>% sel
 # UNC-EXPR
 # UNC-SOLR
 # UNC-BLDG
+
+
 
 ##### Export to postgres #####
 con <- connect_to_db("altadena_recovery_rebuild")
@@ -902,12 +921,12 @@ permits_deduped %>% filter(ain %in% qa_new_suspicious$ain) %>% select(ain, every
 ## has two structures and 2 permits: one had major damage (looks like main residence), one with no damage; 
 ## From the aerial it doesn't appear to have 26-50% damage
 ## In the permits it sounds like there was damage to the detached garage. In that case this is probably repaired 
-## Conclusion: Keep as is.
+## Conclusion: Keep as is. # EMG AGREED 
 
 # 5845015007 (prev. without permit): https://portal.assessor.lacounty.gov/parceldetail/5845015007
 ## has 3 structures and 1 permit: 2 of 3 structures were destroyed and each structure is confirmed residence
 ## Has one misc permit (not sufficient) arguably this permit should be misc_minor (e.g., repair/replacement of roof)
-## Conclusion: MANUAL REASSIGN to In Construction at least. I would argue this was minor repair for the 3rd structure (other two will require full rebuilds)
+## Conclusion: MANUAL REASSIGN to In Construction at least. I would argue this was minor repair for the 3rd structure (other two will require full rebuilds) # EMG AGREED
 
 # the 16 non-suspicious new rebuilt/repaired
 # used below to check for build permit types, there are many New Builds which I think is a good sign at a glance
@@ -921,8 +940,8 @@ structure_count %>% left_join(final_types, by = c("apn_parcel"="ain")) %>% View(
 
 ## There are 4 AINs that reverted to In Construction
 qa_reverted$ain
-calfire %>% filter(apn_parcel %in% qa_reverted$ain) %>% select(apn_parcel, everything()) %>% View()
-permits_deduped %>% filter(ain %in% qa_reverted$ain) %>% select(ain, everything()) %>% View()
+qa_reverted_calfire <- calfire %>% filter(apn_parcel %in% qa_reverted$ain) %>% select(apn_parcel, everything())
+qa_reverted_permits <- permits_deduped %>% filter(ain %in% qa_reverted$ain) %>% select(ain, everything())
 
 # "5846021004": https://portal.assessor.lacounty.gov/parceldetail/5846021004
 ## Has two structures and 4 permits: 1 Destroyed and 1 Affected
@@ -939,8 +958,9 @@ permits_deduped %>% filter(ain %in% qa_reverted$ain) %>% select(ain, everything(
 # "5829020023": https://portal.assessor.lacounty.gov/parceldetail/5829020023
 ## Has 14 structures and 20 permits: 2 destroyed and 12 no damage
 ## Last permits were repair/replacements likely for the 12 other structures (some are multiunit)
-## New permits are CREBs presumably for 2 destroyed structures
-## Conclusion: Keep as is
+## New permits are CREBs presumably for 2 destroyed structures - associated with destroyed property at 3056
+# note calfire has a 3052 property that is marked as destroyed but no associated permit data - sometimes calfire addresses can be inaccurate
+## Conclusion: Keep as is # EMG AGREED
 
 # "5828018005": https://portal.assessor.lacounty.gov/parceldetail/5828018005
 ## Has 2 structures and 3 permits: 1 destroyed, 1 affected
