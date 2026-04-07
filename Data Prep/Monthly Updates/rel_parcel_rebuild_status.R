@@ -107,9 +107,25 @@ table(permits_substring$permit_sub_unc)
 # UNC-BLDC UNC-BLDF UNC-BLDG UNC-BLDM UNC-BLDR UNC-ELEC UNC-EXPR UNC-GRAD UNC-MECH UNC-PLMB UNC-PLSP UNC-SEWR UNC-SOLR 
 # 25      206      805       20    26859     6801      337      211     3882     4388      218     2668      764 
 
+# https://permits.lacounty.gov/permits/building-and-safety/
+# building permit types
+# UNC-BLDC - Commercial
+# UNC-BLDF - Multifamily
+# UNC-BLDG - Retaining Wall or Fence Permit
+# UNC-BLDM - Mixed use
+# UNC-BLDR - Residential
+# UNC-ELEC - Electrical
+# UNC-EXPR - Express - electrical, plumbing, temporary housing
+# UNC-GRAD - Grading
+# UNC-MECH - Mechanical
+# UNC-PLMB - Plumbing
+# UNC-PLSP - Pool/spa permit
+# UNC-SEWR - Sewer
+# UNC-SOLR - Solar
 
-# based on QA, flag ones that are just -- if these are the only repairs completed on a property they likely have more work to do
+# based on QA, flag ones that are just repairs or express permits -- if these are the only repairs completed on a property they likely have more work to do
 # UNC-BLDG UNC-ELEC UNC-EXPR UNC-GRAD UNC-MECH UNC-PLMB UNC-PLSP UNC-SEWR UNC-SOLR
+
 
 ##### 1. Prep data #####
 debris_transformed <- debris_usace %>% 
@@ -214,6 +230,10 @@ permits_filtered_curr_ains <- permits_filtered_curr_ains %>%
   rename(ain_scrape=ain,
          ain=ain_curr)
 
+# check for NAs in WF status data
+sum(is.na(permits_filtered_curr_ains$wf_status_date))
+sum(is.na(permits_filtered_curr_ains$wf_status))
+
 # get workflow items and add has_inspection (will use for the bucket 3 check - construction has started)
 workflow_all <- permits_filtered_curr_ains %>% 
   select(ain, permit_number, workflow_item, wf_status, wf_status_date) %>%
@@ -233,6 +253,7 @@ workflow_all <- permits_filtered_curr_ains %>%
 # check recode
 check <- workflow_all %>% group_by(b3_has_inspection,workflow_item,wf_status) %>% summarise(count=n())
 View(workflow_all)
+# confirmed NAs are not interrupting code result
 
 # summarize to the permit level
 workflow <- workflow_all %>%
@@ -334,7 +355,7 @@ permits <- permits_filtered_curr_ains %>%
     # specifically is this a finaled permit for misc construction related to rebuilding or repairs
     b4_has_finaled_misc = ifelse((b2_misc != "" &
                                     b4_has_finaled==1), 1, 0),
-    # specifically is this a finaled permit for misc construction related to MINOR just mechnical, electrical, solar, plumbing, grading, pool repairs
+    # specifically is this a finaled permit for misc construction related to MINOR just mechanical, electrical, solar, plumbing, grading, pool repairs
     b4_has_finaled_misc_minor = ifelse((b2_misc_minor != "" &
                                     b4_has_finaled==1), 1, 0)) 
 
@@ -362,6 +383,23 @@ permits %>%
   filter(b4_has_finaled==1) %>%
   View()
 
+## finaled perm
+permits %>%
+  filter(b4_has_finaled_perm==1) %>%
+  View()
+
+## finaled temp
+permits %>%
+  filter(b4_has_finaled_temp==1) %>%
+  View()
+
+## finaled misc
+permits %>%
+  filter(b4_has_finaled_misc==1) %>%
+  View()
+# Creb permit in here, but for garage, consider how we mark garages complete? All complete rebuilds of garages have type - 	
+# Residential New Construction Building Permit - County
+
 ## misc repairs that may not be substantial to count as completed repair
 permits %>%
   filter(b4_has_finaled_misc_minor==1) %>%
@@ -381,18 +419,22 @@ check <- permits %>% filter(gen_status %in% c("Exempt")) %>%
   group_by(permit_sub) %>%
   summarize(count=n()) 
 View(check) # 1 UNC- is UNC-GRAD (misc permit), all remaining are "other" permits (e.g., RRP - Construction/Demolition deposit)
+permits %>% filter(gen_status %in% c("Exempt")) %>% View()
 # march 2026 prelim note: one of above is FRP (fire debris removal permit for properties that opted out of government-run program)
-
+# april 2026 4 unc permits that are for grading and they have a finaled date - will these count against a finaled construction?
 
 # check counts for dups
+# permit number and ain combos
 nrow(permits)  # 8743 # march 2026: 11573 # april 2026: 12358
-length(unique(permits$permit_number)) # 8642 multiple rows per permit # march 2026: 11496 # april 2026: 12280
-length(unique(permits$ain)) # 2640 multiple rows per ain which makes sense # march 2026:3149 # april 2026: 3249
-n_distinct(permits$permit_number, permits$ain) # 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355
-length(unique(permits_filtered_curr_ains$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
-length(unique(permits$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
+n_distinct(permits$permit_number, permits$ain) # 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355 - should match above
 n_distinct(permits_filtered_curr_ains$permit_number, permits_filtered_curr_ains$ain) 
 # 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355
+# unique permits
+length(unique(permits$permit_number)) # 8642 multiple rows per permit # march 2026: 11496 # april 2026: 12280
+length(unique(permits_filtered_curr_ains$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
+length(unique(permits$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
+
+# length(unique(permits$ain)) # 2640 multiple rows per ain which makes sense # march 2026:3149 # april 2026: 3249 - delete?
 
 # explore duplicates
 duplicate <- permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56 # march 2026: 6 # april 2026: 6
@@ -426,7 +468,7 @@ permits_deduped <- rbind(permits_deduped,dupes_to_keep)
 nrow(permits_deduped) #8716; march 2026: 11570 # april 2026: 12355
 n_distinct(permits_deduped$permit_number, permits_deduped$ain) # 8715 unique ain/permit pairs; march 2026: 11570 # april 2026: 12355
 duplicate <- permits_deduped %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56; ; march 2026: 0 # april 2026: 0
-# RRP permit won't matter later, and due to 5841023022 which merged 2 parcels, original permit from original parcel
+# Jan note - RRP permit won't matter later, and due to 5841023022 which merged 2 parcels, original permit from original parcel
 
 # get distinct parcels from xwalk
 parcels_df <- xwalk_parcels %>%
@@ -677,7 +719,6 @@ check_final_creb <- final_types %>%  left_join(parcels_creb, by="ain")
 check <- as.data.frame(table(check_final_creb$has_creb, check_final_creb$rebuild_status))
 # see above - parcels with CREBs are only associated with construction phase (none are "Rebuild Complete")
 
-
 table(final_types$rebuild_status, useNA = "ifany")
 
 # Apr 2026
@@ -718,6 +759,15 @@ nrow(final_types)
 nrow(parcels_df)
 length(unique(final_types$ain))
 
+# check those with fire debris removal still incomplete
+permits_deduped %>% filter(ain %in% (final_types %>% 
+                                       filter(rebuild_status == "Fire Debris Removal Incomplete") %>%
+                                       pull(ain))) %>% View() # looks fine
+
+debris_usace  %>% filter(ain %in% (final_types %>% 
+                                      filter(rebuild_status == "Fire Debris Removal Incomplete") %>%
+                                      pull(ain))) %>% View() # looks fine
+
 # review repairs or rebuild complete
 completed <- final_types %>% filter(dashboard_label=='Repairs or Rebuild Complete')
 
@@ -725,13 +775,30 @@ rebuild_check <- combined_parcels_all %>% filter(ain %in% completed$ain)
 
 rebuild_check_full <- permits_deduped %>% filter(ain %in% completed$ain) %>% select(ain, permit_number, description, everything())
 ### QA - SKIM THESE TWO VIEWS REBUILD_CHECK and REBUILD_CHECK_FULL to make sure 
+
+# # check against old labels for changes-finish updating this here so it works before export
+# prev_labels <- dbGetQuery(con, sprintf("SELECT * FROM %s.rel_parcel_rebuild_status_%s_%s;",
+#                                          schema, prev_year, prev_month)) 
+# 
+# check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
+#   left_join(prev_labels %>% rename(prev_label=dashboard_label),by=c("ain"="ain")) %>%
+#   mutate(change_summary=case_when(
+#     curr_label==prev_label THEN 'unchanged'
+#            WHEN curr.dashboard_label = 'Repairs or Rebuild Complete' AND prev.dashboard_label != 'Repairs or Rebuild Complete' THEN 'new rebuild complete'
+#            WHEN curr.dashboard_label != 'Repairs or Rebuild Complete' AND prev.dashboard_label = 'Repairs or Rebuild Complete' THEN 'reverted - QA to figure out why'
+#            ELSE 'something else?'
+#            END AS change_summary
+#   ) %>%
+#   filter(prev.dashboard_label = 'Repairs or Rebuild Complete' OR curr.dashboard_label = 'Repairs or Rebuild Complete';", 
+
+
 ### those flagged as completed make sense based on types of permits or further refinement might be needed
 # April 2026
 
 # looks better one parcel questionable still 	5846008016
 # HK 3/5/26: Agreed that 5846008016 looks questionable - doesn't seem related to fires but not sure if we can address 
 # HK 3/5/26: It falls under the case where there is only a misc permit and its finaled - don't notice a clear way to reclassify other than manually
-# HK 3/5/26: 4 new "complete" ains are: 
+# HK 3/5/26: 4 new "complete" ains are: EMG- missing note?
 
 ### EMG--we had 60 repairs/rebuild complete originally which included these instances-minor repairs just starting working like plumbing and electrical completed but not full construction yet, needed to bump these back to construction in progress
 # instances where the only permit is electrical or plumbing and rebuild not complete, e.g.,
@@ -750,6 +817,8 @@ rebuild_check_full <- permits_deduped %>% filter(ain %in% completed$ain) %>% sel
 # UNC-EXPR
 # UNC-SOLR
 # UNC-BLDG
+
+
 
 ##### Export to postgres #####
 con <- connect_to_db("altadena_recovery_rebuild")
@@ -846,18 +915,18 @@ qa_unchanged <- check_rebuild_changes %>% filter(change_summary=='unchanged')
 ## There are 18 new rebuilds (16 previously In Construction and 2 that were not)
 # Focusing on 2 not previously In Construction
 qa_new_suspicious$ain
-calfire %>% filter(apn_parcel %in% qa_new_suspicious$ain) %>% select(apn_parcel, everything()) %>% View()
-permits_deduped %>% filter(ain %in% qa_new_suspicious$ain) %>% select(ain, everything())  %>% View()
+qa_new_suspicious_calfire <- calfire %>% filter(apn_parcel %in% qa_new_suspicious$ain) %>% select(apn_parcel, everything())
+qa_new_suspicious_permits <- permits_deduped %>% filter(ain %in% qa_new_suspicious$ain) %>% select(ain, everything()) 
 # 5845014026 (prev. with permit): https://portal.assessor.lacounty.gov/parceldetail/5845014026 
 ## has two structures and 2 permits: one had major damage (looks like main residence), one with no damage; 
 ## From the aerial it doesn't appear to have 26-50% damage
 ## In the permits it sounds like there was damage to the detached garage. In that case this is probably repaired 
-## Conclusion: Keep as is.
+## Conclusion: Keep as is. # EMG AGREED 
 
 # 5845015007 (prev. without permit): https://portal.assessor.lacounty.gov/parceldetail/5845015007
 ## has 3 structures and 1 permit: 2 of 3 structures were destroyed and each structure is confirmed residence
 ## Has one misc permit (not sufficient) arguably this permit should be misc_minor (e.g., repair/replacement of roof)
-## Conclusion: MANUAL REASSIGN to In Construction at least. I would argue this was minor repair for the 3rd structure (other two will require full rebuilds)
+## Conclusion: MANUAL REASSIGN to In Construction at least. I would argue this was minor repair for the 3rd structure (other two will require full rebuilds) # EMG AGREED
 
 # the 16 non-suspicious new rebuilt/repaired
 # used below to check for build permit types, there are many New Builds which I think is a good sign at a glance
@@ -865,38 +934,65 @@ permits_deduped %>% filter(ain %in% qa_new_suspicious$ain) %>% select(ain, every
 # not sure if that's needed now though
 structure_count <- calfire %>% filter(apn_parcel %in% qa_new$ain) %>% 
   select(apn_parcel, everything()) %>% group_by(apn_parcel) %>% summarise(structure_count=n()) %>% ungroup()
-calfire %>% filter(apn_parcel %in% qa_new$ain) %>% select(apn_parcel, everything()) %>% View()
-permits_deduped %>% filter(ain %in% qa_new$ain) %>% select(ain, everything())  %>% View()
+qa_new_calfire <- calfire %>% filter(apn_parcel %in% qa_new$ain) %>% select(apn_parcel, everything())
+qa_new_permits <- permits_deduped %>% filter(ain %in% qa_new$ain) %>% select(ain, everything())
+# filtered qa_new_calfire for destroyed structures and checked for these in qa_new_permits
+qa_new_permits_destroyed <- qa_new_permits %>% filter(ain %in% (qa_new_calfire %>% 
+                                               filter(damage == "Destroyed (>50%)") %>%
+                                               pull(apn_parcel)))
+distinct(qa_new_permits_destroyed,ain) # 14
+# do they each have at least one new construction
+qa_new_permits_destroyed %>%
+  filter(type=='Residential New Construction Building Permit - County') %>%
+  distinct(ain) # 11
+
+setdiff(distinct(qa_new_permits_destroyed,ain),
+        qa_new_permits_destroyed %>%
+          filter(type=='Residential New Construction Building Permit - County') %>%
+          distinct(ain)) # 11)
+
+# These have no new construction - 
+# 1 5846006027 - minor structure destroyed
+# 2 5845005020 - mobile home and minor structures
+# 3 5843019018 - according to calfire main residence was fine, wondering if we should filter out these permits PWRP?
+
+# filtered qa_new_calfire for main residences with major damage and checked for these in qa_new_permits
+qa_new_permits_damaged_residence <- qa_new_permits %>% filter(ain %in% (qa_new_calfire %>% 
+                                                                  filter(damage == "Major (26-50%)" & grepl("Residence",structure_category)) %>%
+                                                                  pull(apn_parcel)))
+# 5832014001 unclear but only a single structure in calfire
+
 structure_count %>% left_join(final_types, by = c("apn_parcel"="ain")) %>% View()
 
 ## There are 4 AINs that reverted to In Construction
 qa_reverted$ain
-calfire %>% filter(apn_parcel %in% qa_reverted$ain) %>% select(apn_parcel, everything()) %>% View()
-permits_deduped %>% filter(ain %in% qa_reverted$ain) %>% select(ain, everything()) %>% View()
+qa_reverted_calfire <- calfire %>% filter(apn_parcel %in% qa_reverted$ain) %>% select(apn_parcel, everything())
+qa_reverted_permits <- permits_deduped %>% filter(ain %in% qa_reverted$ain) %>% select(ain, everything())
 
 # "5846021004": https://portal.assessor.lacounty.gov/parceldetail/5846021004
-## Has two structures and 4 permits: 1 Destroyed and 1 Affected
+## Has two structures and 4 permits: 1 Destroyed (garage) and 1 Affected (main)
 ## Latest permit is explicitly for an Eaton Fire Like For Like Rebuild (garage), 
 ## Previous permits were repair/replacements so previous status was likely Repair and next will be Rebuilt
-## Conclusion: Keep as is
+## Conclusion: Keep as is # EMG AGREED--though do we count differently if new permits are for garages only?
 
 # "5846017025": https://portal.assessor.lacounty.gov/parceldetail/5846017025
 ## Has two structures and 2 permits: 1 Destroyed and 1 Affected
 ## Last permit was repair/replacement for reroof, new one is electrical permit
-## Previous was probably repair of residence but destroyed structure is not rebuilt
-## Conclusion: Keep as is
+## Previous was probably repair of residence but destroyed structure (garage) is not rebuilt
+## Conclusion: Keep as is # EMG AGREED--though do we count differently if new permits are for garages only?
 
 # "5829020023": https://portal.assessor.lacounty.gov/parceldetail/5829020023
 ## Has 14 structures and 20 permits: 2 destroyed and 12 no damage
 ## Last permits were repair/replacements likely for the 12 other structures (some are multiunit)
-## New permits are CREBs presumably for 2 destroyed structures
-## Conclusion: Keep as is
+## New permits are CREBs presumably for 2 destroyed structures - associated with destroyed property at 3056
+# note calfire has a 3052 property that is marked as destroyed but no associated permit data - sometimes calfire addresses can be inaccurate
+## Conclusion: Keep as is # EMG AGREED
 
 # "5828018005": https://portal.assessor.lacounty.gov/parceldetail/5828018005
-## Has 2 structures and 3 permits: 1 destroyed, 1 affected
+## Has 2 structures and 3 permits: 1 destroyed (garage), 1 affected (main)
 ## Last permits were repair/replacements - likely for affected structure
-## New permit is CREB presumably for destroyed structure
-## Conclusion: Keep as is
+## New permit is CREB presumably for destroyed structure - for new ADU
+## Conclusion: Keep as is # EMG AGREED--though do we count differently if new permits are for garages only?
 
 ## There are 19 that stayed rebuilt/repaired - will not manually review
 ## However noting that MOST have multiple structures with varying damage levels so some could still revert
