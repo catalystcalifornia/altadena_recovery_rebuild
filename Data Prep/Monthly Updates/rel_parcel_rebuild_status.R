@@ -253,6 +253,7 @@ workflow_all <- permits_filtered_curr_ains %>%
 # check recode
 check <- workflow_all %>% group_by(b3_has_inspection,workflow_item,wf_status) %>% summarise(count=n())
 View(workflow_all)
+# confirmed NAs are not interrupting code result
 
 # summarize to the permit level
 workflow <- workflow_all %>%
