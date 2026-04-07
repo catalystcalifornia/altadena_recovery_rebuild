@@ -355,7 +355,7 @@ permits <- permits_filtered_curr_ains %>%
     # specifically is this a finaled permit for misc construction related to rebuilding or repairs
     b4_has_finaled_misc = ifelse((b2_misc != "" &
                                     b4_has_finaled==1), 1, 0),
-    # specifically is this a finaled permit for misc construction related to MINOR just mechnical, electrical, solar, plumbing, grading, pool repairs
+    # specifically is this a finaled permit for misc construction related to MINOR just mechanical, electrical, solar, plumbing, grading, pool repairs
     b4_has_finaled_misc_minor = ifelse((b2_misc_minor != "" &
                                     b4_has_finaled==1), 1, 0)) 
 
@@ -383,6 +383,23 @@ permits %>%
   filter(b4_has_finaled==1) %>%
   View()
 
+## finaled perm
+permits %>%
+  filter(b4_has_finaled_perm==1) %>%
+  View()
+
+## finaled temp
+permits %>%
+  filter(b4_has_finaled_temp==1) %>%
+  View()
+
+## finaled misc
+permits %>%
+  filter(b4_has_finaled_misc==1) %>%
+  View()
+# Creb permit in here, but for garage, consider how we mark garages complete? All complete rebuilds of garages have type - 	
+# Residential New Construction Building Permit - County
+
 ## misc repairs that may not be substantial to count as completed repair
 permits %>%
   filter(b4_has_finaled_misc_minor==1) %>%
@@ -402,18 +419,22 @@ check <- permits %>% filter(gen_status %in% c("Exempt")) %>%
   group_by(permit_sub) %>%
   summarize(count=n()) 
 View(check) # 1 UNC- is UNC-GRAD (misc permit), all remaining are "other" permits (e.g., RRP - Construction/Demolition deposit)
+permits %>% filter(gen_status %in% c("Exempt")) %>% View()
 # march 2026 prelim note: one of above is FRP (fire debris removal permit for properties that opted out of government-run program)
-
+# april 2026 4 unc permits that are for grading and they have a finaled date - will these count against a finaled construction?
 
 # check counts for dups
+# permit number and ain combos
 nrow(permits)  # 8743 # march 2026: 11573 # april 2026: 12358
-length(unique(permits$permit_number)) # 8642 multiple rows per permit # march 2026: 11496 # april 2026: 12280
-length(unique(permits$ain)) # 2640 multiple rows per ain which makes sense # march 2026:3149 # april 2026: 3249
-n_distinct(permits$permit_number, permits$ain) # 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355
-length(unique(permits_filtered_curr_ains$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
-length(unique(permits$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
+n_distinct(permits$permit_number, permits$ain) # 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355 - should match above
 n_distinct(permits_filtered_curr_ains$permit_number, permits_filtered_curr_ains$ain) 
 # 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355
+# unique permits
+length(unique(permits$permit_number)) # 8642 multiple rows per permit # march 2026: 11496 # april 2026: 12280
+length(unique(permits_filtered_curr_ains$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
+length(unique(permits$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
+
+# length(unique(permits$ain)) # 2640 multiple rows per ain which makes sense # march 2026:3149 # april 2026: 3249 - delete?
 
 # explore duplicates
 duplicate <- permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56 # march 2026: 6 # april 2026: 6
@@ -447,7 +468,7 @@ permits_deduped <- rbind(permits_deduped,dupes_to_keep)
 nrow(permits_deduped) #8716; march 2026: 11570 # april 2026: 12355
 n_distinct(permits_deduped$permit_number, permits_deduped$ain) # 8715 unique ain/permit pairs; march 2026: 11570 # april 2026: 12355
 duplicate <- permits_deduped %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56; ; march 2026: 0 # april 2026: 0
-# RRP permit won't matter later, and due to 5841023022 which merged 2 parcels, original permit from original parcel
+# Jan note - RRP permit won't matter later, and due to 5841023022 which merged 2 parcels, original permit from original parcel
 
 # get distinct parcels from xwalk
 parcels_df <- xwalk_parcels %>%
@@ -698,7 +719,6 @@ check_final_creb <- final_types %>%  left_join(parcels_creb, by="ain")
 check <- as.data.frame(table(check_final_creb$has_creb, check_final_creb$rebuild_status))
 # see above - parcels with CREBs are only associated with construction phase (none are "Rebuild Complete")
 
-
 table(final_types$rebuild_status, useNA = "ifany")
 
 # Apr 2026
@@ -739,6 +759,15 @@ nrow(final_types)
 nrow(parcels_df)
 length(unique(final_types$ain))
 
+# check those with fire debris removal still incomplete
+permits_deduped %>% filter(ain %in% (final_types %>% 
+                                       filter(rebuild_status == "Fire Debris Removal Incomplete") %>%
+                                       pull(ain))) %>% View() # looks fine
+
+debris_usace  %>% filter(ain %in% (final_types %>% 
+                                      filter(rebuild_status == "Fire Debris Removal Incomplete") %>%
+                                      pull(ain))) %>% View() # looks fine
+
 # review repairs or rebuild complete
 completed <- final_types %>% filter(dashboard_label=='Repairs or Rebuild Complete')
 
@@ -752,7 +781,7 @@ rebuild_check_full <- permits_deduped %>% filter(ain %in% completed$ain) %>% sel
 # looks better one parcel questionable still 	5846008016
 # HK 3/5/26: Agreed that 5846008016 looks questionable - doesn't seem related to fires but not sure if we can address 
 # HK 3/5/26: It falls under the case where there is only a misc permit and its finaled - don't notice a clear way to reclassify other than manually
-# HK 3/5/26: 4 new "complete" ains are: 
+# HK 3/5/26: 4 new "complete" ains are: EMG- missing note?
 
 ### EMG--we had 60 repairs/rebuild complete originally which included these instances-minor repairs just starting working like plumbing and electrical completed but not full construction yet, needed to bump these back to construction in progress
 # instances where the only permit is electrical or plumbing and rebuild not complete, e.g.,
