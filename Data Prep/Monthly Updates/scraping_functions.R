@@ -1,6 +1,40 @@
 library(rvest)
 library(chromote)
 
+# ===== TEMP FILE MANAGEMENT SETUP =====
+# Helps manage disk space 
+# Create custom directory for Chrome temp files
+custom_chrome_dir <- file.path(getwd(), "chrome_temp")
+dir.create(custom_chrome_dir, showWarnings = FALSE, recursive = TRUE)
+Sys.setenv(CHROMOTE_CHROME_USER_DATA_DIR = custom_chrome_dir)
+
+# Cleanup function
+cleanup_all_temp <- function() {
+  # Clean custom Chrome directory
+  if(dir.exists(custom_chrome_dir)) {
+    message("Cleaning Chrome temp directory...")
+    unlink(custom_chrome_dir, recursive = TRUE, force = TRUE)
+  }
+  
+  # Clean R temp files related to chromote
+  temp_files <- list.files(tempdir(), full.names = TRUE, 
+                           pattern = "chromote|rs-graphics|headless", 
+                           recursive = TRUE)
+  if(length(temp_files) > 0) {
+    message(paste("Removing", length(temp_files), "temp files..."))
+    suppressWarnings(file.remove(temp_files))
+  }
+  
+  message("✓ Temp file cleanup complete")
+}
+
+# Add this to check temp size periodically
+check_temp_size <- function() {
+  temp_files <- list.files(tempdir(), full.names = TRUE, recursive = TRUE)
+  total_size <- sum(file.info(temp_files)$size, na.rm = TRUE) / 1024^3  # GB
+  message(paste("Current temp directory size:", round(total_size, 2), "GB"))
+  return(total_size)
+}
 
 # Alternative to RSelenium - much simpler and more reliable
 # test_chromote() confirms we can navigate to a simple, easily accessible page like google.com
