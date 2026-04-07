@@ -776,20 +776,18 @@ rebuild_check <- combined_parcels_all %>% filter(ain %in% completed$ain)
 rebuild_check_full <- permits_deduped %>% filter(ain %in% completed$ain) %>% select(ain, permit_number, description, everything())
 ### QA - SKIM THESE TWO VIEWS REBUILD_CHECK and REBUILD_CHECK_FULL to make sure 
 
-# # check against old labels for changes-finish updating this here so it works before export
-# prev_labels <- dbGetQuery(con, sprintf("SELECT * FROM %s.rel_parcel_rebuild_status_%s_%s;",
-#                                          schema, prev_year, prev_month)) 
-# 
-# check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
-#   left_join(prev_labels %>% rename(prev_label=dashboard_label),by=c("ain"="ain")) %>%
-#   mutate(change_summary=case_when(
-#     curr_label==prev_label THEN 'unchanged'
-#            WHEN curr.dashboard_label = 'Repairs or Rebuild Complete' AND prev.dashboard_label != 'Repairs or Rebuild Complete' THEN 'new rebuild complete'
-#            WHEN curr.dashboard_label != 'Repairs or Rebuild Complete' AND prev.dashboard_label = 'Repairs or Rebuild Complete' THEN 'reverted - QA to figure out why'
-#            ELSE 'something else?'
-#            END AS change_summary
-#   ) %>%
-#   filter(prev.dashboard_label = 'Repairs or Rebuild Complete' OR curr.dashboard_label = 'Repairs or Rebuild Complete';", 
+# check against old labels for changes-finish updating this here so it works before export
+prev_labels <- dbGetQuery(con, sprintf("SELECT * FROM %s.rel_parcel_rebuild_status_%s_%s;",
+                                         schema, prev_year, prev_month))
+
+check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
+  left_join(prev_labels %>% rename(prev_label=dashboard_label),by=c("ain"="ain")) %>%
+  mutate(change_summary=case_when(
+    curr_label==prev_label ~ 'unchanged',
+    curr_label == 'Repairs or Rebuild Complete' & prev_label != 'Repairs or Rebuild Complete' ~ 'new rebuild complete',
+    curr_label != 'Repairs or Rebuild Complete' & prev_label == 'Repairs or Rebuild Complete' ~ 'reverted - QA to figure out why',
+    .default='something else?') %>%
+  filter(prev_label == 'Repairs or Rebuild Complete' | curr_label == 'Repairs or Rebuild Complete')
 
 
 ### those flagged as completed make sense based on types of permits or further refinement might be needed
@@ -817,6 +815,8 @@ rebuild_check_full <- permits_deduped %>% filter(ain %in% completed$ain) %>% sel
 # UNC-EXPR
 # UNC-SOLR
 # UNC-BLDG
+
+##### Manual update from April 2026 QA #####
 
 
 
