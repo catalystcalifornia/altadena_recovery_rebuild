@@ -39,15 +39,16 @@ We analyzed the devastation in West and East Altadena to understand the housing 
 
 # Acknowledgements 
 
-We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, insights, and stories that contributed to this project. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
+We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, insights, and stories that contributed to this project. We also thank Altadena Not For Sale for providing current MLS data to help us stay updates on properties sold after the Eaton Fire. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
 
 # Data Sources
 All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team used the following data sources to build the dashboard and summarize the challenges to recovery:
+* Altadena Not For Sale. *Lots Sold in Altadena (based on MLS data)*. March 30, 2026. [Unpublished raw data].
 * California Department of Forestry & Fire Protection. *CAL FIRE damage inspection (DINS) data*. June 2, 2025. https://gis.data.cnra.ca.gov/datasets/CALFIRE-Forestry::cal-fire-damage-inspection-dins-data/explore
 * California Office of State Fire Marshall. *Fire hazard severity zones*. 2024-2025. https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones
-* Los Angeles County. *Electronic permitting and inspections portal (EPIC-LA)*. December 10, 2025. https://epicla.lacounty.gov/energov_prod/SelfService/#/home
+* Los Angeles County. *Electronic permitting and inspections portal (EPIC-LA)*. March 30, 2026. https://epicla.lacounty.gov/energov_prod/SelfService/#/home
 * Los Angeles County Department of Public Health & Roux Associates Inc. *Community soil sampling and human health screening report*. September 5, 2025. https://storymaps.arcgis.com/stories/667412ef37ee4392bddb5c90da3480f1?cover=false
-* Los Angeles County Assessor. *Secured basic file abstract*. November 2025. https://assessor.lacounty.gov/real-estate-toolkit/data-sales
+* Los Angeles County Assessor. *Secured basic file abstract*. March 2026. https://assessor.lacounty.gov/real-estate-toolkit/data-sales
 
 # Methodology
 
