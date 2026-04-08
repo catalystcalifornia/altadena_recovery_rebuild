@@ -39,7 +39,7 @@ We analyzed the devastation in West and East Altadena to understand the housing 
 
 # Acknowledgements 
 
-We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, insights, and stories that contributed to this project. We also thank Altadena Not For Sale for providing current MLS data to help us stay updates on properties sold after the Eaton Fire. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
+We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, insights, and stories that contributed to this project. We also thank Altadena Not For Sale for providing MLS data to help us stay updated on current properties sold after the Eaton Fire. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
 
 # Data Sources
 All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team used the following data sources to build the dashboard and summarize the challenges to recovery:
