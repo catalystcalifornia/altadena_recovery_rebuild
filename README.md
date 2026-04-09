@@ -39,11 +39,11 @@ We analyzed the devastation in West and East Altadena to understand the housing 
 
 # Acknowledgements 
 
-We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, insights, and stories that contributed to this project. We also thank Altadena Not For Sale for providing MLS data to help us stay updated on current properties sold after the Eaton Fire. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
+We thank the [Dena Rise UP!](https://denariseup.org/) for their collaboration, insights, and stories that contributed to this project. We also thank Altadena Not For Sale for providing us with updated sales data to more accurately capture properties sold after the Eaton Fire. The dashboard is developed and maintained by [Catalyst California](https://www.catalystcalifornia.org/). 
 
 # Data Sources
 All research and analysis is conducted by [Catalyst California](https://www.catalystcalifornia.org/). The team used the following data sources to build the dashboard and summarize the challenges to recovery:
-* Altadena Not For Sale. *Lots Sold in Altadena (based on MLS data)*. March 30, 2026. [Unpublished raw data].
+* Altadena Not For Sale. *Lots Sold in Altadena*. March 30, 2026. [Privately acquired data].
 * California Department of Forestry & Fire Protection. *CAL FIRE damage inspection (DINS) data*. June 2, 2025. https://gis.data.cnra.ca.gov/datasets/CALFIRE-Forestry::cal-fire-damage-inspection-dins-data/explore
 * California Office of State Fire Marshall. *Fire hazard severity zones*. 2024-2025. https://osfm.fire.ca.gov/what-we-do/community-wildfire-preparedness-and-mitigation/fire-hazard-severity-zones
 * Los Angeles County. *Electronic permitting and inspections portal (EPIC-LA)*. March 30, 2026. https://epicla.lacounty.gov/energov_prod/SelfService/#/home
