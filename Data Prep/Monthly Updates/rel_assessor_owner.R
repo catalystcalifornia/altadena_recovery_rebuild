@@ -1,5 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_owner table for the Monthly Dashboard Updates ##
-## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_assessor_residential.docx ##
+## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_04.docx ##
 ## SCRIPT OUTPUT: rel_assessor_owner_YYYY_MM
 
 #### STEP 1: SET UP (*UPDATE* year and month) ####
@@ -17,27 +17,27 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
-year <- "2025"
-month <- "12"
+year <- "2026"
+month <- "04"
 
 #### STEP 2: PULL XWALKS AND DATA (*UPDATE* to latest data and xwalks) ####
 # get for CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2026_12_04")
 
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
-assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2025_12") %>%
-  filter(ain %in% xwalk$ain_2025_12)
+assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2026_04") %>%
+  filter(ain %in% xwalk$ain_2026_04)
 
 # get sales data for current month 
-sales_data <- st_read(con_alt, query="select * from dashboard.rel_assessor_sales_2025_12_temp") %>%
-  filter(ain %in% xwalk$ain_2025_12)
+sales_data <- st_read(con_alt, query="select * from dashboard.rel_assessor_sales_2026_04") %>%
+  filter(ain %in% xwalk$ain_2026_04)
 
 # get residential data for current month 
-residential_data <- st_read(con_alt, query="select * from dashboard.rel_assessor_residential_2025_12")
+residential_data <- st_read(con_alt, query="select * from dashboard.rel_assessor_residential_2026_04")
 
 # join sales data to assessor data keeping columns for owner type
 owner_info <- sales_data %>%
-  left_join(residential_data %>% select(ain_2025_12,total_units,landlord_units), by=c("ain"="ain_2025_12")) %>%
+  left_join(residential_data %>% select(ain_2026_04,total_units,landlord_units), by=c("ain"="ain_2026_04")) %>%
   left_join(assessor_data %>% 
               select(ain,exemption_type,tax_stat_key,year_sold_to_state,
                      contains("owner"),mail_house_no,contains("m_")), 
@@ -104,11 +104,11 @@ data_owner <- data_owner %>%
   # recoding other church or charity owned based on specific name
   mutate(
     owner_renter = ifelse(
-      grepl("SUBSIDIZED HOUSING CORP|PASADENA CEMETRY ASSN CORP|Pasadena Cemetery Association|PUBLIC WORKS GROUP CORP", owner_name, ignore.case = TRUE),
+      grepl("SUBSIDIZED HOUSING CORP|PASADENA CEMETRY ASSN CORP|Pasadena Cemetery Association|PUBLIC WORKS GROUP CORP|ARROYOS AND FOOTHILLS \\(CONSERVANCY\\)", owner_name, ignore.case = TRUE),
       "Church/Welfare exemption",owner_renter),
     # adding land trusts
     owner_renter = ifelse(
-      grepl("GREENLINE HOUSING FOUNDATION|NHS NEIGHBORHOOD REDEVELOPMENT", owner_name, ignore.case = TRUE),
+      grepl("GREENLINE HOUSING FOUNDATION|NHS NEIGHBORHOOD REDEVELOPMENT|NHS Nbrhd Redevelopment Corp", owner_name, ignore.case = TRUE),
       "Land Trust",owner_renter),
     # Misc owner type
     owner_renter = ifelse(
@@ -152,6 +152,19 @@ data_owner %>% count(owner_renter)
 # 10                       Sold to state   31 # same
 # 11                         Trust owned  688 # went down
 
+# March/April 2026 Update
+# owner_renter    n
+# 1  Church, charity, or nonprofit owned   11 # down
+# 2                    Corporation owned  253 # up
+# 3                     Government owned    2 # no change
+# 4                           Land Trust    5 # no change
+# 5  Likely owner occupied, no exemption 1255 # up
+# 6               Other or Unknown Owner   48 # down
+# 7              Owner & renter occupied  385 # no change
+# 8  Owner occupied, homeowner exemption 2479 # down
+# 9                      Renter occupied  517 # up
+# 10                       Sold to state   28 # down
+# 11                         Trust owned  693 # up
 
 ###### *QA and Update* - Review likely owner occupied and update recoding as needed ----------
 likely_homeowner <-data_owner %>% filter(owner_renter=="Likely owner occupied, no exemption") %>%
@@ -164,7 +177,7 @@ likely_homeowner_table <- likely_homeowner %>%
 View(likely_homeowner_table) # sort desc by count
 # looks okay
 
-# 3-16-26 Update - check NA owner
+# check NA owner
 na_owner_name <- data_owner %>% filter(is.na(owner_name))
 View(na_owner_name)
 na_owner_name_assessor <- assessor_data %>% filter(ain %in% na_owner_name$ain)
@@ -192,7 +205,7 @@ final_df<- data_owner %>%
   # remove 0 from start of PO Boxes
   mutate(owner_address=str_remove(owner_address, "^0 ")) %>%
   select(ain, owner_name, owner_renter, owner_address, sold_source) %>%
-  rename(ain_2025_12 = ain) %>%
+  rename(ain_2026_04 = ain) %>%
   # make owner address unavailable when sold source is anfs, we only have site address from anfs not owner contact
   mutate(owner_address=case_when(
     sold_source=='anfs' ~ 'Not Available',
@@ -200,10 +213,10 @@ final_df<- data_owner %>%
   ))
 
 # check for duplicates
-nrow(final_df)-length(unique(final_df$ain_2025_12)) # should be 0 difference
+nrow(final_df)-length(unique(final_df$ain_2026_04)) # should be 0 difference
 
 # check for same number of rows as xwalk
-nrow(final_df)-length(unique(xwalk$ain_2025_12)) # should be 0 difference
+nrow(final_df)-length(unique(xwalk$ain_2026_04)) # should be 0 difference
 
 # check for NA owner type - should be 0
 table(final_df$owner_renter,useNA='always')
@@ -217,10 +230,10 @@ indicator <- "Relational table with summarized information owner type and owner 
 Owner type created based on combination of rental units, exemptions on property, tax status, and owner name. 
 For recent sales just recorded in Altadena not for sale, only owner name is used to create owner renter type, not the assessor data which may not be associated with most recent sale"
 source <- "Script: altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_residential.R "
-qa_filepath<-"  QA_sheet_rel_assessor_residential.docx "
+qa_filepath<-"  QA_sheet_rel_tables_update_2026_04.docx "
 
-dbWriteTable(con_alt, Id(schema, table_label), final_df,
-             overwrite = FALSE, row.names = FALSE)
+# dbWriteTable(con_alt, Id(schema, table_label), final_df,
+#              overwrite = FALSE, row.names = FALSE)
 
 # Add metadata
 column_names <- colnames(final_df) # Get column names
@@ -231,7 +244,7 @@ column_comments <- c('Assessor ID number for current month- use this to match to
                      'Owner mailing address - different from property site address - only for private dashboard',
                      'sold source - lac, anfs, both - indicators where owner data came from')
 
-add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
 #### STEP 9: close dbconnection (NO UPDATES NEEDED) ####
 dbDisconnect(con_alt)
