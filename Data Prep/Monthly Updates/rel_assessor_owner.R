@@ -109,7 +109,7 @@ data_owner <- data_owner %>%
     # adding land trusts
     owner_renter = ifelse(
       grepl("GREENLINE HOUSING FOUNDATION|NHS NEIGHBORHOOD REDEVELOPMENT|NHS Nbrhd Redevelopment Corp", owner_name, ignore.case = TRUE),
-      "Land Trust",owner_renter),
+      "Nonprofit/CDC",owner_renter),
     # Misc owner type
     owner_renter = ifelse(
       grepl("LA VINA HOMEOWNERS|CAMERON,MARGARET K|CAMERON,JOHN K|LINCOLN AVENUE WATER CO", owner_name, ignore.case = TRUE) & owner_renter == "Other",
@@ -130,6 +130,7 @@ data_owner <- data_owner %>%
            owner_renter_orig=="Owner & Renter occupied" ~ "Owner & renter occupied",
            owner_renter_orig=="SBE or Government owned" ~ "Government owned",
            owner_renter_orig=="Owner occupied" ~ "Owner occupied, homeowner exemption",
+           owner_renter_orig=="Nonprofit/CDC" ~ "Church, charity, or nonprofit owned",
            TRUE ~ owner_renter_orig
          ))
 
@@ -154,17 +155,16 @@ data_owner %>% count(owner_renter)
 
 # March/April 2026 Update
 # owner_renter    n
-# 1  Church, charity, or nonprofit owned   11 # down
+# 1  Church, charity, or nonprofit owned   16 # land bank or redevelopment corps included here
 # 2                    Corporation owned  253 # up
 # 3                     Government owned    2 # no change
-# 4                           Land Trust    5 # no change
-# 5  Likely owner occupied, no exemption 1255 # up
-# 6               Other or Unknown Owner   48 # down
-# 7              Owner & renter occupied  385 # no change
-# 8  Owner occupied, homeowner exemption 2479 # down
-# 9                      Renter occupied  517 # up
-# 10                       Sold to state   28 # down
-# 11                         Trust owned  693 # up
+# 4  Likely owner occupied, no exemption 1255 # up
+# 5               Other or Unknown Owner   48 # down
+# 6              Owner & renter occupied  385 # no change
+# 7  Owner occupied, homeowner exemption 2479 # down
+# 8                      Renter occupied  517 # up
+# 9                       Sold to state   28 # down
+# 10                         Trust owned  693 # up
 
 ###### *QA and Update* - Review likely owner occupied and update recoding as needed ----------
 likely_homeowner <-data_owner %>% filter(owner_renter=="Likely owner occupied, no exemption") %>%
