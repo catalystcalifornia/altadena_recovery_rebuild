@@ -1,0 +1,94 @@
+---
+title: "Commercial-Multiuse-Exploration"
+output: html_document
+---
+
+
+```{r}
+#load libraries
+library(dplyr)
+library(sf)
+library(mapview)
+
+#Add database connection and source script with functions for pushing to postgres
+source("W:\\RDA Team\\R\\credentials_source.R")
+con <- connect_to_db("altadena_recovery_rebuild")
+options(scipen = 999)
+```
+
+```{r}
+# Get the observed use codes in the Jan 2025 assessor data - 
+# Note: these have already been filtered for AINs in Altadena
+
+get_use_code_query <- "SELECT 
+    use_code, 
+    COUNT(*) AS frequency
+FROM 
+    dashboard.assessor_data_universe_2025_01
+GROUP BY 
+    use_code
+ORDER BY 
+    frequency DESC;"
+
+assessor_use_codes_jan_2025 <- dbGetQuery(con, get_use_code_query) # 266
+
+assessor_use_codes_jan_2025
+
+# Data dictionary is here:W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html
+# Relevant codes summarized below
+
+```
+
+Based on the property use classification chart commercial use codes are 4 characters and generally start with a 1 or 2. Based on the data dictionary there are specific codes to note residential units on the property. In addition to this, the code can end in "C" to represent "condominiums." Here are the specific codes that site residential units:
+- 111C
+- 121*
+- 1**C
+- 171C
+- 172*
+- 184*
+- 185*
+- 191C
+- 192C
+- 193C
+- 194C
+- 2**C
+
+
+Use codes related to residence but not included:
+- Artist in residence: 102*
+- Hotel under 50 rooms: 180*
+- Hotel 50 rooms and over: 181*
+- Motel under 50 rooms: 182*
+- Motel 50 rooms and over: 183*
+
+```{r}
+commercial_codes <- assessor_use_codes_jan_2025 %>% 
+  filter( 
+    grepl("^1|^2", use_code)) %>% # 113
+  mutate(residential = case_when(
+    grepl("C$", use_code) ~ TRUE,
+    grepl("^121", use_code) ~ TRUE,
+    grepl("^172", use_code) ~ TRUE,
+    grepl("^184", use_code) ~ TRUE,
+    grepl("^185", use_code) ~ TRUE,
+    .default = FALSE
+  ))
+
+commercial_residential_codes <- commercial_codes %>% filter(residential == TRUE)
+
+# get all AINs 
+get_jan_2025_data_query <- "SELECT * FROM dashboard.assessor_data_universe_2025_01;"
+jan_2025_data <- dbGetQuery(con, get_jan_2025_data_query)
+
+jan_2025_data_filtered <- jan_2025_data %>% filter(use_code %in% commercial_residential_codes$use_code) # 292
+
+# get shapes for these AINS
+get_jan_2025_shapes_query <- "SELECT ain, matched_name, geom FROM dashboard.assessor_parcels_universe_2025_01;"
+jan_2025_shapes <- st_read(con, query=get_jan_2025_shapes_query)
+
+jan_2025_shapes_filtered <- jan_2025_shapes %>% 
+  filter(ain %in% jan_2025_data_filtered$ain) %>% # 292
+  filter(matched_name == "Altadena" | matched_name=="Pasadena; Altadena") # 48
+m <- jan_2025_shapes_filtered
+mapview(m, zcol="matched_name")
+```
