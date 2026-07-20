@@ -17,10 +17,9 @@ options(scipen = 999)
 ```
 
 ```{r}
-# Get the observed use codes in the Jan 2025 assessor data - 
+# Get the observed use codes in the Jan 2025 assessor data and April 2026
 # Note: these have already been filtered for AINs in Altadena
-
-get_use_code_query <- "SELECT 
+get_use_code_query1 <- "SELECT 
     use_code, 
     COUNT(*) AS frequency
 FROM 
@@ -30,9 +29,22 @@ GROUP BY
 ORDER BY 
     frequency DESC;"
 
-assessor_use_codes_jan_2025 <- dbGetQuery(con, get_use_code_query) # 266
-
+assessor_use_codes_jan_2025 <- dbGetQuery(con, get_use_code_query1) # 266
 assessor_use_codes_jan_2025
+
+get_use_code_query2 <- "SELECT 
+    use_code, 
+    COUNT(*) AS frequency
+FROM 
+    dashboard.assessor_data_universe_2026_04
+GROUP BY 
+    use_code
+ORDER BY 
+    frequency DESC;"
+
+assessor_use_codes_apr_2026 <- dbGetQuery(con, get_use_code_query2) # 101
+assessor_use_codes_apr_2026
+
 
 # Data dictionary is here:W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html
 # Relevant codes summarized below
@@ -62,25 +74,29 @@ Use codes related to residence but not included:
 - Motel 50 rooms and over: 183*
 
 ```{r}
-commercial_codes <- assessor_use_codes_jan_2025 %>% 
+# get commerical use codes of interest in jan 2025 and apr 2026
+# use the codes to filter the data and parcel tables
+
+### jan 2025
+commercial_codes_jan_2025 <- assessor_use_codes_jan_2025 %>% 
   filter( 
     grepl("^1|^2", use_code)) %>% # 113
-  mutate(residential = case_when(
-    grepl("C$", use_code) ~ TRUE,
-    grepl("^121", use_code) ~ TRUE,
-    grepl("^172", use_code) ~ TRUE,
-    grepl("^184", use_code) ~ TRUE,
-    grepl("^185", use_code) ~ TRUE,
-    .default = FALSE
-  ))
-
-commercial_residential_codes <- commercial_codes %>% filter(residential == TRUE)
+  mutate(
+    commercial = TRUE,
+    residential = case_when(
+      grepl("C$", use_code) ~ TRUE,
+      grepl("^121", use_code) ~ TRUE,
+      grepl("^172", use_code) ~ TRUE,
+      grepl("^184", use_code) ~ TRUE,
+      grepl("^185", use_code) ~ TRUE,
+      .default = FALSE))
 
 # get all AINs 
 get_jan_2025_data_query <- "SELECT * FROM dashboard.assessor_data_universe_2025_01;"
 jan_2025_data <- dbGetQuery(con, get_jan_2025_data_query)
 
-jan_2025_data_filtered <- jan_2025_data %>% filter(use_code %in% commercial_residential_codes$use_code) # 292
+jan_2025_data_filtered <- commercial_codes_jan_2025 %>%
+  left_join(jan_2025_data, by = "use_code") # 2629
 
 # get shapes for these AINS
 get_jan_2025_shapes_query <- "SELECT ain, matched_name, geom FROM dashboard.assessor_parcels_universe_2025_01;"
@@ -88,7 +104,79 @@ jan_2025_shapes <- st_read(con, query=get_jan_2025_shapes_query)
 
 jan_2025_shapes_filtered <- jan_2025_shapes %>% 
   filter(ain %in% jan_2025_data_filtered$ain) %>% # 292
-  filter(matched_name == "Altadena" | matched_name=="Pasadena; Altadena") # 48
-m <- jan_2025_shapes_filtered
-mapview(m, zcol="matched_name")
+  filter(matched_name == "Altadena" | matched_name=="Pasadena; Altadena") %>% # 319
+  left_join(jan_2025_data_filtered, by = c("ain"))
+
+m_0125 <- jan_2025_shapes_filtered
+
+# get list of ains to compare against apr 2026 vintage
+jan_2025_ains <- jan_2025_data_filtered %>% filter(ain %in% jan_2025_shapes_filtered$ain)
+
+### apr 2026
+commercial_codes_apr_2026 <- assessor_use_codes_apr_2026 %>% 
+  filter( 
+    grepl("^1|^2", use_code)) %>% # 113
+  mutate(
+    commercial = TRUE,
+    residential = case_when(
+      grepl("C$", use_code) ~ TRUE,
+      grepl("^121", use_code) ~ TRUE,
+      grepl("^172", use_code) ~ TRUE,
+      grepl("^184", use_code) ~ TRUE,
+      grepl("^185", use_code) ~ TRUE,
+      .default = FALSE
+  ))
+
+# get all AINs 
+get_apr_2026_data_query <- "SELECT * FROM dashboard.assessor_data_universe_2026_04;"
+apr_2026_data <- dbGetQuery(con, get_apr_2026_data_query)
+
+apr_2026_data_filtered <- commercial_codes_apr_2026 %>%
+  left_join(apr_2026_data, by = "use_code") # 2629
+
+# get shapes for these AINS
+get_apr_2026_shapes_query <- "SELECT ain, matched_name, geom FROM dashboard.assessor_parcels_universe_2026_04;"
+apr_2026_shapes <- st_read(con, query=get_apr_2026_shapes_query)
+
+apr_2026_shapes_filtered <- apr_2026_shapes %>% 
+  filter(ain %in% apr_2026_data_filtered$ain) %>% # 47
+  filter(matched_name == "Altadena" | matched_name=="Pasadena; Altadena") %>% # 315
+  left_join(apr_2026_data_filtered, by = c("ain"))
+
+m_0426 <- apr_2026_shapes_filtered
+
+# get list of ains to compare against jan 2025 vintage
+apr_2026_ains <- apr_2026_data_filtered %>% filter(ain %in% apr_2026_shapes_filtered$ain)
+
+```
+
+# January 2025 Commercial Properties
+```{r}
+mapview(m_0125, zcol="residential") 
+```
+
+# Apr 2026 Commercial Properties
+```{r}
+mapview(m_0426, zcol="residential") 
+```
+
+```{r}
+
+# Note these are roughly the same - by count Jan 2025 has 48 AINs to Apr 2026 47
+
+check1 <- setdiff(jan_2025_ains$ain, apr_2026_ains$ain)
+check1 # "5828026005" "5845018001" "5845010020" "5828027024"
+
+check2 <- setdiff(apr_2026_ains$ain, jan_2025_ains$ain)
+check2 # none
+
+jan_2025_data_filtered %>% filter(ain == "5845018001") # use_code 1210 (store and residential combo)
+
+# LAC Assessor Portal currently considers this purely residential: https://portal.assessor.lacounty.gov/parceldetail/5845018001
+# No history or parcel change (or any indication of why these was use code 1210 previously and is now 0400)
+
+# Additionally in EPIC-LA nothing to explain change in use code: https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5845018001
+# There is a "Fire Rapid Assessment Inspection" (Status Red) requested on 2/20/25
+# We have not reviewed these types of inspections in relation to Eaton Fire Recovery (should explore)
+
 ```
