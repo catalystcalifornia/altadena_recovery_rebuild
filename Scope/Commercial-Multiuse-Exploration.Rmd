@@ -161,6 +161,37 @@ mapview(m_0426, zcol="residential")
 ```
 
 ```{r}
+# Get zoning codes to try and identify which commercial use codes are also zoned
+# for residential (mixed-use) purposes.
+
+zoning_codes_0125 <- jan_2025_shapes_filtered %>% st_drop_geometry() %>% select(zoning_code)
+zoning_codes_0125_df <- as.data.frame(table(zoning_codes$zoning_code))
+
+zoning_codes_0426 <- apr_2026_shapes_filtered %>% st_drop_geometry() %>% select(zoning_code)
+zoning_codes_0426_df <- as.data.frame(table(zoning_codes$zoning_code))
+
+setdiff(as.character(zoning_codes_0426_df$Var1), as.character(zoning_codes_0125_df$Var1))
+# character(0)
+setdiff(as.character(zoning_codes_0125_df$Var1), as.character(zoning_codes_0426_df$Var1))
+# character(0)
+
+# Same universe of zoning codes are available. Will review individually.
+# Reference data dictionary
+## First two characters are place (LC: LA County; PS: Pasadena)
+## 3rd character: can be (A)gricultural, (C)ommercial, (M) Industrial, R(esidential)
+## 4th character: alphanumeric and generally represents either the intensity or limit of a property's use;
+## 5th-15th characters: represent data supplied and used by the Real Estate Division of the L.A. Office of Assessor 
+
+the case of a dash, it is used to separate multiple zones or height districts.
+
+# Questions:
+# What do asterisks mean?
+
+```
+
+
+
+```{r}
 
 # Note these are roughly the same - by count Jan 2025 has 48 AINs to Apr 2026 47
 
