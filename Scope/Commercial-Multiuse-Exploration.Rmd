@@ -181,8 +181,7 @@ setdiff(as.character(zoning_codes_0125_df$Var1), as.character(zoning_codes_0426_
 ## 3rd character: can be (A)gricultural, (C)ommercial, (M) Industrial, R(esidential)
 ## 4th character: alphanumeric and generally represents either the intensity or limit of a property's use;
 ## 5th-15th characters: represent data supplied and used by the Real Estate Division of the L.A. Office of Assessor 
-
-the case of a dash, it is used to separate multiple zones or height districts.
+## in the case of a dash, it is used to separate multiple zones or height districts.
 
 # Questions:
 # What do asterisks mean?
