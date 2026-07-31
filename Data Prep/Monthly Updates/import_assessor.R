@@ -16,12 +16,12 @@ source("Data Prep\\assessor_data_functions.R")
 con <- connect_to_db("altadena_recovery_rebuild")
 
 # Zipped assessor data downloaded to D: drive from EMG's OneDrive - should match date suffix in Sharepoint
-assessor_date <-"2026-03-02" # Update
+assessor_date <-"2026-07-30" # Update
 assessor_date_clean <- gsub("-", "", assessor_date) 
 
-temp_data_migration_folder <- "Cold Data Migration - D Drive" # for rds data migration
-assessor_data_folder <- sprintf("D:/%s/Assessor Data FULL/OneDrive_%s.zip", temp_data_migration_folder, assessor_date)
-temp_extract_dir <- "D:/temp_extract/Assessor Data/"
+# temp_data_migration_folder <- "Cold Data Migration - D Drive" # for rds data migration
+assessor_data_folder <- sprintf("W:/Project/RDA Team/Altadena Recovery and Rebuild/Data/Assessor Data FULL/OneDrive_%s.zip", assessor_date)
+temp_extract_dir <- "W:/Temp/Assessor Data/"
 
 # clear temp_extract first if it exists
 if (dir.exists(temp_extract_dir)) {
@@ -38,19 +38,21 @@ unzipped_result <- system(paste0('powershell "Expand-Archive -Path \\"', assesso
 extracted_files <- list.files(temp_extract_dir, recursive = TRUE, full.names = TRUE)
 print(extracted_files)
 
-# [1] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.cpg"                              
-# [2] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.dbf"                              
-# [3] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.prj"                              
-# [4] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.sbn"                              
-# [5] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.sbx"                              
-# [6] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shp"                              
-# [7] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shp.HAS026961.21100.17200.sr.lock"
-# [8] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shp.HAS026961.21100.rd.lock"      
-# [9] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shp.xml"                          
-# [10] "D:/temp_extract/Assessor Data/March 2026/Assr Data 20260302/parcel.shx"                              
-# [11] "D:/temp_extract/Assessor Data/March 2026/DS04 Part 1.csv"                                            
-# [12] "D:/temp_extract/Assessor Data/March 2026/DS04 Part 2.csv"                                            
-# [13] "D:/temp_extract/Assessor Data/March 2026/DS04 Part 3.csv"         
+# [1] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.cpg"                              
+# [2] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.dbf"                              
+# [3] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.prj"                              
+# [4] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.sbn"                              
+# [5] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.sbx"                              
+# [6] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.shp"                              
+# [7] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.shp.HAS026961.11900.17796.sr.lock"
+# [8] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.shp.HAS026961.12432.17796.sr.lock"
+# [9] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.shp.HAS026961.21096.17796.sr.lock"
+# [10] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.shp.HAS026961.9412.17796.sr.lock" 
+# [11] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.shp.xml"                          
+# [12] "W:/Temp/Assessor Data/OneDrive_7-30-2026/Assr Data 20260702/parcel.shx"                              
+# [13] "W:/Temp/Assessor Data/OneDrive_7-30-2026/DS04 Part 1.csv"                                            
+# [14] "W:/Temp/Assessor Data/OneDrive_7-30-2026/DS04 Part 2.csv"                                            
+# [15] "W:/Temp/Assessor Data/OneDrive_7-30-2026/DS04 Part 3.csv"        
 
 # Define file locations we'll need
 shp_path <- grep("parcel.shp$", extracted_files, value=TRUE)
