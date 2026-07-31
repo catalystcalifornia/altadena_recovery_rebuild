@@ -83,13 +83,13 @@ city_perimeters <- st_read(con, query='select name, geom as geometry from data.t
   st_transform(2229)
 st_crs(city_perimeters)$epsg # 2229
 
-# intersection
+# intersection assessor parcels with the altadena city shape
 if (shp_path %in% extracted_files) {
   shp_intersect <- batch_intersect_shapefile(
     shp_path=shp_path,
     target_geo=city_perimeters,
     chunk_size = 10000,
-    retain_cols = c("name")) # This time: 54868 (6 fewer); Last time: 54874
+    retain_cols = c("name")) 
   
 } else {
   print("shp file path has changed - compare shp_path to extracted_files list and update accordingly")
@@ -97,6 +97,10 @@ if (shp_path %in% extracted_files) {
 
 length(unique(shp_intersect$AIN)) 
 table(shp_intersect$matched_name, useNA = "ifany")
+
+# July 2026 (Q3/August 2026 update)
+# Altadena
+# 14527 (1 less)
 
 # March 2026 (april 2026 update)
 # Altadena 
@@ -114,14 +118,15 @@ table(shp_intersect$matched_name, useNA = "ifany")
 
 # clean up before export #
 colnames(shp_intersect) <- tolower(colnames(shp_intersect))
+st_agr(shp_intersect) <- "constant"   # add this to prevent bug when using export_shpfile() 
 shp_intersect_3310 <- st_transform(shp_intersect, 3310)
 
 # # export results
-data_vintage_month <- "03" 
+data_vintage_month <- "07" 
 data_vintage_year <- "2026"
 date_ran <- as.character(Sys.Date()) 
-update_year <-  "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year of dashboard update
-update_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month of dashboard update
+update_year <-  "2026" # year of dashboard update
+update_month <- "08" # month of dashboard update
 source <- "Los Angeles County Assessor; Data Dictionary: W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html"
 qa_filepath <- "W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\QA_monthly_import_assessor_data.docx"
 schema <- "dashboard"
