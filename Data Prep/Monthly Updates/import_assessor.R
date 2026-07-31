@@ -196,7 +196,7 @@ length(unique(csv_ains_combined$ain)) # 14511
 # check last sale date
 max(as.Date(as.character(csv_ains_combined$last_sale_date),
             format = "%Y%m%d"),
-    na.rm = TRUE) # "2026-05-22" updated but seems somewhat outdated for March?
+    na.rm = TRUE) # "2026-05-22"
 
 ### Export to postgres
 csv_table_name <- paste("assessor_data_universe", update_year, update_month, sep="_")
