@@ -156,11 +156,10 @@ st_crs(shp_intersect)$epsg # 3310
 shp_ain_universe <- shp_intersect %>% st_drop_geometry() %>% select(ain) %>% pull()
 
 # add these AINs manually, the related
-
 csv_1_ain_filter <- batch_filter_csv_data(
   csv_file=csv_1,
   target_list = shp_ain_universe,
-  filter_column="ï»¿AIN", # AIN, sometimes has encoding typos
+  filter_column="AIN", # AIN or ï»¿AIN, sometimes has encoding typos (latter)
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
@@ -168,7 +167,7 @@ csv_1_ain_filter <- batch_filter_csv_data(
 csv_2_ain_filter <- batch_filter_csv_data(
   csv_file=csv_2,
   target_list = shp_ain_universe,
-  filter_column="ï»¿AIN",
+  filter_column="AIN",
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
@@ -176,28 +175,28 @@ csv_2_ain_filter <- batch_filter_csv_data(
 csv_3_ain_filter <- batch_filter_csv_data(
   csv_file=csv_3,
   target_list = shp_ain_universe,
-  filter_column="ï»¿AIN",
+  filter_column="AIN",
   chunk_size = 10000,
   debug_filter=TRUE,
   exact_match=TRUE)
 
 # Combine results
-csv_ains_combined <- rbind(csv_1_ain_filter,
-                           csv_2_ain_filter,
-                           csv_3_ain_filter) # 13934 (Altadena only)
+csv_ains_combined <- rbind(csv_1_ain_filter, # 0
+                           csv_2_ain_filter, # 14511
+                           csv_3_ain_filter) # 0
 
 colnames(csv_ains_combined) <- tolower(gsub(" ", "_", colnames(csv_ains_combined)))
 
 csv_ains_combined <- csv_ains_combined %>%
-  rename(ain = `ï»¿ain`) %>%
+  # rename(ain = `ï»¿ain`) %>%
   mutate(ain=as.character(ain))
 
-length(unique(csv_ains_combined$ain)) # 13934
+length(unique(csv_ains_combined$ain)) # 14511
 
 # check last sale date
 max(as.Date(as.character(csv_ains_combined$last_sale_date),
             format = "%Y%m%d"),
-    na.rm = TRUE) # "2025-12-31" updated but seems somewhat outdated for March?
+    na.rm = TRUE) # "2026-05-22" updated but seems somewhat outdated for March?
 
 ### Export to postgres
 csv_table_name <- paste("assessor_data_universe", update_year, update_month, sep="_")
@@ -208,7 +207,6 @@ indicator <- sprintf("Assessor data from %s/%s that matches Altadena and Pasaden
 #             Data imported on ", date_ran, ".",
 #                         "QA DOC: ", qa_filepath,
 #                         " Source: ", source, "'"))
-
 
 
 ##### QA Clean-up #####
