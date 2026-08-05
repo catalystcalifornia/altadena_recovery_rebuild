@@ -291,8 +291,8 @@ xwalk_same_shape_diff_count_ain <- same_shape_diff_ain  %>%
 diff_shape <- match_parcels_wide %>%
   filter(xwalk_type=="run intersect by month")
 
-prev_parcels_filtered_ains <- diff_shape %>% filter(flag_prev==1) %>% select(ain)
-curr_parcels_filtered_ains <- diff_shape %>% filter(flag_curr==1)%>% select(ain)
+prev_parcels_filtered_ains <- diff_shape %>% filter(flag_prev==1) %>% select(ain) #63
+curr_parcels_filtered_ains <- diff_shape %>% filter(flag_curr==1)%>% select(ain) #62
 
 prev_parcels_filtered <- parcels_prev %>% filter(ain %in% prev_parcels_filtered_ains$ain)
 curr_parcels_filtered <- parcels_curr %>% filter(ain %in% curr_parcels_filtered_ains$ain)
@@ -317,6 +317,10 @@ intersection <- st_intersection(prev_parcels_filtered, curr_parcels_filtered) %>
          in_curr_shp = ifelse(ain %in% parcels_curr$ain, 1, 0), 
          ain_match = ifelse(ain==ain.1, 1 ,0)) %>%
   filter(pct_overlap_prev>0)
+
+# 173 intersections that overlap a prev parcel by any amount > 0 
+length(unique(intersection$ain.1)) # curr: 62
+length(unique(intersection$ain)) # prev: 63
 
 # Keep matching AINs first
 xwalk_diff_shape_same_ain <- intersection %>%
@@ -358,6 +362,20 @@ xwalk_diff_shape_overlap <- intersection %>%
   # drop records in the spatial intersect ain match
   filter(!ain_prev %in% xwalk_diff_shape_same_ain$ain_prev)
 
+# add QA check to see if all 125 parcels are accounted for
+prev_parcels_intersect <- c(prev_parcels_filtered_ains$ain) # 63 prev parcels used in intersect step
+curr_parcels_intersect <- c(curr_parcels_filtered_ains$ain) # 62 curr parcels used in the intersect step
+
+# prev parcels accounted for in the intersect xwalks - 62/63
+prev_parcel_intersect_matches <- unique(c(xwalk_diff_shape_overlap$ain_prev, xwalk_diff_shape_same_ain$ain_prev))
+setdiff(prev_parcel_intersect_matches, prev_parcels_intersect) # 0
+setdiff(prev_parcels_intersect, prev_parcel_intersect_matches) # 1 - "5823022006"
+
+# curr parcels accounted for in the intersect xwalks - 60/62
+curr_parcel_intersect_matches <- unique(c(xwalk_diff_shape_overlap$ain_curr, xwalk_diff_shape_same_ain$ain_curr))
+setdiff(curr_parcel_intersect_matches, curr_parcels_intersect) # 0
+setdiff(curr_parcels_intersect, curr_parcel_intersect_matches) # 2 - "5823022022" "5823022023"
+
 # Step 5: Monthly Update: Compile crosswalks - Make sure to pull in any xwalk tables you added to script ------
 xwalk_df <- bind_rows(
   xwalk_same_shape_ain %>% 
@@ -378,8 +396,6 @@ xwalk_df <- bind_rows(
          use_code_prev, use_code_curr, address_prev, address_curr, 
          xwalk_type, status)) 
 
-
-
 # Step 6:  Monthly Update: Filter for universe and check/modify for missing Jan parcels ------
 #### Will need to update and pull in the previous xwalk that has been filtered overtime for the january universe
 # filter just for the parcel universe
@@ -397,17 +413,17 @@ final_xwalk %>% group_by(ain_curr) %>% filter(n()>1) %>% View() # 2
 
 length(unique(final_xwalk$ain_curr)) # 5676
 
-# March/April 2026 update - getting many to many warning. 
-# Check dupes
-final_xwalk %>% group_by(ain_2025_01) %>% filter(n()>1) %>% View() # 3
-final_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% View()
-final_xwalk %>% group_by(ain_curr) %>% filter(n()>1) %>% View()
+# # March/April 2026 update - getting many to many warning. 
+# # Check dupes
+# final_xwalk %>% group_by(ain_2025_01) %>% filter(n()>1) %>% View() # 3
+# final_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% View()
+# final_xwalk %>% group_by(ain_curr) %>% filter(n()>1) %>% View()
 
 # Additional QA 
 # Check if dupes are in xwalk_df
-xwalk_df %>% group_by(ain_prev) %>% filter(n()>1) %>% nrow() #6
+xwalk_df %>% group_by(ain_prev) %>% filter(n()>1) %>% nrow() #0
 # Check if dupes are in prev_xwalk
-prev_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% nrow() #2
+prev_xwalk %>% group_by(ain_prev) %>% filter(n()>1) %>% nrow() #4
 
 final_xwalk %>% 
   group_by(ain_2025_01) %>% 
