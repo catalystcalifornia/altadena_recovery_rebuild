@@ -93,8 +93,13 @@ wait_for_spa_load <- function(url, max_wait = 20) {
       elapsed_time <- difftime(Sys.time(), start_time, units = "secs")
       
       # Check if the moduleResultMessage container is visible (page loaded indicator)
+      # Updated to: target the label's aria-hidden ID, not the wrapper div's, and cover all three cases (multiple results / one result / no results):
       module_loaded <- tryCatch({
-        b$Runtime$evaluate('document.querySelector("#moduleResultMessage[aria-hidden=\\"false\\"]") !== null')$result$value
+        b$Runtime$evaluate('
+    document.querySelector(\'label[data-ng-show="vm.totalFoundDisplay > 1"][aria-hidden="false"]\') !== null ||
+    document.querySelector(\'label[data-ng-show="vm.totalFoundDisplay == 1"][aria-hidden="false"]\') !== null ||
+    document.querySelector(\'label[data-ng-show="vm.totalFoundDisplay == 0"][aria-hidden="false"]\') !== null
+  ')$result$value
       }, error = function(e) {
         message("Warning: Could not check module loaded status")
         return(FALSE)
@@ -132,6 +137,11 @@ wait_for_spa_load <- function(url, max_wait = 20) {
     if(status != "success") {
       message("⚠ Timeout: Results module did not load within wait period")
       status <- "timeout"
+      
+      # add diagnostic: save a screenshot so you can see what loaded when requst timed out
+      tryCatch({
+        b$screenshot(filename = file.path(custom_chrome_dir, paste0("timeout_debug_", Sys.getpid(), ".png")))
+      }, error = function(e) message("Couldn't capture debug screenshot"))
     }
     
     # Get final page state

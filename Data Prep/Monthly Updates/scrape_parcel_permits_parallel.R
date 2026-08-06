@@ -44,7 +44,7 @@ dbDisconnect(con)
 test_chromote()
 
 # 2. If above works, try to extract data from one test url to get general data fields
-url_ <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=10&pn=1&em=true&st=2204%20Grand%20Oaks%20Avenue"
+url_ <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=2204%20Grand%20Oaks%20Avenue"
 message(paste("Current search URL:", url_))
 permits <- scrape_permits_chromote(url=url_, wait_time = 30)
 
@@ -188,9 +188,9 @@ dbDisconnect(con)
 # # ## Check the response_status to see if we got any "timeout" or "error" for a given request
 # # ## will rerun each once more with a longer wait time to see if we get better results
 # unsuccessful_requests <- check_df %>%
-#   filter(response_status != "success")
+#   filter(response_status != "success") # 0
 # 
-# # use EPIC LA to spot check a few of these
+# # use EPIC LA to spot check a few of these - none this time
 # spot_check_5 <- unsuccessful_requests %>% slice_sample(n=5)
 # # https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=5847021016 - true error, should have 5 permits
 # # https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=5847020010 - true error, should have 1 permit
@@ -234,7 +234,7 @@ dbDisconnect(con)
 # final_data_clean <- read.csv(csv_filepath,
 #                              encoding = "UTF-8",
 #                              colClasses = c("character"))
-# retried <- final_data_clean %>% 
+# retried <- final_data_clean %>%
 #   filter(ain %in% unsuccessful_requests$ain) %>%
 #   mutate(qa_add=TRUE) %>%
 #   filter(response_status=="success") %>%
@@ -247,7 +247,7 @@ dbDisconnect(con)
 # write.csv(final_data_clean, csv_filepath_clean, row.names=FALSE, fileEncoding = "UTF-8")
 # 
 # ## read in final data with retried requests and export to pg
-# final_data_retried <- final_data <- read.csv(csv_filepath_clean,
+# final_data <- read.csv(csv_filepath_clean,
 #                                              encoding = "UTF-8",
 #                                              colClasses = c("character"))
 # 
@@ -263,9 +263,9 @@ dbDisconnect(con)
 # # 2. if any ains are associated with 100 permits
 # ## We pulled first 100 permits per parcel, if any have 100 check to see if we missed any
 # ## if so, update function to go to additional results pages to get rest of permits
-# check_record_counts <- final_data_retried %>% filter(record_id==100)
+# check_record_counts <- final_data %>% filter(record_id=="100")
 # 
-# if (nrow(check_record_counts)==100) {
+# if (nrow(check_record_counts)>0) {
 #   message(
 #     paste("These parcels should be reviewed individually. If the portal shows more than 100 permits for any, we should update the functions. AINS: ",
 #           as.list(check_record_counts$ain))
