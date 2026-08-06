@@ -1,5 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_fhsz table for the Monthly Dashboard Updates ##
-## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_04.docx ##
+## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_08.docx ##
 ## SCRIPT OUTPUT: rel_assessor_fhsz_YYYY_MM
 
 #### STEP 1: SET UP (Update year and month) ####
@@ -21,12 +21,12 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2026"
-month <- "04"
+month <- "08"
 
 #### STEP 2: PULL current data and fhsz (Update to latest data and xwalks) ####
 # current month parcels
-parcels <- st_read(con_alt, query="SELECT ain_2026_04,geom FROM dashboard.rel_assessor_parcels_2026_04") %>%
-  rename(ain=ain_2026_04) # rename ain for code simplicity
+parcels <- st_read(con_alt, query="SELECT ain_2026_08,geom FROM dashboard.rel_assessor_parcels_2026_08") %>%
+  rename(ain=ain_2026_08) # rename ain for code simplicity
 
 # get fire hazard zones
 fhsz_local <- st_read(con_alt, query = "Select * FROM data.local_fhsz_3310", geom="geom") %>%
@@ -43,8 +43,8 @@ parcels_local_fhsz<- st_intersection(parcels,fhsz_local)
 
 # #check
 # mapview(parcels_local_fhsz) # looks good
-# nrow(parcels_local_fhsz)
-# length(unique(parcels_local_fhsz$ain))
+# nrow(parcels_local_fhsz) # 08/04/2026 2707 rows
+# length(unique(parcels_local_fhsz$ain)) # 08/04/2026 2361 unduplicated
 # duplicates, keep the highest hazard
 
 parcels_local_fhsz_dedup <-parcels_local_fhsz %>%
@@ -56,7 +56,7 @@ parcels_local_fhsz_dedup <-parcels_local_fhsz %>%
 
 #check which are duplicates and if they've been assigned correctly compared to parcels_local_fhsz_dedup
 # dupes <- parcels_local_fhsz[duplicated(parcels_local_fhsz$ain) | duplicated(parcels_local_fhsz$ain, fromLast = TRUE), ]
-# View(dupes[order(dupes$ain), ])
+# View(dupes[order(dupes$ain), ]) # 08/04/2026 692 entries or 346 pairs
 
 
 parcels_local_fhsz_dedup <-  parcels_local_fhsz_dedup %>%
@@ -69,6 +69,14 @@ parcels_local_fhsz_dedup <-  parcels_local_fhsz_dedup %>%
 check <- parcels_local_fhsz_dedup %>%
   group_by(local_fhsz, local_fhsz_list) %>%
   summarise(count=n())
+# output 8/6/2026 #2361 total deduped entries
+# local_fhsz local_fhsz_list count
+# <chr>      <chr>           <int>
+#   1 High       High              392
+# 2 High       Moderate, High    175
+# 3 Moderate   Moderate          527
+# 4 Very High  High, Very High   171
+# 5 Very High  Very High        1096
 
 #### Step 4: Join parcel data to state fire hazard zones data ####
 st_crs(fhsz_state)
@@ -79,8 +87,8 @@ parcels_state_fhsz<- st_intersection(parcels,fhsz_state)
 
 # #check
 # mapview(parcels_state_fhsz) # looks good
-# nrow(parcels_state_fhsz)
-# length(unique(parcels_state_fhsz$ain))
+# nrow(parcels_state_fhsz) #08/06/2026 78
+# length(unique(parcels_state_fhsz$ain)) #08/06/2026 78
 # no duplicates
 table(parcels_state_fhsz$fhsz_descr,useNA='always')
 
@@ -109,6 +117,14 @@ View(parcels_fhsz)
 check <- parcels_fhsz %>%
   group_by(local_fhsz, state_fhsz) %>%
   summarise(count=n())
+# 08/06/2026
+# local_fhsz state_fhsz count #total count 2407
+# <chr>      <chr>      <int>
+#   1 High       NA           567
+# 2 Moderate   NA           527
+# 3 Very High  Very High     32
+# 4 Very High  NA          1235
+# 5 NA         Very High     46
 
 parcels_fhsz <- parcels_fhsz %>%
   mutate(combined_fhsz=
@@ -161,7 +177,7 @@ xtabs(~ local_fhsz + state_fhsz + authority, data = curr_fhsz , na.action=na.pas
 
 #### STEP 8: PUSH TO PGADMIN  ####
 curr_fhsz <- curr_fhsz %>%
-  rename(ain_2026_04=ain)
+  rename(ain_2026_08=ain)
 
 # final check
 table(curr_fhsz$combined_fhsz,useNA='always')
@@ -174,8 +190,8 @@ table(curr_fhsz$authority,useNA='always')
 table_label <- paste0("rel_assessor_fhsz_", year, "_", month)
 schema <- "dashboard"
 indicator <- paste0("Relational table of Fire Hazard State Zone in either West or East Altadena proper as of MONTH:", month, " YEAR:", year)
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_fhsz.R "
-qa_filepath<-" QA_sheet_rel_tables_update_2026_04.docx "
+source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/AB/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_fhsz.R "
+qa_filepath<-" QA_sheet_rel_tables_update_2026_08.docx "
 
 # dbWriteTable(con_alt, Id(schema, table_label), curr_fhsz,
 #              overwrite = FALSE, row.names = FALSE)

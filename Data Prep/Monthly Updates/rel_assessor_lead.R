@@ -1,5 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_lead table for the Monthly Dashboard Updates ##
-## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_04.docx ##
+## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_08.docx ##
 ## SCRIPT OUTPUT: rel_assessor_lead_YYYY_MM
 
 #### STEP 1: SET UP (Update year and month) ####
@@ -18,11 +18,11 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2026"
-month <- "04"
+month <- "08"
 
 #### STEP 2: PULL SHAPES AND DATA (Update to latest data and xwalks) ####
 # current month parcels
-parcels <- st_read(con_alt, query="SELECT ain_2026_04,geom FROM dashboard.rel_assessor_parcels_2026_04")
+parcels <- st_read(con_alt, query="SELECT ain_2026_08,geom FROM dashboard.rel_assessor_parcels_2026_08")
 
 # get lead data
 lead <- st_read(con_alt, query="SELECT * FROM data.lacdph_lead_results_grid_2025", geom = "geom") %>% 
@@ -48,15 +48,17 @@ ain_lead <- st_intersection(parcels %>%
 
 # check for missing
 table(ain_lead$hi_lead_flag,useNA='always')
-
+# 08/06/2026
+# FALSE  TRUE  <NA> 
+#   2974  2673    29 
 ain_lead_missing <- ain_lead %>% filter(is.na(hi_lead_flag))
 
-# parcels %>% filter(ain_2026_04 %in% ain_lead_missing$ain_2026_04) %>% mapview() + mapview(lead)
+# parcels %>% filter(ain_2026_08 %in% ain_lead_missing$ain_2026_08) %>% mapview() + mapview(lead)
 #untested grids
 
 # clean up table and for parcels missing from grids add flag for not assessed
 curr_lead <- ain_lead %>%
-  select(ain_2026_04, grid_name, lead_geometric_mean, hi_lead_flag) %>%
+  select(ain_2026_08, grid_name, lead_geometric_mean, hi_lead_flag) %>%
   mutate(hi_lead_label=case_when(
     hi_lead_flag==TRUE ~ "High Lead Grid",
     hi_lead_flag==FALSE ~ "Not High Lead Grid",
@@ -64,10 +66,12 @@ curr_lead <- ain_lead %>%
   ))
 
 table(curr_lead$hi_lead_label,useNA='always')
-
+# 08/06/2026
+# Grid Not Tested     High Lead Grid Not High Lead Grid               <NA> 
+#   29               2673               2974                  0
 nrow(curr_lead) - nrow(parcels) # same count
 #Another quick duplicates check 
-# sum(duplicated(curr_lead$ain_2026_04)) should be 0
+# sum(duplicated(curr_lead$ain_2026_08)) should be 0
 
 
 #### STEP 4: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
@@ -76,8 +80,8 @@ nrow(curr_lead) - nrow(parcels) # same count
 table_label <- paste0("rel_assessor_lead_", year, "_", month)
 schema <- "dashboard"
 indicator <- paste0("Relational table of Lead Grids and Testing in either West or East Altadena proper as of MONTH:", month, " YEAR:", year)
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_lead.R "
-qa_filepath<-"  QA_sheet_rel_tables_update_2026_04.docx "
+source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/AB/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_lead.R "
+qa_filepath<-"  QA_sheet_rel_tables_update_2026_08.docx "
 
 # dbWriteTable(con_alt, Id(schema, table_label), curr_lead,
 #              overwrite = FALSE, row.names = FALSE)

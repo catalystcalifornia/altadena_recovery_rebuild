@@ -1,5 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_owner table for the Monthly Dashboard Updates ##
-## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_04.docx ##
+## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_08.docx ##
 ## SCRIPT OUTPUT: rel_assessor_owner_YYYY_MM
 
 #### STEP 1: SET UP (*UPDATE* year and month) ####
@@ -18,26 +18,26 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2026"
-month <- "04"
+month <- "08"
 
 #### STEP 2: PULL XWALKS AND DATA (*UPDATE* to latest data and xwalks) ####
 # get for CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2026_12_04")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2026_04_08")
 
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
-assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2026_04") %>%
-  filter(ain %in% xwalk$ain_2026_04)
+assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2026_08") %>%
+  filter(ain %in% xwalk$ain_2026_08)
 
 # get sales data for current month 
-sales_data <- st_read(con_alt, query="select * from dashboard.rel_assessor_sales_2026_04") %>%
-  filter(ain %in% xwalk$ain_2026_04)
+sales_data <- st_read(con_alt, query="select * from dashboard.rel_assessor_sales_2026_08") %>%
+  filter(ain %in% xwalk$ain_2026_08)
 
 # get residential data for current month 
-residential_data <- st_read(con_alt, query="select * from dashboard.rel_assessor_residential_2026_04")
+residential_data <- st_read(con_alt, query="select * from dashboard.rel_assessor_residential_2026_08")
 
 # join sales data to assessor data keeping columns for owner type
 owner_info <- sales_data %>%
-  left_join(residential_data %>% select(ain_2026_04,total_units,landlord_units), by=c("ain"="ain_2026_04")) %>%
+  left_join(residential_data %>% select(ain_2026_08,total_units,landlord_units), by=c("ain"="ain_2026_08")) %>%
   left_join(assessor_data %>% 
               select(ain,exemption_type,tax_stat_key,year_sold_to_state,
                      contains("owner"),mail_house_no,contains("m_")), 
@@ -205,7 +205,7 @@ final_df<- data_owner %>%
   # remove 0 from start of PO Boxes
   mutate(owner_address=str_remove(owner_address, "^0 ")) %>%
   select(ain, owner_name, owner_renter, owner_address, sold_source) %>%
-  rename(ain_2026_04 = ain) %>%
+  rename(ain_2026_08 = ain) %>%
   # make owner address unavailable when sold source is anfs, we only have site address from anfs not owner contact
   mutate(owner_address=case_when(
     sold_source=='anfs' ~ 'Not Available',
@@ -213,10 +213,10 @@ final_df<- data_owner %>%
   ))
 
 # check for duplicates
-nrow(final_df)-length(unique(final_df$ain_2026_04)) # should be 0 difference
+nrow(final_df)-length(unique(final_df$ain_2026_08)) # should be 0 difference
 
 # check for same number of rows as xwalk
-nrow(final_df)-length(unique(xwalk$ain_2026_04)) # should be 0 difference
+nrow(final_df)-length(unique(xwalk$ain_2026_08)) # should be 0 difference
 
 # check for NA owner type - should be 0
 table(final_df$owner_renter,useNA='always')
@@ -230,7 +230,7 @@ indicator <- "Relational table with summarized information owner type and owner 
 Owner type created based on combination of rental units, exemptions on property, tax status, and owner name. 
 For recent sales just recorded in Altadena not for sale, only owner name is used to create owner renter type, not the assessor data which may not be associated with most recent sale"
 source <- "Script: altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_residential.R "
-qa_filepath<-"  QA_sheet_rel_tables_update_2026_04.docx "
+qa_filepath<-"  QA_sheet_rel_tables_update_2026_08.docx "
 
 # dbWriteTable(con_alt, Id(schema, table_label), final_df,
 #              overwrite = FALSE, row.names = FALSE)
