@@ -6,7 +6,16 @@ library(chromote)
 # Create custom directory for Chrome temp files
 custom_chrome_dir <- file.path(getwd(), "chrome_temp")
 dir.create(custom_chrome_dir, showWarnings = FALSE, recursive = TRUE)
-Sys.setenv(CHROMOTE_CHROME_USER_DATA_DIR = custom_chrome_dir)
+# Sys.setenv(CHROMOTE_CHROME_USER_DATA_DIR = custom_chrome_dir)
+# add function so that parallel processing workers get distinct chrome browsers
+# if they all try to use the same one it can create conflicts and impact data collection
+get_worker_chrome_dir <- function() {
+  worker_dir <- file.path(custom_chrome_dir, paste0("worker_", Sys.getpid()))
+  dir.create(worker_dir, showWarnings = FALSE, recursive = TRUE)
+  Sys.setenv(CHROMOTE_CHROME_USER_DATA_DIR = worker_dir)
+  worker_dir
+}
+
 
 # Cleanup function
 cleanup_all_temp <- function() {
@@ -71,6 +80,7 @@ wait_for_spa_load <- function(url, max_wait = 20) {
   page_source <- NULL
   
   tryCatch({
+    get_worker_chrome_dir()
     b <- ChromoteSession$new()
     b$Page$navigate(url)
     b$Page$loadEventFired()
@@ -300,6 +310,7 @@ wait_for_permit_detail_load <- function(url, max_wait = 20) {
   page_source <- NULL
   
   tryCatch({
+    get_worker_chrome_dir()
     b <- ChromoteSession$new()
     b$Page$navigate(url)
     b$Page$loadEventFired()

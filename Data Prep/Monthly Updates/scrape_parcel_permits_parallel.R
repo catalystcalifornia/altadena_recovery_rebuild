@@ -3,9 +3,12 @@
 # scraping these sites.
 
 library(dplyr) 
+library(furrr)
+library(future)
 
 source("W:\\RDA Team\\R\\credentials_source.R")
 source("Data Prep\\Monthly Updates\\scraping_functions.R")
+on.exit(cleanup_all_temp(), add = TRUE) # clean up temp files when script closes
 
 con <- connect_to_db("altadena_recovery_rebuild")
 schema <- "dashboard"
@@ -66,10 +69,8 @@ if (file.exists(csv_filepath)) {
   
   remaining <- data.frame(ain=setdiff(ains_list, scraped_ains))
   
-  
 } else {
   print("there's no csv with that name - starting scrape from the beginning")
-  
   remaining <- data.frame(ain=ains_list)
   
 }
@@ -80,25 +81,66 @@ gc()
 first_write_this_session <- !file.exists(csv_filepath)
 
 if (nrow(remaining)> 0){
-  for (row_ in 1:nrow(remaining)) { 
-    
-    row_ain <- remaining[row_, "ain"]
+  # Set up parallel processing with batches to manage memory
+  # Use fewer workers than cores to be respectful to the website
+  plan(multisession, workers = 8)
+  
+  # Parallel process in small batches to write incrementally and manage memory
+  batch_size <- 50  # Adjust based on your memory constraints - this is 50 AINs
+  batches <- split(remaining, ceiling(seq_len(nrow(remaining)) / batch_size))
+  
+  # Parallel process - define function to scrape one ain
+  scrape_one_ain <- function(row_data) {
+    row_ain <- row_data$ain
     portal_url <- paste0(lac_permits_url, row_ain)
     
-    message(paste(row_, ":", portal_url))
-    result <- scrape_permits_chromote(
-      url=portal_url, 
-      wait_time = 30,
-      ain = row_ain, 
-      max_retries = 1, 
-      retry_wait_time = 60)
+    tryCatch({
+      message(paste("Scraping:", portal_url))
+      
+      result <- scrape_permits_chromote(
+        url = portal_url,
+        wait_time = 30,
+        ain = row_ain,
+        max_retries = 1,
+        retry_wait_time = 60
+      )
+      
+      Sys.sleep(1)  # Still be polite even in parallel
+      
+      return(data.frame(result))
+      
+    }, error = function(e) {
+      message(paste("Error scraping", row_ain, ":", e$message))
+      return(data.frame(
+        ain = row_ain,
+        response_status = "error",
+        error_message = e$message
+      ))
+    })
+  }
+  
+  # Process batches
+  for (i in seq_along(batches)) {
+    message(paste("\n=== Processing batch", i, "of", length(batches), "==="))
     
+    current_batch <- batches[[i]]
     
-    # Write initial data (with header)
-    write.table(result,
-                file = csv_filepath,
-                sep = ",",
-                row.names = FALSE,
+    # Scrape this batch in parallel
+    batch_results <- future_map(
+      split(current_batch, seq_len(nrow(current_batch))),
+      scrape_one_ain,
+      .options = furrr_options(seed = TRUE),
+      .progress = TRUE
+    )
+    
+    # Extract results from this batch
+    batch_data <- bind_rows(batch_results)
+    
+    # Write this batch to CSV (append mode after first write)
+    write.table(batch_data, 
+                file = csv_filepath, 
+                sep = ",", 
+                row.names = FALSE, 
                 col.names = first_write_this_session,  # Headers only on first write
                 append = !first_write_this_session,    # Don't append on first write
                 fileEncoding = "UTF-8",
@@ -108,17 +150,21 @@ if (nrow(remaining)> 0){
     # After first write, switch to append mode
     first_write_this_session <- FALSE
     
-    Sys.sleep(1)
+    # Clear batch results from memory
+    rm(batch_results, batch_data)
+    gc()
+    
+    message(paste("Batch", i, "written to CSV"))
+    check_temp_size()
   }
 }
 
-
+# Once all batches are run - pull in all data from csv
 final_data <- read.csv(csv_filepath,
                        encoding = "UTF-8",
                        colClasses = c("character"))
 
-
-
+# Export to pg
 con <- connect_to_db("altadena_recovery_rebuild")
 
 dbWriteTable(con, Id(schema=schema, table_name=table_name), final_data,
