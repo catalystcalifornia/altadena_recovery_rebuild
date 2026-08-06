@@ -96,7 +96,8 @@ data_owner <- data_owner %>%
       TRUE ~ owner_renter  # keeps existing value if none of the above conditions are met
     )
   ) %>%
-  # other church or charity owned based on name
+  # other church or charity owned based on name 
+  #(if hoemowner's exemption, likely adding to it, if a new owner name appears multiple times, want to hard that into oneof these statements, need to skim through the other names to see if its a charity)
   mutate(
     owner_renter = ifelse(
       (grepl("CHURCH|FRATERNAL|SERVICES", owner_name, ignore.case = TRUE) & owner_renter == "Other"),

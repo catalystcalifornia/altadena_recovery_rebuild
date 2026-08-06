@@ -41,16 +41,16 @@ anfs_cols <- c(
 
 #Second, I am reading it into this script.
 # MUST UPDATE FILENAME, DATA VINTAGE YEAR/MONTH/DAY, DATA UPDATE YEAR/MONTH
-anfs_sales_filename <- "Altadena LOTS Sold Jan_07 March 30 2026.csv" 
+anfs_sales_filename <- "Altadena LOTS Sold Jan_07 June_30 2026.xlsx" 
 data_vintage_year <- "2026"
-data_vintage_month <- "03"
+data_vintage_month <- "06"
 data_vintage_day <- "30"
 data_update_year <- "2026"
-data_update_month <- "04"
+data_update_month <- "08"
 anfs_sales_filepath <- sprintf("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Altadena Not for Sale Data\\%s", anfs_sales_filename)
-anfs_sales <- read.csv(anfs_sales_filepath, header=FALSE, col.names = anfs_cols, fileEncoding = "UTF-8-BOM") 
+anfs_sales <- read_xlsx(anfs_sales_filepath, col_names = anfs_cols) 
 
-nrow(anfs_sales) # 428
+nrow(anfs_sales) #501 08/06/2026 # 428 04/12/2026
 colnames(anfs_sales)
 head(anfs_sales)
 tail(anfs_sales) # note: headers are at the end and there's a blank row - will convert date cols to date types and filter the NAs
@@ -58,10 +58,23 @@ View(anfs_sales)
 
  
 #Third, clean up the dataset 
-anfs_sales_clean <- anfs_sales %>% 
-  mutate(across(ends_with("_date"), ~as.Date(., format = "%Y-%m-%d"))) %>%
-  filter(!is.na(sold_date)) #filter out empty row and header row at the bottom. 
-nrow(anfs_sales_clean) # 426 (dropped last 2 rows - good)
+parse_mixed_date <- function(x) {
+  is_serial <- grepl("^[0-9]+$", x)  # pure digits = Excel serial
+  out <- as.Date(rep(NA, length(x)))
+  out[is_serial]  <- as.Date(as.numeric(x[is_serial]), origin = "1899-12-30")
+  out[!is_serial] <- as.Date(x[!is_serial], format = "%Y-%m-%d")
+  out
+}
+
+anfs_sales_clean <- anfs_sales %>%
+  mutate(across(ends_with("_date"), parse_mixed_date)) %>%
+  filter(!is.na(sold_date)) 
+nrow(anfs_sales_clean) 
+# Aug 2026
+# 498 (dropped last 3 NA rows - good)
+# April 2026
+# nrow(anfs_sales_clean) # 426 (dropped last 2 rows - good)
+# 426 (dropped last 2 rows - good)
 
 # Comment on table and columns
 schema <- "dashboard"
@@ -89,9 +102,9 @@ column_comments <- c(
   "New Owner"
 )
 
-# dbWriteTable(con, DBI::Id(schema = schema, table = table_name), anfs_sales_clean,
-#   overwrite = FALSE,
-#   row.names = FALSE
-# )
+dbWriteTable(con, DBI::Id(schema = schema, table = table_name), anfs_sales_clean,
+  overwrite = FALSE,
+  row.names = FALSE
+)
 
-# add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
+add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
