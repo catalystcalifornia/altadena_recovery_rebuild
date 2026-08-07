@@ -110,6 +110,32 @@ vacant <- rel_res_df %>%
 # print(unique(vacant$ain)) #still 347; includes the 2 other vacancies from previous years
   # QAer do you mind double checking this? *************
   
+  # 8-7-26: JZ QA of the high number of vacant parcels------------------------------
+  
+  # read in prior assessor universe 
+  
+  assessor_data_04<-dbGetQuery(con, "SELECT * FROM dashboard.assessor_data_universe_2026_04")
+  
+  # Pull out AINs of parcels that are vacant in the August assessor data
+  
+  vacant_08<-vacant$ain
+  
+  # Filter out these vacant AINs in the  April asssesor data
+  
+  assessor_data_04_vacant_08<-assessor_data_04%>%
+    filter(ain %in% vacant_08)%>%
+    select(ain, use_code)
+  
+  # Looking at this, it looks like 2 vacancies from the April data. Remaining just seem like new vacancies. 
+  
+  # Double check use codes in the August vacant data ---they do all accurately have the V flag in the use code for Vacant
+  
+  vacant%>%
+    select(ain, use_code)%>%
+    View()
+  
+  # I think this data is correct and is an interesting finding we should add to our data findings
+  
   #### STEP 7: CLEAN UP DF AND ADD PARCELS WITH MISSING DATA: UPDATE ####
 final_res_data <- rel_res_df %>% 
   # add address field for dashboard
@@ -164,6 +190,26 @@ table(final_res_data$res_type,useNA='always')
 # April numbers - flag significant changes # Aug 2026 exactly the same
 # Condominium   Multifamily Single-family          <NA> 
 #   64           316          5296             0 
+
+# JZ QA-------------------------------
+
+# I see 1 NA value when I run:
+
+table(final_res_data$res_type,useNA='always')
+
+# pull it out
+
+final_res_data%>%
+  filter(is.na(res_type))%>%
+  View()
+# ain == 5842008017
+
+# Check is this AIN is NULL in postgres too by running: select * from dashboard.rel_assessor_residential_2026_08 where ain_2026_08 = '5842008017' --I see it is NA
+
+# Manually looked up this AIN in the assessor data portal: https://portal.assessor.lacounty.gov/parceldetail/5842008017 ---it is marked as single family residence
+
+# Look up this AIN number in the August assessor data universe by running: select * from dashboard.assessor_data_universe_2026_08 where ain= '5842008017'
+## I don't see this AIN in that data universe
 
 #### STEP 8: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
