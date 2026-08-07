@@ -41,16 +41,16 @@ anfs_cols <- c(
 
 #Second, I am reading it into this script.
 # MUST UPDATE FILENAME, DATA VINTAGE YEAR/MONTH/DAY, DATA UPDATE YEAR/MONTH
-anfs_sales_filename <- "Altadena LOTS Sold Jan_07 June_30 2026.xlsx" 
+anfs_sales_filename <- "Altadena LOTS Sold Jan_07_Aug_04 2026.csv" 
 data_vintage_year <- "2026"
 data_vintage_month <- "06"
 data_vintage_day <- "30"
 data_update_year <- "2026"
 data_update_month <- "08"
 anfs_sales_filepath <- sprintf("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Altadena Not for Sale Data\\%s", anfs_sales_filename)
-anfs_sales <- read_xlsx(anfs_sales_filepath, col_names = anfs_cols) 
+anfs_sales <- read_csv(anfs_sales_filepath, col_names = anfs_cols) 
 
-nrow(anfs_sales) #501 08/06/2026 # 428 04/12/2026
+nrow(anfs_sales) # 517 08/07/2026 pulling from the correct csv #501 08/06/2026 # 428 04/12/2026 
 colnames(anfs_sales)
 head(anfs_sales)
 tail(anfs_sales) # note: headers are at the end and there's a blank row - will convert date cols to date types and filter the NAs
@@ -71,10 +71,8 @@ anfs_sales_clean <- anfs_sales %>%
   filter(!is.na(sold_date)) 
 nrow(anfs_sales_clean) 
 # Aug 2026
-# 498 (dropped last 3 NA rows - good)
-# April 2026
-# nrow(anfs_sales_clean) # 426 (dropped last 2 rows - good)
-# 426 (dropped last 2 rows - good)
+# 515 rows --good matches the original "W:\Project\RDA Team\Altadena Recovery and Rebuild\Data\Altadena Not for Sale Data\Altadena LOTS Sold Jan_07_Aug_04 2026.csv" CSV file
+# I also spot checked all the values in row 515 against the last row in the raw csv file for August and matches. 
 
 # Comment on table and columns
 schema <- "dashboard"
@@ -103,7 +101,7 @@ column_comments <- c(
 )
 
 dbWriteTable(con, DBI::Id(schema = schema, table = table_name), anfs_sales_clean,
-  overwrite = FALSE,
+  overwrite = TRUE,
   row.names = FALSE
 )
 
