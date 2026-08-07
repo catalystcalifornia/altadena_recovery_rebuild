@@ -156,7 +156,8 @@ anfs_sales <- dbGetQuery(con_alt, "SELECT * FROM dashboard.anfs_sales_data_2026_
 # future check for anymore combined AINs
 check <- anfs_sales %>%
   filter(grepl(",\\s*", parcel))
-# same 1 - 5844012018,19
+# 08/06/2026 same 1 - 5844012018,19
+# 04/12/2026 same 1 - 5844012018,19
 
 anfs_sales <- anfs_sales %>%
   # there's 2 AINs in one sales row - split so each is one row and we can match
@@ -174,6 +175,9 @@ anfs_sales <- anfs_sales %>%
 
 # check for duplicates
 length(unique(anfs_sales$parcel))-nrow(anfs_sales)
+# 08/06/2026
+# 8 duplicates remove by taking latest sale
+# 04/12/2026
 # 3 duplicates remove by taking latest sale
 
 # remove duplicates
@@ -193,7 +197,7 @@ lac_sales_records <- lac_sales_final %>%
   select(ain, sold_after_eaton_lac) %>% 
   mutate(lac_ain = ain) %>%
   left_join(xwalk, by = c("ain" = "ain_2026_08")) %>% # merge to get older ains jic anfs data is recording from prior ains
-  select(lac_ain, sold_after_eaton_lac, ain_2026_04, ain_2026_08)
+  select(lac_ain, sold_after_eaton_lac, ain_2025_01, ain_2026_04, ain)
 
 # check on duplicates after adding crosswalk
 nrow(lac_sales_records) - nrow(lac_sales_final)
@@ -205,10 +209,10 @@ xwalk %>% filter(ain_2026_08 %in% dup_check$lac_ain) %>% View()
 
 # check to make sure if any anfs parcels will get dropped and find no match
 anfs_missing <- anfs_sales %>% 
-  filter(!parcel %in% c(lac_sales_records$lac_ain,lac_sales_records$ain_2025_12,lac_sales_records$ain_2026_08))
+  filter(!parcel %in% c(lac_sales_records$lac_ain,lac_sales_records$ain_2025_01,lac_sales_records$ain_2026_08))
 # check against prior damage records
 damage <- dbGetQuery(con_alt, "SELECT * FROM data.rel_assessor_damage_level_sept2025")
-residential <- dbGetQuery(con_alt, "SELECT ain_2026_08, residential FROM data.rel_assessor_residential_2026_08") 
+residential <- dbGetQuery(con_alt, "SELECT ain_2026_08, residential FROM dashboard.rel_assessor_residential_2026_08") 
 anfs_missing <- anfs_missing %>% 
   left_join(damage,by=c("parcel"="ain_sept")) %>%
   left_join(residential,by=c("parcel"="ain_2026_08"))
@@ -217,7 +221,9 @@ anfs_missing <- anfs_missing %>%
 # explore anfs ains that get no match in our crosswalks - 
 # likely commercial or deleted parcels or in some cases typos
 anfs_missing %>% filter(is.na(damage_category)) %>% View() 
-
+# 8/06/2026
+# 13 came up as missing and when I checked then in the assessor portal, they came up as commercial, institutional, vacant, deleted, shell (like 5842008018), etc. basically not residential and active
+# 4/12/2026
 # update log of parcels that don't apply (e.g., commercial) or that have typos
 ## Don't apply because commercial or public land or vacant (in jan25) properties
 # 5845002015 - commercial (doesn't apply)
@@ -225,7 +231,7 @@ anfs_missing %>% filter(is.na(damage_category)) %>% View()
 # 5835038003 - commercial (doesn't apply)
 # 5862007300 - public land
 # 5841001014 - vacant land - was vacant in jan 2025 based on 'SELECT * FROM dashboard.assessor_data_universe_2025_01 where ain='5841001014'' so doesn't apply to universe
-
+# 4/12/2026
 ## Don't join because of typo or outdated AIN - All are manually
 ## addressed when loading in anfs in lines 147-152
 # 5843022001 - deleted (old ain from 2021) - should be: 5843022058 (manually fixed)
@@ -234,7 +240,7 @@ anfs_missing %>% filter(is.na(damage_category)) %>% View()
 # 5844012018,19 - 5844012018 - significant damage split (manually fixed)
 # 5844012018,19 - 5844012019 - no damage split (manually fixed)
 # 5482015020 - 5842015020 typo (manually fixed)
-
+# 4/12/2026
 ## Don't apply due to damage level
 # # 5751009007 - residential no damage on CalFire database - unclear why didn't match our september data
 # 5831005008 Some damage (doesn't apply) / Misfortune & Calamity Status: APPROVED (looks ok in photo) https://portal.assessor.lacounty.gov/parceldetail/5831005008
@@ -260,7 +266,7 @@ sales_merged <- lac_sales_records %>%
   # add prior ains from previous xwalks each update
   left_join(anfs_sales_records, by = c("lac_ain" = "anfs_ain")) %>%
   left_join(anfs_sales_records, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>%
-  left_join(anfs_sales_records, by = c("ain_2025_12" = "anfs_ain"), suffix = c("", "_c")) %>%
+  left_join(anfs_sales_records, by = c("ain_2026_04" = "anfs_ain"), suffix = c("", "_c")) %>%
   # coalesce anfs sales columns into one field
   mutate(anfs_sold_combined = coalesce(anfs_sold,
                                  anfs_sold_b,
@@ -279,10 +285,23 @@ sales_merged <- lac_sales_records %>%
 sales_merged %>% filter(is.na(anfs_sold) & !is.na(anfs_sold_b)) %>% View()
 table(sales_merged$sold_source)
 table(sales_merged$sold_after_eaton)
+#08/06/2026
+# anfs    both     lac neither 
+# 98     389      60    5130 
+# FALSE  TRUE 
+# 5130   547 
+# 04/12/2026
 # 73 + 340 + 43 = 456
 sales_merged %>% group_by(sold_source,anfs_sold_combined,sold_after_eaton_lac) %>% summarise(count=n())
+#08/06/2026
+# sold_source anfs_sold_combined sold_after_eaton_lac count
+# <chr>       <lgl>              <lgl>                <int>
+#   1 anfs        TRUE               FALSE                   98
+# 2 both        TRUE               TRUE                   389
+# 3 lac         FALSE              TRUE                    60
+# 4 neither     FALSE              FALSE                 5130
 
-# check for dups again
+# check for dupes again
 nrow(sales_merged) - nrow(lac_sales_records)
 # none extra
 
@@ -416,11 +435,11 @@ table_label <- paste0("rel_assessor_sales_", year, "_", month)
 schema <- "dashboard"
 indicator <- "Relational table with information on sales date and owner information using a combination of LAC assessor data and Altadena not for sale data
 We mark a property as sold if sale date was on or after 2-8-25 in either source. In cases where property is only marked as sold in ANFS data then we use the owner information and sales data from that file. In all other cases, we use LAC assessor"
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_sales.R "
+source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/AB/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_sales.R "
 qa_filepath<-"  QA_Sheet_rel_tables_update_2026_08.docx "
 
-# dbWriteTable(con_alt, Id(schema, table_label), final_df,
-#                          overwrite = FALSE, row.names = FALSE)
+ # dbWriteTable(con_alt, Id(schema, table_label), final_df,
+ #                          overwrite = FALSE, row.names = FALSE)
 
 
 # Add metadata
@@ -435,7 +454,7 @@ column_comments <- c('ain for current month- use to match to other tables',
         'sold amount - note sold amount from LAC assessor might be inaccurate - unverified sales are recorded, meaning final sale price could be different in other sources',
          'owner name - from lac assessor if source is lac assessor or both and from anfs if source of sale is anfs')
 
-# add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
+ # add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
 
 #### PART 8: close dbconnection (NO UPDATES NEEDED) ####
