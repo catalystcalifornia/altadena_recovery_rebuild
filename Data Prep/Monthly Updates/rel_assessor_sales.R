@@ -116,7 +116,7 @@ na_sale_date <- lac_sales %>%
   select(last_sale_date_orig, last_sale_year,recording_date, doc_reason_code, land_reason_key, everything()) %>%
   filter(is.na(last_sale_year))
 
-# 08/06/2026 Notes: 31 obs, similarly ones that sold before Eaton. so assume false for 0 or missing
+# 08/06/2026 Notes: 25 obs, similarly ones that sold before Eaton. so assume false for 0 or missing
 # 04/12/2026 Notes:
 # those with a sales date originally have errors in the sales date or are missing a date, but sold prior to 2025
 # looking at recording date, only one had a recording date in 2025, 
@@ -195,6 +195,14 @@ lac_sales_records <- lac_sales_final %>%
   left_join(xwalk, by = c("ain" = "ain_2026_08")) %>% # merge to get older ains jic anfs data is recording from prior ains
   select(lac_ain, sold_after_eaton_lac, ain_2026_04, ain_2026_08)
 
+# JZ QA: Line 196 produces an error because ain_2026_08 does not exist anymore because you join on this. So now the only column in there is ain:
+lac_sales_records <- lac_sales_final %>% 
+  select(ain, sold_after_eaton_lac) %>% 
+  mutate(lac_ain = ain) %>%
+  left_join(xwalk, by = c("ain" = "ain_2026_08")) %>% # merge to get older ains jic anfs data is recording from prior ains
+  select(lac_ain, sold_after_eaton_lac, ain_2026_04, ain)%>% # remove ain_2026_08
+rename("ain_2026_08"="ain") # rename back to ain_2026_08
+
 # check on duplicates after adding crosswalk
 nrow(lac_sales_records) - nrow(lac_sales_final)
 dup_check <- lac_sales_records %>% count(lac_ain) %>% filter(n>1)
@@ -208,7 +216,7 @@ anfs_missing <- anfs_sales %>%
   filter(!parcel %in% c(lac_sales_records$lac_ain,lac_sales_records$ain_2025_12,lac_sales_records$ain_2026_08))
 # check against prior damage records
 damage <- dbGetQuery(con_alt, "SELECT * FROM data.rel_assessor_damage_level_sept2025")
-residential <- dbGetQuery(con_alt, "SELECT ain_2026_08, residential FROM data.rel_assessor_residential_2026_08") 
+residential <- dbGetQuery(con_alt, "SELECT ain_2026_08, residential FROM dashboard.rel_assessor_residential_2026_08") # JZ QA: change schema to dashboard
 anfs_missing <- anfs_missing %>% 
   left_join(damage,by=c("parcel"="ain_sept")) %>%
   left_join(residential,by=c("parcel"="ain_2026_08"))
@@ -219,6 +227,13 @@ anfs_missing <- anfs_missing %>%
 anfs_missing %>% filter(is.na(damage_category)) %>% View() 
 
 # update log of parcels that don't apply (e.g., commercial) or that have typos
+
+# JZ QA notes:
+# 5835038003 - commercial (doesn't apply)
+# 5841032019 - commercial (doesn't apply)
+# 5845002015 - commercial (doesn't apply)
+# 5835014001 - Auto service
+
 ## Don't apply because commercial or public land or vacant (in jan25) properties
 # 5845002015 - commercial (doesn't apply)
 # 5841032019 - commercial (doesn't apply)
@@ -259,8 +274,8 @@ sales_merged <- lac_sales_records %>%
   # join anfs records based on each ain field date in the crosswalk, add suffix after 2nd join
   # add prior ains from previous xwalks each update
   left_join(anfs_sales_records, by = c("lac_ain" = "anfs_ain")) %>%
-  left_join(anfs_sales_records, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>%
-  left_join(anfs_sales_records, by = c("ain_2025_12" = "anfs_ain"), suffix = c("", "_c")) %>%
+  left_join(anfs_sales_records, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>% ###  JZ QA: this does not run for me. I don't see ain_2025_01 in the lac_sales_records df 
+  left_join(anfs_sales_records, by = c("ain_2025_12" = "anfs_ain"), suffix = c("", "_c")) %>% ### JZ QA: I don't see ain_2025_12 in lac_sales_record
   # coalesce anfs sales columns into one field
   mutate(anfs_sold_combined = coalesce(anfs_sold,
                                  anfs_sold_b,
