@@ -46,7 +46,7 @@ test_chromote()
 # 2. If above works, try to extract data from one test url to get general data fields
 url_ <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=2204%20Grand%20Oaks%20Avenue"
 message(paste("Current search URL:", url_))
-permits <- scrape_permits_chromote(url=url_, wait_time = 30)
+permits <- scrape_permits_chromote_json(url=url_, wait_time = 30)
 
 # 3. If above works, scale it up to loop through a list of AINS and return all permits (with general data fields)
 csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", table_name, ".csv")
@@ -97,7 +97,7 @@ if (nrow(remaining)> 0){
     tryCatch({
       message(paste("Scraping:", portal_url))
       
-      result <- scrape_permits_chromote(
+      result <- scrape_permits_chromote_json(
         url = portal_url,
         wait_time = 30,
         ain = row_ain,
@@ -163,6 +163,14 @@ if (nrow(remaining)> 0){
 final_data <- read.csv(csv_filepath,
                        encoding = "UTF-8",
                        colClasses = c("character"))
+
+# QA - spot check these to see if NAs are valid
+check_na <-final_data %>% filter(is.na(permit_number))
+# Make results reproducible
+set.seed(42)
+# Select 20 random rows (without replacement)
+random_rows <- check_na[sample.int(nrow(check_na), 20), ]
+# Confirmed all came back in EPIC LA portal with no permits
 
 # Export to pg
 con <- connect_to_db("altadena_recovery_rebuild")
