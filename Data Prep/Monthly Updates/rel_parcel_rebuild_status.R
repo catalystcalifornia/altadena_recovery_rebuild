@@ -44,13 +44,13 @@ con <- connect_to_db("altadena_recovery_rebuild")
 options(scipen = 999)
 date_ran <- as.character(Sys.Date())
 curr_xwalk_year <- "2026" # year
-curr_xwalk_month <- "04"
-prev_xwalk_month <- "12"
+curr_xwalk_month <- "08"
+prev_xwalk_month <- "04"
 schema <- "dashboard"
 curr_year <- "2026" # current update year
-curr_month <- "04" # current update month
-prev_year <- "2025" # prev update year
-prev_month <- "12" # prev update month
+curr_month <- "08" # current update month
+prev_year <- "2026" # prev update year
+prev_month <- "04" # prev update month
 
 ain_curr <- sprintf("ain_%s_%s", curr_year, curr_month)
 
@@ -82,6 +82,15 @@ ON gen.ain = wf.ain AND gen.permit_number = wf.permit_number;",
                                         schema, curr_year, curr_month))
 
 table(permits_orig$gen_status, useNA="ifany")
+# # Aug 2026
+# Approved Pending Clearances   Approved Ready for Permit                    Canceled                      Denied 
+# 1359                        1277                         637                         372 
+# Exempt                     Expired                     Finaled                   In Review 
+# 616                         364                       20232                        2308 
+# Issued                         New                New - Online                     On Hold 
+# 67913                         367                         155                         650 
+# Void       Waiting for Applicant              Zoning Cleared                        <NA> 
+#   1631                        2687                           6                        1739 
 
 # look at permit numbers
 permits_substring <- permits_orig %>%
@@ -90,9 +99,11 @@ permits_substring <- permits_orig %>%
          
 table(permits_substring$permit_sub)
 # CREB County Disaster recovery Permit Rebuild Project
-# FCD Flood access/construction permit
+# FCDP Flood access/construction permit
 # FCR Construction & Demolition Final Compliance
+# FDR Fire debris removal
 # FIRE tree removal
+# FILM Filming - varies for location (road, flood, etc.)
 # PROP Property report
 # PWRP Road permits
 # RRP Construction & Demolition Deposit
@@ -100,6 +111,10 @@ table(permits_substring$permit_sub)
 # UNC- Mechanical, Plumbing, Electrical permits (and building permits for SFR, MFR, Temporary Housing, Commercial buildings, etc.)
 
 table(permits_substring$permit_sub_unc)
+# August 2026
+# UNC-BLDC UNC-BLDF UNC-BLDG UNC-BLDM UNC-BLDR UNC-ELEC UNC-EXPR UNC-GRAD UNC-MECH UNC-PLMB UNC-PLSP UNC-SEWR UNC-SOLR 
+# 53      203     1718       17    36377    11809      497      362     5833     7037      749     4924      872 
+
 # April 2026
 # UNC-BLDC UNC-BLDF UNC-BLDG UNC-BLDM UNC-BLDR UNC-ELEC UNC-EXPR UNC-GRAD UNC-MECH UNC-PLMB UNC-PLSP UNC-SEWR UNC-SOLR 
 # 49      231     1350       26    36138    10245      442      305     5695     6718      418     4182      816 
@@ -137,10 +152,11 @@ debris_transformed <- debris_usace %>%
   
 
 # check length and NAs
-length(unique(debris_transformed$ain))
-length(unique(debris_transformed$ain_2025_12))
+length(unique(debris_transformed$ain)) #5673 (jan ain)
+length(unique(debris_transformed$ain_2026_04)) #5673 (prev ain)
+length(unique(debris_transformed$ain_2026_08)) # 5673 (curr ain)
 debris_transformed %>% group_by(ain) %>% filter(n()>1)
-# one duplicate ain 5842008010
+# one duplicate ain 5842008010 - same in Aug 2026
 
 # get army corps fire debris removal status
 debris_status <- debris_transformed %>%
@@ -154,20 +170,22 @@ debris_status <- debris_transformed %>%
   rename(ain=all_of(ain_curr))
 
 length(unique(debris_status$ain)) # 5673
-debris_status %>% group_by(ain)%>% filter(n()>1)
+debris_status %>% group_by(ain)%>% filter(n()>1) #0
 table(debris_status$b1_has_ace_fso, useNA="ifany")
-# Dec Update 2025: 0    1 
-#             396 5277 
-# March 2026 Prelim: 0    1 
-#               396 5277 
+# August 2026
+# same again 
 # April 2026
 # same - can probably make this a permanent pg table?
+# March 2026 Prelim: 0    1 
+#               396 5277 
+# Dec Update 2025: 0    1 
+#             396 5277 
+
+
 
 # Filter permits for applied date after Jan 7, 2025
 permits_filtered <- permits_orig %>%
-  # note: this filter happens in the general permit scraping script - we can remove but leaving for now while we prep the December update
   filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
-  # filter out voided, canceled, denied permits - also applied in permit scraping
   filter(!(gen_status %in% c("Void", "Canceled", "Denied"))) %>%
   mutate(is_creb = ifelse(grepl("^CREB", permit_number), 1, 0)) 
 
@@ -179,52 +197,46 @@ parcels_creb <- check_creb %>% select(ain, has_creb) %>% unique()
 
 # check number of creb permits
 table(permits_filtered$is_creb,useNA='always')
-# Dec 2025 update 2081 CREB permits
-# March 2026 Prelim 5342 CREB permits
+# August 2026 update 14631 CREB (massive increase - doubled in 4 months)
 # April 2026 update 7196 CREBs
+# March 2026 Prelim 5342 CREB permits
+# Dec 2025 update 2081 CREB permits
 
 # check status to make sure no new statuses to filter out
 table(permits_filtered$gen_status, useNA="ifany")
 
 nrow(permits_filtered) 
-# 48360
-# March 2026 prelim: 65122
+# August 2026: 88419
 # April 2026: 74829
+# March 2026 prelim: 65122
+# 48360
 
 # permit xwalk - need to have the same ain across datasets to group by the correct current parcel
 permit_xwalk <- permits_filtered %>% 
-  distinct(ain) %>% # 3250
+  distinct(ain) %>% # 3024
   mutate(ain_curr = transform_ain_to_curr(ain, xwalk_parcels, curr_ain = ain_curr))
-  # # transform to dec ains
-  # # first join to jan ains to get a match in the xwalk that way
-  # left_join(xwalk_parcels %>% select(starts_with("ain_")), by=c("ain"="ain_2025_01")) %>%
-  # # some ains may be the new december or september ain so try a match that way next
-  # left_join(xwalk_parcels %>% select(starts_with("ain_")), by=c("ain"="ain_2025_12")) %>%
-  # # recode everything to december
-  # mutate(ain_2025_12_orig=ain_2025_12,
-  #   ain_2025_12=case_when(!is.na(ain_2025_12_orig) ~ ain_2025_12_orig,
-  #                      is.na(ain_2025_12_orig) ~ ain,
-  #                      TRUE ~ NA))
 
 # now add xwalk to permits filtered
 permits_filtered_curr_ains <- permits_filtered %>%
   left_join(permit_xwalk %>% select(ain, ain_curr), by=c("ain"="ain"))
 
-# march prelim: above returns many to many warnings - makes sense since one ain can have multiple permits?
-check <- permits_filtered_curr_ains %>%
-  group_by(ain) %>%
-  filter(n()>1)
+# # march prelim: above returns many to many warnings - makes sense since one ain can have multiple permits?
+# check <- permits_filtered_curr_ains %>%
+#   group_by(ain) %>%
+#   filter(n()>1)
 
 # check
 sum(is.na(permits_filtered_curr_ains$ain_curr))
-# no NAs
-# March prelim: no NAs
+# August 2026: No NAs
 # April 2026: No NAs
+# March prelim: no NAs
+# no NAs
 
 length(unique(permits_filtered_curr_ains$ain_curr))
-# 2640
-# March prelim: 3149
+# August 2026: 3024 (number has decreased?)
 # April 2026: 3249
+# March prelim: 3149
+# 2640
 
 permits_filtered_curr_ains <- permits_filtered_curr_ains %>%
   rename(ain_scrape=ain,
@@ -232,7 +244,9 @@ permits_filtered_curr_ains <- permits_filtered_curr_ains %>%
 
 # check for NAs in WF status data
 sum(is.na(permits_filtered_curr_ains$wf_status_date))
+# August 2026: 890
 sum(is.na(permits_filtered_curr_ains$wf_status))
+# August 2026: 890
 
 # get workflow items and add has_inspection (will use for the bucket 3 check - construction has started)
 workflow_all <- permits_filtered_curr_ains %>% 
@@ -262,33 +276,44 @@ workflow <- workflow_all %>%
   select(ain, permit_number, b3_has_inspection) %>%
   unique() 
 
-# 7679 
-# march prelim: 10097
+# august 2026: 11842
 # april 2026: 11134
+# march prelim: 10097
+# 7679 
 
 # check counts and recoding
 check <- workflow %>% group_by(ain,permit_number) %>% summarise(count=n())
 workflow %>% distinct(ain,permit_number) %>% nrow() 
-# 7679 # should match number of rows in workflow df
+# should match number of rows in workflow df
+# august 2206: 11842
 # april 2026: 11134
+# 7679 
+
 length(unique(workflow$permit_number)) 
-#7610, permit numbers are not necessarily unique - a permit can be associated be associated with multiple ains and have multiple workflow items (inspections, etc.)
-# March prelim: 10097 unique permit-ain combos; 10029 unique permit numbers 
+# permit numbers are not necessarily unique - a permit can be associated be associated with multiple ains and have multiple workflow items (inspections, etc.)
+# August 2026: 11774
 # April 2026:  11064
+# March prelim: 10097 unique permit-ain combos; 10029 unique permit numbers 
+# 7610
+
 
 # check result
 table(workflow$b3_has_inspection, useNA = "ifany")
-# Dec Update
+# August 2026 (more evenly split than previous updates, more inspections)
 # 0    1 
-# 5724 1955 
+# 5766 6076 
+
+# April 2026
+# 0    1 
+# 7212 3922
 
 # March prelim
 # 0    1 
 # 6833 3264
 
-# April 2026
+# Dec Update
 # 0    1 
-# 7212 3922
+# 5724 1955 
 
 # permit level data
 # key words used to determine permits related to residential permanent housing
@@ -378,6 +403,17 @@ permits %>%
   filter(b1_has_fdr==1) %>%
   View()
 
+# August 2026
+# There are expired FDR permits (issued date was over a year ago) with statuses other than Void like: Approved Pending Clearances, Approved Ready for Permit - may want to check in QA
+# 5846016052
+# 5845027008
+# There are FDR permits with status like New, New-online - most applied for over a year ago - probably fine but should check in QA
+# 3 of these were also marked as unpermitted?
+# 5828001012
+# 5844024018
+# 5846008034
+# 5845032008
+
 ## finaled
 permits %>%
   filter(b4_has_finaled==1) %>%
@@ -398,7 +434,7 @@ permits %>%
   filter(b4_has_finaled_misc==1) %>%
   View()
 # Creb permit in here, but for garage, consider how we mark garages complete? All complete rebuilds of garages have type - 	
-# Residential New Construction Building Permit - County
+# Residential New Construction Building Permit - County - many relate to garages or ADUs
 
 ## misc repairs that may not be substantial to count as completed repair
 permits %>%
@@ -418,28 +454,33 @@ check <- permits %>% filter(gen_status %in% c("Exempt")) %>%
   left_join(select(permits_substring, ain, permit_number, permit_sub), by=c("ain", "permit_number")) %>%
   group_by(permit_sub) %>%
   summarize(count=n()) 
-View(check) # 1 UNC- is UNC-GRAD (misc permit), all remaining are "other" permits (e.g., RRP - Construction/Demolition deposit)
+View(check) 
+# 1 NA permit-sub? Permit: RRP012026-0187 (sub should be RRP0? and is in permits_substring but not in the join?)
+## looking closer permits_substring has ain and main parcel as 5841023010
+## however permits has ain as 5841023022 so the record isn't matching properly - leaving for now
+# All UNC- is UNC-GRAD (misc permit), all remaining are "other" permits (e.g., RRP - Construction/Demolition deposit, FCR)
 permits %>% filter(gen_status %in% c("Exempt")) %>% View()
-# march 2026 prelim note: one of above is FRP (fire debris removal permit for properties that opted out of government-run program)
+# august 2026: 5 unc grading permits
 # april 2026 4 unc permits that are for grading and they have a finaled date - will these count against a finaled construction?
+# march 2026 prelim note: one of above is FRP (fire debris removal permit for properties that opted out of government-run program)
+
 
 # check counts for dups
 # permit number and ain combos
-nrow(permits)  # 8743 # march 2026: 11573 # april 2026: 12358
-n_distinct(permits$permit_number, permits$ain) # 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355 - should match above
+nrow(permits)  # 8743 # march 2026: 11573 # april 2026: 12358 # august 2026: 13036
+n_distinct(permits$permit_number, permits$ain) # 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355 # august 2026: 13036 - should match above
 n_distinct(permits_filtered_curr_ains$permit_number, permits_filtered_curr_ains$ain) 
-# 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355
+# 8715 unique ain/permit pairs # march 2026: 11570 # april 2026: 12355 # august 2026: 13036
 # unique permits
-length(unique(permits$permit_number)) # 8642 multiple rows per permit # march 2026: 11496 # april 2026: 12280
-length(unique(permits_filtered_curr_ains$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
-length(unique(permits$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280
-
-# length(unique(permits$ain)) # 2640 multiple rows per ain which makes sense # march 2026:3149 # april 2026: 3249 - delete?
+length(unique(permits$permit_number)) # 8642 multiple rows per permit # march 2026: 11496 # april 2026: 12280 # august 2026: 12964
+length(unique(permits_filtered_curr_ains$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280 # august 2026: 12964
+length(unique(permits$permit_number)) # 8642 # march 2026: 11496 # april 2026: 12280 # august 2026: 12964
 
 # explore duplicates
-duplicate <- permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56 # march 2026: 6 # april 2026: 6
+duplicate <- permits %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56 # march 2026: 6 # april 2026: 6 # august 2026: 0
 # includes duplicates where some permits have a blank description 
-# now (march 2026): duplicates are just 3 pairs of permits for the same pair of AIN: 5841023022 (active, created 5/23/25) and 5841023010 (deleted 5/23/25)
+# august 2026: no duplicates
+# march 2026: duplicates are just 3 pairs of permits for the same pair of AIN: 5841023022 (active, created 5/23/25) and 5841023010 (deleted 5/23/25)
 # https://portal.assessor.lacounty.gov/parceldetail/5841023010
 # https://portal.assessor.lacounty.gov/parceldetail/5841023022
 # april 2026: same as from march 2026
@@ -454,8 +495,8 @@ dupes_to_keep <- permits  %>%
   # prev dec 2025: filter(!is.na(description)) 
 
 # check deduped work
-n_distinct(duplicate$permit_number, duplicate$ain) # 28 unique ain/permit pairs; march 2026: 3 # april 2026: 3
-n_distinct(dupes_to_keep$permit_number, dupes_to_keep$ain) # 28 unique ain/permit pairs ; march 2026: 3 # april 2026: 3
+n_distinct(duplicate$permit_number, duplicate$ain) # 28 unique ain/permit pairs; march 2026: 3 # april 2026: 3 # august 2026: 0
+n_distinct(dupes_to_keep$permit_number, dupes_to_keep$ain) # 28 unique ain/permit pairs ; march 2026: 3 # april 2026: 3 # august 2026: 0
 # checks out
 
 permits_deduped <- permits %>%
@@ -465,9 +506,9 @@ permits_deduped <- permits %>%
 # add records we are keeping
 permits_deduped <- rbind(permits_deduped,dupes_to_keep)
 
-nrow(permits_deduped) #8716; march 2026: 11570 # april 2026: 12355
-n_distinct(permits_deduped$permit_number, permits_deduped$ain) # 8715 unique ain/permit pairs; march 2026: 11570 # april 2026: 12355
-duplicate <- permits_deduped %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56; ; march 2026: 0 # april 2026: 0
+nrow(permits_deduped) #8716; march 2026: 11570 # april 2026: 12355 # august 2026: 13036
+n_distinct(permits_deduped$permit_number, permits_deduped$ain) # 8715 unique ain/permit pairs; march 2026: 11570 # april 2026: 12355 # august 2026: 13036
+duplicate <- permits_deduped %>% group_by(permit_number,ain) %>% filter(n()>1) # - 56; ; march 2026: 0 # april 2026: 0 # august 2026: 0
 # Jan note - RRP permit won't matter later, and due to 5841023022 which merged 2 parcels, original permit from original parcel
 
 # get distinct parcels from xwalk
@@ -487,22 +528,29 @@ combined_wf <- parcels_df %>%
   unique()
 
 table(combined_wf$b3_has_inspection, useNA = "ifany")
-# Dec Update
+# August 2026
 # 0    1 
-# 4811  865 
-# March 2026 Update
-# 0    1 
-# 4431 1245 
+# 3885 1791
+
 # April 2026 Update
 # 0    1 
 # 4263 1413
 
+# March 2026 Update
+# 0    1 
+# 4431 1245 
+
+# Dec Update
+# 0    1 
+# 4811  865 
 
 # check
 nrow(parcels_df) 
-# 5676 - should be 5676 (number of distinct 12/2025 ains); 
-# same for 03/2026 (expected because parcels not updated yet)
+# august 2026: 5676 - same as n_distinct(xwalk_parcels$ain_2026_08)
 # april 2026 5676 - same as n_distinct(xwalk_parcels$ain_2026_04)
+# same for 03/2026 (expected because parcels not updated yet)
+# 5676 - should be 5676 (number of distinct 12/2025 ains); 
+
 nrow(combined_wf) # 5676
 length(unique(combined_wf$ain)) # 5676 distinct row per ain, no dups
 
@@ -630,9 +678,14 @@ dups <- combined_parcels %>%
 cols_sums <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% select(where(is.numeric)) %>% colSums(na.rm=TRUE) %>% as.data.frame()
 
 qa_view <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% select(sort(names(.)))
+# august 2026: 3 ains have commercial permits, the newest one seems to operate partially towards a business (Apricoty)
+# overall I don't think we need to intervene
+# 5845020008 (same as last time, though looking at a zoning map and there it's in a Zone c-3)
+# 5843029046 https://portal.assessor.lacounty.gov/parceldetail/5843029046
+# 5828018003 (same as last time)
 
 # april 2026: two ains have commercial permits but are still residential in Assessor portal
-# both seem to be related to getting new addresses for a structure on the parcel
+# both seem to be related to getting new addresses for a structure on the parcel (ADU, 2 story apt)
 # https://portal.assessor.lacounty.gov/parceldetail/5845020008
 # https://portal.assessor.lacounty.gov/parceldetail/5828018003
 
@@ -720,6 +773,11 @@ check <- as.data.frame(table(check_final_creb$has_creb, check_final_creb$rebuild
 # see above - parcels with CREBs are only associated with construction phase (none are "Rebuild Complete")
 
 table(final_types$rebuild_status, useNA = "ifany")
+# August 2026
+# Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
+# 1676                            1161                             100*                            2660*
+# Repairs or Rebuild Complete 
+# 79
 
 # Apr 2026
 # Construction In Progress        Construction Not Started  Fire Debris Removal Incomplete Permit Application Not Received 
@@ -741,10 +799,13 @@ table(final_types$rebuild_status, useNA = "ifany")
 
 
 table(final_types$dashboard_label, useNA = "ifany")
+# August 2026
+# Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications
+# 100                                                 1676                             79                         1161                           2660
 
 # Apr 2026
 # Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications
-# 16                                                  1338                             37                           1698                         2587
+# 16                                                  1338                             37                         1698                           2587
 
 # Mar 2026
 # Fire Debris Removal Incomplete                In Construction    Repairs or Rebuild Complete       With Permit Applications    Without Permit Applications 
@@ -762,7 +823,7 @@ length(unique(final_types$ain))
 # check those with fire debris removal still incomplete
 permits_deduped %>% filter(ain %in% (final_types %>% 
                                        filter(rebuild_status == "Fire Debris Removal Incomplete") %>%
-                                       pull(ain))) %>% View() # looks fine
+                                       pull(ain))) %>% View() # looks fine - there are 2 but confirmed no build permits
 
 debris_usace  %>% filter(ain %in% (final_types %>% 
                                       filter(rebuild_status == "Fire Debris Removal Incomplete") %>%
@@ -781,16 +842,38 @@ prev_labels <- dbGetQuery(con, sprintf("SELECT * FROM %s.rel_parcel_rebuild_stat
                                          schema, prev_year, prev_month))
 
 check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
-  left_join(prev_labels %>% rename(prev_label=dashboard_label), by=c("ain"="ain")) %>%
+  left_join(prev_labels %>% rename(prev_label=dashboard_label), by=c("ain"="ain"), suffix = c("_curr", "_prev")) %>%
   mutate(change_summary=case_when(
     curr_label==prev_label ~ 'unchanged',
     curr_label == 'Repairs or Rebuild Complete' & prev_label != 'Repairs or Rebuild Complete' ~ 'new rebuild complete',
     curr_label != 'Repairs or Rebuild Complete' & prev_label == 'Repairs or Rebuild Complete' ~ 'reverted - QA to figure out why',
     .default='something else?')) %>%
-  filter(prev_label == 'Repairs or Rebuild Complete' | curr_label == 'Repairs or Rebuild Complete')
+  filter(prev_label == 'Repairs or Rebuild Complete' | curr_label == 'Repairs or Rebuild Complete') %>%
+  select(ain, change_summary, prev_label, curr_label, everything())
+
+table(check_rebuild_changes$change_summary)
+
+# August 2026
+# new rebuild complete      reverted - QA to figure out why           unchanged 
+# 51                                      8                              28 
+
+new_rebuild <- check_rebuild_changes %>% filter(change_summary=="new rebuild complete")
+# 5831010012 jumped from With Permit Applications but looks ok (1 CREB to build a shed is finaled); assessor portal confirms damage to garage. Could be categorized as a repair in future updates
+# 5846024052 jumped from Without Permit Applications- seems premature a misc/minor structure was fully damaged and permits do not account for it being rebuilt, also permits don't mention fire damage but perhaps fine that this has repairs complete? (seems similar to 5846008016 below)
+# 5829016053 jumped from In Construction but has no permanent rebuild permits - confirmed ok, garage rebuild matches assessor maps
+# 5847009004 jumped from In Construction but has no permanent rebuild permits - confirmed ok, garage rebuild matches assessor maps
+
+reverted <- check_rebuild_changes %>% filter(change_summary=="reverted - QA to figure out why")
+# "5832023013" / FDR Incomplete but has a finaled FDR: FDR2025001275 - Assessor map also confirms should be rebuild complete
+# "5845005020" / Without Permit App
+# "5846006027" / Without Permit App
+# "5846022028" / Without Permit App
+# "5829018039" / In Construction
+# "5833004047" / In Construction
+# "5840008022" / In Construction
+# "5844028003" / In Construction
 
 
-### those flagged as completed make sense based on types of permits or further refinement might be needed
 # April 2026
 
 # looks better one parcel questionable still 	5846008016
@@ -829,6 +912,7 @@ check_rebuild_changes <- final_types %>% rename(curr_label=dashboard_label) %>%
 # final_types_clean <- rbind(final_types_drop, manual_reassign)
 # table(final_types_clean$rebuild_status, useNA="always")
 # table(final_types_clean$dashboard_label, useNA="always")
+
 
 ##### Export to postgres #####
 con <- connect_to_db("altadena_recovery_rebuild")
@@ -886,11 +970,9 @@ column_comments <- c(
   "Label for dashboard")
 
 # # Now write the table
-# dbWriteTable(con, Id(schema=schema, table=table_name), final_types_clean,
-#              overwrite = FALSE, row.names = FALSE)
-
-
-# add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
+dbWriteTable(con, Id(schema=schema, table=table_name), final_types,
+             overwrite = FALSE, row.names = FALSE)
+add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
 
 
 dbDisconnect(con)
