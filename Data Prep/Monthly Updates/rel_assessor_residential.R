@@ -126,7 +126,7 @@ final_res_data <- rel_res_df %>%
   mutate(address=ifelse(address=="0 0", NA, address)) %>%
   select(ain, residential, mixed_use, res_type, total_units, landlord_units, total_square_feet, total_bedrooms, address, use_code, zoning_code) %>%
   rename(ain_2026_08 = ain)
-
+  
 # Add missing parcels (UPDATE)
 final_missing_data <- missing_data %>% select(starts_with("ain"))%>% 
   left_join(xwalk_prev %>% select(starts_with("ain"), starts_with("use_code")), by=c("ain_2026_04"="ain_2026_04"))
@@ -152,6 +152,14 @@ final_missing_data <- final_missing_data %>%
          mixed_use=ifelse(str_detect(use_code, "^121") | str_detect(use_code, "^172"), TRUE, FALSE))
 
 final_res_data <- bind_rows(final_res_data,final_missing_data)
+
+# individually update ain 5842008017 (08/06/2026 Update)
+update_row <- final_res_data %>% # replace df with the correct df name
+  filter(ain_2026_08 == '5842008010') %>% 
+  mutate(ain_2026_08 = '5842008017') #needs to be single = to replace
+
+final_res_data <- final_res_data %>%  # replace df with the correct df name
+  rows_update(update_row, by = "ain_2026_08")
 
 # check for duplicates
 nrow(final_res_data)-length(unique(final_res_data$ain_2026_08)) # should be 0 difference
