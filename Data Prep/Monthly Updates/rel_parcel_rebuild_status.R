@@ -412,7 +412,28 @@ permits %>%
 ## 5751003007
 ## 5829017005
 
-## finaled
+# JZ QA notes: I look up these AINs on the la county epic permit portal: https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=10&pn=1&em=true&st=5828001012 
+
+# August 2026
+## There are expired FDR permits (issued date was over a year ago) with statuses other than Void like: Approved Pending Clearances, Approved Ready for Permit - may want to check in QA
+## 5846016052 ---this has 'Approved Pending Clearance' status online, for "Phase 2 Removal and Disposal of hardscapes" 
+## 5845027008 --- this has 'Approved Ready for Permit' for ' removal of fire debris, concrete foundation, hardscape, landscape and shrub' so seems like these things weren't actually done yet?
+
+## There are 6 FDR permits with status like New, New-online - most applied for over a year ago - probably fine but should check in QA
+## 5 of these were also marked as unpermitted?
+
+## 5828001012 --this status says 'Finaled' and seems to be the only one recent. So maybe this is the only one that raises a flag. 
+
+## 5844024018 --this says 'Status Void' but from 08/11/2025
+## 5846008034 --this says 'Status New' but from 10/27/2025 
+## 5845032008 --- same as above ^ 
+## 5751003007 --this says 'Status New' but from 08/07/2025
+## 5829017005 -- this says 'Status New' but from 09/09/2025
+
+# I agree these are fine since they are from such a long time ago
+
+
+## finaled --JZ notes: I see 5828001012 in here as I expect so I think everything is fine 
 permits %>%
   filter(b4_has_finaled==1) %>%
   View()
@@ -674,6 +695,8 @@ cols_sums <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% s
 qa_view <- combined_parcels %>% select(starts_with("b"),"total_permits") %>% select(sort(names(.)))
 # august 2026: 3 ains have commercial permits, the newest one seems to operate partially towards a business (Apricoty)
 # overall I don't think we need to intervene
+## JZ QA notes: Agree about not intervening. Interestingly all 3 of these addresses look like houses on google maps so they are maybe home based businesses? 
+
 # 5845020008 (same as last time, though looking at a zoning map and there it's in a Zone c-3)
 # 5843029046 https://portal.assessor.lacounty.gov/parceldetail/5843029046
 # 5828018003 (same as last time)
@@ -754,7 +777,7 @@ final_types <- parcels_df %>%
     )
   )
 
-# check column sums - compare to cols_sums dataframe to see if NA's were handled right
+# check column sums - compare to cols_sums dataframe to see if NA's were handled right --Aug 2026 looks good
 cols_sums_check_2 <- final_types %>% select(starts_with("b"),"total_permits") %>% select(where(is.numeric)) %>% colSums(na.rm=TRUE) %>% as.data.frame()
 
 table(final_types$bucket_1_status, useNA="ifany")
@@ -826,12 +849,25 @@ debris_usace  %>% filter(ain %in% (final_types %>%
 # review repairs or rebuild complete
 completed <- final_types %>% filter(dashboard_label=='Repairs or Rebuild Complete')
 
+
 rebuild_check <- combined_parcels_all %>% filter(ain %in% completed$ain)
 
 rebuild_check_full <- permits_deduped_final %>% filter(ain %in% completed$ain) %>% select(ain, permit_number, description, everything())
 ### QA - SKIM THESE TWO VIEWS REBUILD_CHECK and REBUILD_CHECK_FULL to make sure 
 
-# check against old labels for changes-finish updating this here so it works before export
+# JZ QA Notes:
+
+# 47 observations have b4_has_finaled==0 even though they got the dashboard label 'Repairs or Rebuild Complete'
+rebuild_check%>%
+  filter(b4_has_finaled==0)%>%
+  View()
+
+rebuild_check_full%>%
+  filter(b4_has_finaled==0)%>%
+  View()
+
+
+rebuild_check# check against old labels for changes-finish updating this here so it works before export
 prev_labels <- dbGetQuery(con, sprintf("SELECT * FROM %s.rel_parcel_rebuild_status_%s_%s;",
                                          schema, prev_year, prev_month))
 
