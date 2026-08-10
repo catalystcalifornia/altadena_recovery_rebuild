@@ -3,9 +3,12 @@
 # scraping these sites.
 
 library(dplyr) 
+library(furrr)
+library(future)
 
 source("W:\\RDA Team\\R\\credentials_source.R")
 source("Data Prep\\Monthly Updates\\scraping_functions.R")
+on.exit(cleanup_all_temp(), add = TRUE) # clean up temp files when script closes
 
 con <- connect_to_db("altadena_recovery_rebuild")
 schema <- "dashboard"
@@ -41,9 +44,9 @@ dbDisconnect(con)
 test_chromote()
 
 # 2. If above works, try to extract data from one test url to get general data fields
-url_ <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=10&pn=1&em=true&st=2204%20Grand%20Oaks%20Avenue"
+url_ <- "https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=2204%20Grand%20Oaks%20Avenue"
 message(paste("Current search URL:", url_))
-permits <- scrape_permits_chromote(url=url_, wait_time = 30)
+permits <- scrape_permits_chromote_json(url=url_, wait_time = 30)
 
 # 3. If above works, scale it up to loop through a list of AINS and return all permits (with general data fields)
 csv_filepath <- paste0("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Permit Data Prepped\\", table_name, ".csv")
@@ -66,10 +69,8 @@ if (file.exists(csv_filepath)) {
   
   remaining <- data.frame(ain=setdiff(ains_list, scraped_ains))
   
-  
 } else {
   print("there's no csv with that name - starting scrape from the beginning")
-  
   remaining <- data.frame(ain=ains_list)
   
 }
@@ -80,25 +81,66 @@ gc()
 first_write_this_session <- !file.exists(csv_filepath)
 
 if (nrow(remaining)> 0){
-  for (row_ in 1:nrow(remaining)) { 
-    
-    row_ain <- remaining[row_, "ain"]
+  # Set up parallel processing with batches to manage memory
+  # Use fewer workers than cores to be respectful to the website
+  plan(multisession, workers = 8)
+  
+  # Parallel process in small batches to write incrementally and manage memory
+  batch_size <- 50  # Adjust based on your memory constraints - this is 50 AINs
+  batches <- split(remaining, ceiling(seq_len(nrow(remaining)) / batch_size))
+  
+  # Parallel process - define function to scrape one ain
+  scrape_one_ain <- function(row_data) {
+    row_ain <- row_data$ain
     portal_url <- paste0(lac_permits_url, row_ain)
     
-    message(paste(row_, ":", portal_url))
-    result <- scrape_permits_chromote(
-      url=portal_url, 
-      wait_time = 30,
-      ain = row_ain, 
-      max_retries = 1, 
-      retry_wait_time = 60)
+    tryCatch({
+      message(paste("Scraping:", portal_url))
+      
+      result <- scrape_permits_chromote_json(
+        url = portal_url,
+        wait_time = 30,
+        ain = row_ain,
+        max_retries = 1,
+        retry_wait_time = 60
+      )
+      
+      Sys.sleep(1)  # Still be polite even in parallel
+      
+      return(data.frame(result))
+      
+    }, error = function(e) {
+      message(paste("Error scraping", row_ain, ":", e$message))
+      return(data.frame(
+        ain = row_ain,
+        response_status = "error",
+        error_message = e$message
+      ))
+    })
+  }
+  
+  # Process batches
+  for (i in seq_along(batches)) {
+    message(paste("\n=== Processing batch", i, "of", length(batches), "==="))
     
+    current_batch <- batches[[i]]
     
-    # Write initial data (with header)
-    write.table(result,
-                file = csv_filepath,
-                sep = ",",
-                row.names = FALSE,
+    # Scrape this batch in parallel
+    batch_results <- future_map(
+      split(current_batch, seq_len(nrow(current_batch))),
+      scrape_one_ain,
+      .options = furrr_options(seed = TRUE),
+      .progress = TRUE
+    )
+    
+    # Extract results from this batch
+    batch_data <- bind_rows(batch_results)
+    
+    # Write this batch to CSV (append mode after first write)
+    write.table(batch_data, 
+                file = csv_filepath, 
+                sep = ",", 
+                row.names = FALSE, 
                 col.names = first_write_this_session,  # Headers only on first write
                 append = !first_write_this_session,    # Don't append on first write
                 fileEncoding = "UTF-8",
@@ -108,17 +150,29 @@ if (nrow(remaining)> 0){
     # After first write, switch to append mode
     first_write_this_session <- FALSE
     
-    Sys.sleep(1)
+    # Clear batch results from memory
+    rm(batch_results, batch_data)
+    gc()
+    
+    message(paste("Batch", i, "written to CSV"))
+    check_temp_size()
   }
 }
 
-
+# Once all batches are run - pull in all data from csv
 final_data <- read.csv(csv_filepath,
                        encoding = "UTF-8",
                        colClasses = c("character"))
 
+# QA - spot check these to see if NAs are valid
+check_na <-final_data %>% filter(is.na(permit_number))
+# Make results reproducible
+set.seed(42)
+# Select 20 random rows (without replacement)
+random_rows <- check_na[sample.int(nrow(check_na), 20), ]
+# Confirmed all came back in EPIC LA portal with no permits
 
-
+# Export to pg
 con <- connect_to_db("altadena_recovery_rebuild")
 
 dbWriteTable(con, Id(schema=schema, table_name=table_name), final_data,
@@ -142,9 +196,9 @@ dbDisconnect(con)
 # # ## Check the response_status to see if we got any "timeout" or "error" for a given request
 # # ## will rerun each once more with a longer wait time to see if we get better results
 # unsuccessful_requests <- check_df %>%
-#   filter(response_status != "success")
+#   filter(response_status != "success") # 0
 # 
-# # use EPIC LA to spot check a few of these
+# # use EPIC LA to spot check a few of these - none this time
 # spot_check_5 <- unsuccessful_requests %>% slice_sample(n=5)
 # # https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=5847021016 - true error, should have 5 permits
 # # https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=2&ps=100&pn=1&em=true&st=5847020010 - true error, should have 1 permit
@@ -188,7 +242,7 @@ dbDisconnect(con)
 # final_data_clean <- read.csv(csv_filepath,
 #                              encoding = "UTF-8",
 #                              colClasses = c("character"))
-# retried <- final_data_clean %>% 
+# retried <- final_data_clean %>%
 #   filter(ain %in% unsuccessful_requests$ain) %>%
 #   mutate(qa_add=TRUE) %>%
 #   filter(response_status=="success") %>%
@@ -201,7 +255,7 @@ dbDisconnect(con)
 # write.csv(final_data_clean, csv_filepath_clean, row.names=FALSE, fileEncoding = "UTF-8")
 # 
 # ## read in final data with retried requests and export to pg
-# final_data_retried <- final_data <- read.csv(csv_filepath_clean,
+# final_data <- read.csv(csv_filepath_clean,
 #                                              encoding = "UTF-8",
 #                                              colClasses = c("character"))
 # 
@@ -217,9 +271,9 @@ dbDisconnect(con)
 # # 2. if any ains are associated with 100 permits
 # ## We pulled first 100 permits per parcel, if any have 100 check to see if we missed any
 # ## if so, update function to go to additional results pages to get rest of permits
-# check_record_counts <- final_data_retried %>% filter(record_id==100)
+# check_record_counts <- final_data %>% filter(record_id=="100")
 # 
-# if (nrow(check_record_counts)==100) {
+# if (nrow(check_record_counts)>0) {
 #   message(
 #     paste("These parcels should be reviewed individually. If the portal shows more than 100 permits for any, we should update the functions. AINS: ",
 #           as.list(check_record_counts$ain))

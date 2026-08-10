@@ -15,7 +15,7 @@ schema <- "dashboard"
 # set some metadata for exporting results
 date_ran <- as.character(Sys.Date())
 curr_year <- "2026" # strsplit(date_ran, "-", fixed=TRUE)[[1]][1] # year
-curr_month <- "04" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
+curr_month <- "08" # strsplit(date_ran, "-", fixed=TRUE)[[1]][2] # month
 
 general_table_name <- paste("scraped_general_permit_data", 
                             curr_year, # year
@@ -101,7 +101,7 @@ if (nrow(remaining)> 0){
     permit_url <- paste0(base_url, row_data$permit_href, "/")
     
     tryCatch({
-      message(paste("Scraping:", permit_url))
+      log_message(paste("Scraping:", permit_url))
       
       results <- scrape_permits_detailed(
         url = permit_url, 
@@ -122,7 +122,7 @@ if (nrow(remaining)> 0){
       ))
       
     }, error = function(e) {
-      message(paste("Error scraping", row_data$permit_number, ":", e$message))
+      log_message(paste("Error scraping", row_data$permit_number, ":", e$message))
       return(list(
         detailed = data.frame(
           permit_number = row_data$permit_number,
