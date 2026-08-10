@@ -281,6 +281,24 @@ sales_merged <- lac_sales_records %>%
     # create final sold after eaton column
     sold_after_eaton=ifelse(sold_source!='neither', TRUE, FALSE))
 
+# manually flag: for merged parcel 5841023022, use the 5841023010 lineage (no sale)
+# instead of the 5841023009 lineage (which picked up an unrelated ANFS land sale)
+correct_row <- sales_merged %>%
+  filter(lac_ain == "5841023022", ain_2025_01 == "5841023010") %>%
+  left_join(lac_sales_clean, by = c("lac_ain" = "ain")) %>%
+  left_join(anfs_sales_clean, by = c("lac_ain" = "parcel")) %>%
+  mutate(
+    last_sale_year = ifelse(sold_source == "anfs", last_sale_year_anfs, last_sale_year_lac),
+    last_sale_month = ifelse(sold_source == "anfs", last_sale_month_anfs, last_sale_month_lac),
+    last_sale_date = if_else(sold_source == "anfs", as.Date(last_sale_date_anfs), as.Date(last_sale_date_lac)),
+    sold_amount = ifelse(sold_source == "anfs", sold_amount_anfs, sold_amount_lac),
+    owner_name = ifelse(sold_source == "anfs", owner_name_anfs, owner_name_lac)
+  ) %>%
+  select(-ain) %>%
+  rename(ain = lac_ain) %>%
+  select(ain, sold_after_eaton, sold_source, last_sale_year, last_sale_month,
+         last_sale_date, sold_amount, owner_name)  # write out final_df's known column names explicitly
+
 # check recoding worked
 sales_merged %>% filter(is.na(anfs_sold) & !is.na(anfs_sold_b)) %>% View()
 table(sales_merged$sold_source)
@@ -429,7 +447,16 @@ table(final_df$sold_after_eaton) # sold decreases by 1 because 	5842008010 was d
 final_df <- final_df %>%
   rename(ain=lac_ain)
 
-#### PART 5: PUSH TO PGADMIN ####
+# as a final step apply the rewrite for ain == "5841023022"
+correct_row <- correct_row %>% # was a diff type which caused an error
+  mutate(sold_amount = as.character(sold_amount))
+
+final_df <- final_df %>%
+  rows_update(correct_row, by = "ain")
+
+final_df %>% filter(ain == "5841023022")  # confirm it took
+
+#### PUSH TO PGADMIN ####
 # Export to postgres
 table_label <- paste0("rel_assessor_sales_", year, "_", month) 
 schema <- "dashboard"
@@ -454,8 +481,8 @@ column_comments <- c('ain for current month- use to match to other tables',
         'sold amount - note sold amount from LAC assessor might be inaccurate - unverified sales are recorded, meaning final sale price could be different in other sources',
          'owner name - from lac assessor if source is lac assessor or both and from anfs if source of sale is anfs')
 
- # add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
+# add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
 
-#### PART 8: close dbconnection (NO UPDATES NEEDED) ####
+#### close dbconnection (NO UPDATES NEEDED) ####
 dbDisconnect(con_alt)
