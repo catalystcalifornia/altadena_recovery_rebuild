@@ -96,7 +96,6 @@ column_comments <- c(
 dbWriteTable(con, DBI::Id(schema = schema, table = table_name), anfs_sales_clean,
              overwrite = TRUE,
              row.names = FALSE
-
 )
 
 add_table_comments(con, schema, table_name, indicator, source, qa_filepath, column_names, column_comments)
