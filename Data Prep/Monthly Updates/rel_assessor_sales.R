@@ -116,7 +116,7 @@ na_sale_date <- lac_sales %>%
   select(last_sale_date_orig, last_sale_year,recording_date, doc_reason_code, land_reason_key, everything()) %>%
   filter(is.na(last_sale_year))
 
-# 08/06/2026 Notes: 31 obs, similarly ones that sold before Eaton. so assume false for 0 or missing
+# 08/06/2026 Notes: 32 obs, similarly ones that sold before Eaton. so assume false for 0 or missing
 # 04/12/2026 Notes:
 # those with a sales date originally have errors in the sales date or are missing a date, but sold prior to 2025
 # looking at recording date, only one had a recording date in 2025, 
@@ -222,7 +222,12 @@ anfs_missing <- anfs_missing %>%
 # likely commercial or deleted parcels or in some cases typos
 anfs_missing %>% filter(is.na(damage_category)) %>% View() 
 # 8/06/2026
-# 13 came up as missing and when I checked then in the assessor portal, they came up as commercial, institutional, vacant, deleted, shell (like 5842008018), etc. basically not residential and active
+# 12 came up as missing and when I checked then in the assessor portal, they came up as commercial, institutional, vacant, deleted, shell (like 5842008018), etc. basically not residential and active
+# 5835038003 - commercial (doesn't apply)
+# 5841032019 - commercial (doesn't apply)
+# 5845002015 - commercial (doesn't apply)
+# 5835014001 - Auto service
+
 # 4/12/2026
 # update log of parcels that don't apply (e.g., commercial) or that have typos
 ## Don't apply because commercial or public land or vacant (in jan25) properties
@@ -267,6 +272,7 @@ sales_merged <- lac_sales_records %>%
   left_join(anfs_sales_records, by = c("lac_ain" = "anfs_ain")) %>%
   left_join(anfs_sales_records, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>%
   left_join(anfs_sales_records, by = c("ain_2026_04" = "anfs_ain"), suffix = c("", "_c")) %>%
+
   # coalesce anfs sales columns into one field
   mutate(anfs_sold_combined = coalesce(anfs_sold,
                                  anfs_sold_b,
