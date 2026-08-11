@@ -48,9 +48,7 @@ data_vintage_day <- "30"
 data_update_year <- "2026"
 data_update_month <- "08"
 anfs_sales_filepath <- sprintf("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Altadena Not for Sale Data\\%s", anfs_sales_filename)
-
 anfs_sales <- read.csv(anfs_sales_filepath, header=FALSE, col.names = anfs_cols, fileEncoding = "UTF-8-BOM")  
-
 
 nrow(anfs_sales) # 517 08/07/2026 pulling from the correct csv #501 08/06/2026 # 428 04/12/2026 
 colnames(anfs_sales)
@@ -96,8 +94,8 @@ column_comments <- c(
 )
 
 dbWriteTable(con, DBI::Id(schema = schema, table = table_name), anfs_sales_clean,
-  overwrite = TRUE,
-  row.names = FALSE
+             overwrite = TRUE,
+             row.names = FALSE
 
 )
 
