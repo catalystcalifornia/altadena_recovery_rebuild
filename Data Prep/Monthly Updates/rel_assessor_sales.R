@@ -199,14 +199,6 @@ lac_sales_records <- lac_sales_final %>%
   left_join(xwalk, by = c("ain" = "ain_2026_08")) %>% # merge to get older ains jic anfs data is recording from prior ains
   select(lac_ain, sold_after_eaton_lac, ain_2025_01, ain_2026_04, ain)
 
-# JZ QA: Line 196 produces an error because ain_2026_08 does not exist anymore because you join on this. So now the only column in there is ain:
-lac_sales_records <- lac_sales_final %>% 
-  select(ain, sold_after_eaton_lac) %>% 
-  mutate(lac_ain = ain) %>%
-  left_join(xwalk, by = c("ain" = "ain_2026_08")) %>% # merge to get older ains jic anfs data is recording from prior ains
-  select(lac_ain, sold_after_eaton_lac, ain_2026_04, ain)%>% # remove ain_2026_08
-rename("ain_2026_08"="ain") # rename back to ain_2026_08
-
 # check on duplicates after adding crosswalk
 nrow(lac_sales_records) - nrow(lac_sales_final)
 dup_check <- lac_sales_records %>% count(lac_ain) %>% filter(n>1)
@@ -220,9 +212,7 @@ anfs_missing <- anfs_sales %>%
   filter(!parcel %in% c(lac_sales_records$lac_ain,lac_sales_records$ain_2025_01,lac_sales_records$ain_2026_08))
 # check against prior damage records
 damage <- dbGetQuery(con_alt, "SELECT * FROM data.rel_assessor_damage_level_sept2025")
-
 residential <- dbGetQuery(con_alt, "SELECT ain_2026_08, residential FROM dashboard.rel_assessor_residential_2026_08") 
-
 anfs_missing <- anfs_missing %>% 
   left_join(damage,by=c("parcel"="ain_sept")) %>%
   left_join(residential,by=c("parcel"="ain_2026_08"))
