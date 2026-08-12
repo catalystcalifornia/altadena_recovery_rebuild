@@ -1,0 +1,288 @@
+---
+title: "Timespent in Recovery"
+output: html_document
+---
+
+### Objective: Identify general trends around time spent for Altadena properties in recovery.
+
+- Will measure time spent in days
+- Will look at the time spent for properties currently classified as repairs or rebuild complete
+  - About 30 of them have been unchanged, whereas others are newly classified this way
+  - Look at distribution over update cycles?
+- Time permitting
+  - Plot the distribution of application dates
+  - Identify a cohort of earlier applicants and see their timelines
+  - Identify time spent across phases (without permits, with permits/rebuilding) and look at the distribution of time spent in these phases over update cycles
+  - Create a flag for more or less damage (or red/yellow tag re: LAC dashboard)
+  - Compare days since Eaton and first application permits for all properties
+
+### Step 0: Setup
+```{r, include=FALSE}
+# Add database connection and source script with functions for pushing to postgres
+source("W:\\RDA Team\\R\\credentials_source.R")
+library(ggplot2)
+con <- connect_to_db("altadena_recovery_rebuild")
+options(scipen = 999)
+
+```
+
+### Step 1: Get data for properties that are considered repaired or rebuilt and their permits
+```{r}
+# get summary of changes
+sql_query <- "SELECT curr.*, prev.dashboard_label as prev_dashboard_label, c.ain_2026_04,
+CASE 
+        WHEN curr.dashboard_label = prev.dashboard_label THEN 'unchanged'
+        WHEN curr.dashboard_label = 'Repairs or Rebuild Complete' AND prev.dashboard_label != 'Repairs or Rebuild Complete' THEN 'new rebuild complete'
+        WHEN curr.dashboard_label != 'Repairs or Rebuild Complete' AND prev.dashboard_label = 'Repairs or Rebuild Complete' THEN 'reverted - QA to figure out why'
+        ELSE 'something else?'
+    END AS change_summary
+FROM dashboard.dashboard_2026_08 curr
+LEFT JOIN dashboard.crosswalk_assessor_2026_04_08 c on c.ain_2026_08 = curr.ain_2026_08
+LEFT JOIN dashboard.dashboard_2026_04 prev ON c.ain_2026_04 = prev.ain_2026_04
+WHERE prev.dashboard_label = 'Repairs or Rebuild Complete' OR curr.dashboard_label = 'Repairs or Rebuild Complete';"
+
+rebuild_changes <- dbGetQuery(con=con, sql_query) %>%
+  mutate(qa_group = case_when(
+    change_summary=='new rebuild complete'& prev_dashboard_label == "In Construction" ~ "new",
+    change_summary=='new rebuild complete' & prev_dashboard_label != "In Construction" ~ "jumped",
+    change_summary=='reverted - QA to figure out why' ~ "reverted",
+    change_summary=='unchanged' ~ "unchanged",
+    .default = "something else"
+  ))
+
+# Get general permit details
+permit_query <- "SELECT * FROM dashboard.scraped_general_permit_data_2026_08;"
+
+permits <- dbGetQuery(con, permit_query) %>% 
+  filter(ain %in% rebuild_changes$ain_2026_08 | ain %in% rebuild_changes$ain_2026_04) %>% 
+  filter(as.Date(applied_date, format = "%m/%d/%Y") > as.Date("2025-01-07")) %>%
+  filter(!(status %in% c("Void", "Canceled", "Denied")))
+
+
+dbDisconnect(con)
+
+```
+
+### Step 2: Identify flags - earliest applied, last applied
+```{r}
+permits_df <- permits %>%
+  group_by(ain) %>%
+  mutate(
+    min_applied_date = min(as.Date(applied_date, format = "%m/%d/%Y"), na.rm=TRUE),
+    max_finalized_date = max(as.Date(finalized_date, format = "%m/%d/%Y"), na.rm = TRUE)) %>%
+  mutate(
+    first_applied_flag = ifelse(
+      as.Date(applied_date, format = "%m/%d/%Y") == min_applied_date, 
+      1, 0),
+    last_applied_flag = ifelse(
+      as.Date(applied_date, format = "%m/%d/%Y") == max(as.Date(applied_date, format = "%m/%d/%Y"), na.rm=TRUE), 
+      1, 0),
+    last_finalized_flag = ifelse(
+      as.Date(finalized_date, format = "%m/%d/%Y") == max_finalized_date, 
+      1, 0),
+    permit_count = n()) %>%
+  
+  ungroup() %>%
+  mutate(permit_timespent = as.Date(finalized_date, format = "%m/%d/%Y")- as.Date(applied_date, format = "%m/%d/%Y"))
+
+combined <- permits_df %>% 
+  select(ain, main_parcel, address, first_applied_flag, last_applied_flag, last_finalized_flag, 
+         min_applied_date, max_finalized_date,
+         permit_timespent, permit_count, permit_number, record_id, 
+         applied_date, type, issued_date, project_name, expiration_date, status, finalized_date) %>%
+  right_join(select(rebuild_changes, ain_2026_08, rebuild_status, change_summary), by=c("ain"="ain_2026_08"))
+
+```
+
+### Step 3: Explore combined
+```{r}
+
+# Looked to see if any concerns where a permit has no finalized date:
+
+check_na_finaled <- combined %>%
+  filter(is.na(last_finalized_flag)) %>%
+  select(ain) %>% 
+  left_join(combined, by="ain")
+
+length(unique(check_na_finaled$ain)) # 32
+
+# I'd like to calculate time spent using the applied date of the first applied permit and the 
+# max finalized date (regardless of it it's the last applied permit)
+# My main concern with the NA finalized dates is if that permit is the last applied permit
+# It could be explained by a glitch (copy of a similar permit that's already been finalized) or
+# it could be a really minor permit like PWRP or UNC-SEWR 
+# We should still be mindful of those but for me the biggest red flag is if any of these NA finalized permits are build permits (UNC-BLDR or CREB)
+
+check_na_finaled %>% 
+  filter(is.na(last_finalized_flag)) %>%
+  filter(grepl("^UNC-BLDR|^CREB", permit_number))
+
+# two cases 
+# AIN / permit number
+# 5829018039 / UNC-BLDR260731007558
+# 5845005020 / CREB2026001112
+
+# Both case are instances where the rebuild change summary is "reverted" and given that these are build permits they've meaningfully reverted
+# To handle I will exclude these AINs from time spent calculations as we'd still consider them in construction at this time.
+
+# I also checked other AINs with "reverted" summaries
+# 5833004047 - would consider rebuilt - keep
+# 5840008022 - would consider rebuilt - keep
+# 5844028003 - would consider rebuilt - keep
+
+ains_to_exclude <- c("5829018039", "5845005020")
+
+```
+
+### Step 4: Calculate timespent and other helpful calcs
+```{r}
+timespent <- combined %>% 
+  filter(!ain %in% ains_to_exclude) %>%
+  mutate(timespent = max_finalized_date - min_applied_date) %>%
+  select(ain, main_parcel, min_applied_date, max_finalized_date, permit_count, timespent, rebuild_status, change_summary) %>%
+  # Add count for days since Eaton to when first permit application was submitted
+  mutate(days_since_eaton = min_applied_date - as.Date("01/07/2025", format = "%m/%d/%Y")) %>%
+  unique() # 97
+
+length(unique(timespent$ain)) == nrow(timespent) # TRUE - no dupes
+
+```
+
+### Step 5: Review summaries of calcs
+##### Time spent
+Finding(s):
+
+- On average, currently rebuilt or repaired properties took 308 days from their first permit application until last finaled permit. This does not include time spent creating the permit applications, meeting with contractors, working with insurance companies, etc.
+- In reality the length of time spent rebuilding from first permit application varied from 7-502 days.
+```{r}
+# summary 
+summary(timespent$timespent)
+timespent$timespent <- as.numeric(timespent$timespent)
+
+
+# review of potential outliers - none found with IQR method
+Q1 <- quantile(timespent$timespent, 0.25, na.rm = TRUE)
+Q3 <- quantile(timespent$timespent, 0.75, na.rm = TRUE)
+IQR_val <- IQR(timespent$timespent, na.rm = TRUE)
+
+lower_bound <- Q1 - 1.5 * IQR_val
+upper_bound <- Q3 + 1.5 * IQR_val
+
+outliers <- timespent$timespent[timespent$timespent < lower_bound | timespent$timespent > upper_bound]
+outliers # There are no outliers
+
+# boxplot visual
+mean_val <- mean(timespent$timespent, na.rm = TRUE)
+
+ggplot(timespent, aes(y = timespent)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8, outlier.size = 2) +
+  coord_flip() +
+  # Reference lines for bounds and mean
+  geom_hline(yintercept = lower_bound, linetype = "dashed", color = "blue", alpha = 0.5) +
+  geom_hline(yintercept = upper_bound, linetype = "dashed", color = "blue", alpha = 0.5) +
+  geom_hline(yintercept = mean_val, linetype = "dashed", color = "red", alpha = 0.7) +
+  # Use the bounds to set axis limits with a little breathing room
+  scale_y_continuous(
+    expand = expansion(mult = c(0.02, 0.1))) +
+  labs(
+    title = paste0("Time Spent (Mean: ", round(mean_val, 1), ")"),
+    subtitle = paste0("Q1: ", round(Q1, 1), " | Q3: ", round(Q3, 1),
+                       " | Outlier bounds: [", round(lower_bound, 1), 
+                       ", ", round(upper_bound, 1), "]"),
+    y = ""
+  ) +
+  theme_minimal()
+
+```
+
+##### Permit count
+Finding(s):
+
+- On average currently rebuilt or repaired properties needed around 8 permits on average.
+- In reality, this ranged from 1-17 permits (excludes outliers)
+
+```{r}
+# summary 
+summary(timespent$permit_count)
+
+# review of outliers - 24 permits considered an outlier (AIN: 5843001005)
+Q1 <- quantile(timespent$permit_count, 0.25, na.rm = TRUE)
+Q3 <- quantile(timespent$permit_count, 0.75, na.rm = TRUE)
+IQR_val <- IQR(timespent$permit_count, na.rm = TRUE)
+
+lower_bound <- Q1 - 1.5 * IQR_val
+upper_bound <- Q3 + 1.5 * IQR_val # 21.5
+
+outliers <- timespent$permit_count[timespent$permit_count < lower_bound | timespent$permit_count > upper_bound]
+outliers # 24 permits (max observed) - AIN: 5843001005
+
+# boxplot visual
+mean_val <- mean(timespent$permit_count, na.rm = TRUE)
+
+ggplot(timespent, aes(y = permit_count)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8, outlier.size = 2) +
+  coord_flip() +
+  # Reference lines for bounds and mean
+  geom_hline(yintercept = lower_bound, linetype = "dashed", color = "blue", alpha = 0.5) +
+  geom_hline(yintercept = upper_bound, linetype = "dashed", color = "blue", alpha = 0.5) +
+  geom_hline(yintercept = mean_val, linetype = "dashed", color = "red", alpha = 0.7) +
+  # Use the bounds to set axis limits with a little breathing room
+  scale_y_continuous(
+    expand = expansion(mult = c(0.02, 0.1))) +
+  labs(
+    title = paste0("Permit Count (Mean: ", round(mean_val, 1), ")"),
+    subtitle = paste0("Q1: ", round(Q1, 1), " | Q3: ", round(Q3, 1),
+                       " | Outlier bounds: [", round(lower_bound, 1), 
+                       ", ", round(upper_bound, 1), "]"),
+    y = ""
+  ) +
+  theme_minimal()
+
+# note: warning just indicates that the max value is an outlier and not plotted
+
+```
+
+##### Days between first applied permit and Eaton Fire
+Finding(s):
+
+- On average, currently repaired on rebuilt properties applied for their first permits 147 days after the Eaton  Fire.
+- In reality, this number ranged from 29-314 days (excludes outliers).
+```{r}
+# summary 
+summary(timespent$days_since_eaton)
+
+# review of outliers - 479 days (max observed) - AIN: 5846024052
+Q1 <- quantile(timespent$days_since_eaton, 0.25, na.rm = TRUE)
+Q3 <- quantile(timespent$days_since_eaton, 0.75, na.rm = TRUE)
+IQR_val <- IQR(timespent$days_since_eaton, na.rm = TRUE)
+
+lower_bound <- Q1 - 1.5 * IQR_val
+upper_bound <- Q3 + 1.5 * IQR_val # 21.5
+
+outliers <- timespent$days_since_eaton[timespent$days_since_eaton < lower_bound | timespent$days_since_eaton > upper_bound]
+outliers # 479 days (max observed) - AIN: 5846024052
+
+# boxplot visual
+mean_val <- mean(timespent$days_since_eaton, na.rm = TRUE)
+
+ggplot(timespent, aes(y = days_since_eaton)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 8, outlier.size = 2) +
+  coord_flip() +
+  # Reference lines for bounds and mean
+  geom_hline(yintercept = lower_bound, linetype = "dashed", color = "blue", alpha = 0.5) +
+  geom_hline(yintercept = upper_bound, linetype = "dashed", color = "blue", alpha = 0.5) +
+  geom_hline(yintercept = mean_val, linetype = "dashed", color = "red", alpha = 0.7) +
+  # Use the bounds to set axis limits with a little breathing room
+  scale_y_continuous(
+    expand = expansion(mult = c(0.02, 0.1))) +
+  labs(
+    title = paste0("Days Since Eaton and First Permit Application (Mean: ", round(mean_val, 1),")"),
+    subtitle = paste0("Q1: ", round(Q1, 1), " | Q3: ", round(Q3, 1),
+                       " | Outlier bounds: [", round(lower_bound, 1), 
+                       ", ", round(upper_bound, 1), "]"),
+    y = ""
+  ) +
+  theme_minimal()
+
+```
+
