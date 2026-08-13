@@ -933,6 +933,10 @@ table(final_types_clean$dashboard_label, useNA="always")
 
 
 ##### Export to postgres #####
+
+# MUST DO: if not manually reassigns are needed set final_df to final_types, otherwise set to final_types clean
+final_df <- final_types_clean
+
 con <- connect_to_db("altadena_recovery_rebuild")
 schema <- "dashboard"
 table_name <- paste("rel_parcel_rebuild_status", curr_year, curr_month, sep="_")
@@ -940,7 +944,7 @@ date_ran <- as.character(Sys.Date())
 indicator <- "Rebuild status for residential Altadena parcels based on scraped permit data from _2025_10 tables."
 source <- paste("Data imported on", date_ran, "- Multiple sources - see QA doc.")
 qa_filepath <- sprintf("W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Documentation\\monthly_updates\\QA_permit_scrape_and_rebuild_%s_%s.docx", curr_year, curr_month)
-column_names <- colnames(final_types)
+column_names <- colnames(final_df)
 column_comments <- c(
   "AIN - current",
   "1/0 Flag - has Full Sign Off (fso) from Army Corps of Engineers (ace)",
@@ -988,9 +992,10 @@ column_comments <- c(
   "Label for dashboard")
 
 # # Now write the table
-dbWriteTable(con, Id(schema=schema, table=table_name), final_types,
+dbWriteTable(con, Id(schema=schema, table=table_name), final_df,
              overwrite = FALSE, row.names = FALSE)
-add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
+add_table_comments(con, schema=schema, table_name = table_name, indicator = indicator, 
+                   source = source, qa_filepath = qa_filepath, column_names = column_names, column_comments = column_comments)
 
 
 dbDisconnect(con)
