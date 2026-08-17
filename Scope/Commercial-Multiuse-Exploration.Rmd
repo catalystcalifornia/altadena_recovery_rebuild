@@ -3,8 +3,8 @@ title: "Commercial-Multiuse-Exploration"
 output: html_document
 ---
 
-
-```{r}
+# Step 0: Setup
+```{r, include=FALSE}
 #load libraries
 library(dplyr)
 library(sf)
@@ -16,6 +16,7 @@ con <- connect_to_db("altadena_recovery_rebuild")
 options(scipen = 999)
 ```
 
+# Step 1a: Review use codes in the January 2025 Assessor data against April 2026 use codes
 ```{r}
 # Get the observed use codes in the Jan 2025 assessor data and April 2026
 # Note: these have already been filtered for AINs in Altadena
@@ -73,6 +74,7 @@ Use codes related to residence but not included:
 - Motel under 50 rooms: 182*
 - Motel 50 rooms and over: 183*
 
+# Step 1b: Identify commercial and residential parcels in January 2025 and April 2026 data
 ```{r}
 # get commerical use codes of interest in jan 2025 and apr 2026
 # use the codes to filter the data and parcel tables
@@ -148,32 +150,101 @@ m_0426 <- apr_2026_shapes_filtered
 # get list of ains to compare against jan 2025 vintage
 apr_2026_ains <- apr_2026_data_filtered %>% filter(ain %in% apr_2026_shapes_filtered$ain)
 
-```
 
-# January 2025 Commercial Properties
+table(jan_2025_ains$residential, useNA="ifany")
+  
+table(apr_2026_ains$residential, useNA="ifany")
+
+```
+In January 2025, there were 319 significantly damaged parcels with commercial use codes. Of those, 48 were also residential.
+
+In April 2026, there were 315 significantly damage parcels with commercial use codes. Of those, 47 were also residential.
+
+
+# Step 1C: View January 2025 and Apr 2026 Commercial Properties
 ```{r}
 mapview(m_0125, zcol="residential") 
-```
 
-# Apr 2026 Commercial Properties
-```{r}
 mapview(m_0426, zcol="residential") 
 ```
+
+# Step 2a: Identify which properties are also zoned for and residential and commercial mixed-use purposes
+
+In January 2025 there are two zoning codes that appear in comm/res mixed-use coded properties that don't appear in other use code types: 
+
+- LCC2
+- LCC3 R2-P
+
+Common zoning codes in both lists:
+
+- LCC2*
+- LCC2YY
+- LCC3*
+- LCC3VV
+- LCC3YY
+- LCM1
+- LCM1YY
+- LCR175
+- LCR2VV
+- LCR3YY
+- PSC- (should exclude, specific to Pasadena)
+
+Repeating for April 2026 - again, two zoning codes in our filtered list of comm/res mixed use properties
+
+- LCC2
+- LCC3 R2-P
+
+Common to both
+
+- LCC2*
+- LCC2YY
+- LCC3*
+- LCC3VV
+- LCC3YY
+- LCM1*
+- LCM1YY
+- LCR175
+- LCR2VV
+- LCR3YY
+- PSC- (should exclude, specific to Pasadena)
+
+Decision: Combine these lists excluding the code for Pasadena. Will keep LCM codes even though they suggest manufacturing is the primary use.
 
 ```{r}
 # Get zoning codes to try and identify which commercial use codes are also zoned
 # for residential (mixed-use) purposes.
 
-zoning_codes_0125 <- jan_2025_shapes_filtered %>% st_drop_geometry() %>% select(zoning_code)
-zoning_codes_0125_df <- as.data.frame(table(zoning_codes$zoning_code))
+# January 2025
+zoning_codes_0125 <- jan_2025_data %>% filter(!(ain %in% jan_2025_ains$ain)) %>% select(zoning_code)
+zoning_codes_0125_df <- as.data.frame(table(zoning_codes_0125$zoning_code))
 
-zoning_codes_0426 <- apr_2026_shapes_filtered %>% st_drop_geometry() %>% select(zoning_code)
-zoning_codes_0426_df <- as.data.frame(table(zoning_codes$zoning_code))
+zoning_codes_0125_filtered <- jan_2025_shapes_filtered %>% st_drop_geometry() %>% 
+  filter(commercial==TRUE & residential == TRUE) %>% 
+  select(zoning_code)
 
-setdiff(as.character(zoning_codes_0426_df$Var1), as.character(zoning_codes_0125_df$Var1))
-# character(0)
-setdiff(as.character(zoning_codes_0125_df$Var1), as.character(zoning_codes_0426_df$Var1))
-# character(0)
+zoning_codes_0125_filtered_df <- as.data.frame(table(zoning_codes_0125_filtered$zoning_code))
+
+# Review all observed zoning codes against those associated with residential and commercial mixed use properties
+setdiff(as.character(zoning_codes_0125_df$Var1), as.character(zoning_codes_0125_filtered_df$Var1))
+setdiff(as.character(zoning_codes_0125_filtered_df$Var1), as.character(zoning_codes_0125_df$Var1))
+intersect(as.character(zoning_codes_0125_filtered_df$Var1), as.character(zoning_codes_0125_df$Var1))
+
+
+# April 2026
+zoning_codes_0426 <- apr_2026_data %>% filter(!(ain %in% apr_2026_ains$ain)) %>% select(zoning_code)
+zoning_codes_0426_df <- as.data.frame(table(zoning_codes_0426$zoning_code))
+
+zoning_codes_0426_filtered <- apr_2026_shapes_filtered %>% st_drop_geometry() %>% 
+  filter(commercial==TRUE & residential == TRUE) %>% 
+  select(zoning_code)
+
+zoning_codes_0426_filtered_df <- as.data.frame(table(zoning_codes_0426_filtered$zoning_code))
+
+# Review all observed zoning codes against those associated with residential and commercial mixed use properties
+setdiff(as.character(zoning_codes_0426_df$Var1), as.character(zoning_codes_0426_filtered_df$Var1))
+setdiff(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_codes_0426_df$Var1))
+intersect(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_codes_0426_df$Var1))
+
 
 # Same universe of zoning codes are available. Will review individually.
 # Reference data dictionary
@@ -184,29 +255,41 @@ setdiff(as.character(zoning_codes_0125_df$Var1), as.character(zoning_codes_0426_
 ## in the case of a dash, it is used to separate multiple zones or height districts.
 
 # Questions:
-# What do asterisks mean?
+# What do asterisks mean? (still not sure)
+
+zoning_codes <- unique(c(
+  setdiff(as.character(zoning_codes_0125_filtered_df$Var1), as.character(zoning_codes_0125_df$Var1)),
+  intersect(as.character(zoning_codes_0125_filtered_df$Var1), as.character(zoning_codes_0125_df$Var1)),
+  setdiff(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_codes_0426_df$Var1)),
+  intersect(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_codes_0426_df$Var1))
+  ))
 
 ```
 
-
-
+Will only review with Apr 2026 data:
 ```{r}
+apr_2026_zoned <- apr_2026_data %>% filter(zoning_code %in% zoning_codes)
+zoning_freq <- as.data.frame(table(apr_2026_zoned$zoning_code, useNA="ifany"))
+zoning_freq
 
-# Note these are roughly the same - by count Jan 2025 has 48 AINs to Apr 2026 47
+apr_2026_lcr175 <- apr_2026_zoned %>% filter(grepl("^LCR175", zoning_code))
+table(apr_2026_lcr175$use_code, useNA = "ifany")
+# https://portal.assessor.lacounty.gov/parceldetail/5827013902
+# 2700 is a parking lot - there are 4
 
-check1 <- setdiff(jan_2025_ains$ain, apr_2026_ains$ain)
-check1 # "5828026005" "5845018001" "5845010020" "5828027024"
+# https://portal.assessor.lacounty.gov/parceldetail/5823020021
+# Split residential, commercial - there is 1
 
-check2 <- setdiff(apr_2026_ains$ain, jan_2025_ains$ain)
-check2 # none
+zoning_codes_final <- Filter(function(x) !any(grepl("^LCR175", x)), zoning_codes)
 
-jan_2025_data_filtered %>% filter(ain == "5845018001") # use_code 1210 (store and residential combo)
-
-# LAC Assessor Portal currently considers this purely residential: https://portal.assessor.lacounty.gov/parceldetail/5845018001
-# No history or parcel change (or any indication of why these was use code 1210 previously and is now 0400)
-
-# Additionally in EPIC-LA nothing to explain change in use code: https://epicla.lacounty.gov/energov_prod/SelfService/#/search?m=1&fm=1&ps=10&pn=1&em=true&st=5845018001
-# There is a "Fire Rapid Assessment Inspection" (Status Red) requested on 2/20/25
-# We have not reviewed these types of inspections in relation to Eaton Fire Recovery (should explore)
+apr_2026_zoned_final <- apr_2026_data %>% filter(zoning_code %in% zoning_codes_final) # 532
 
 ```
+
+
+There are a tremendous number of LCR175	(n=7809 ) which seems primarily a residential zone. Reviewing the use codes these are overwhelmingly residential. Will exclude it from the list of zoning codes.
+
+# Step 3: With the broad list of properties zoned for comm/res mixed use, vet data availability across sources
+
+
+
