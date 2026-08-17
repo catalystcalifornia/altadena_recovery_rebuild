@@ -1,5 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_residential table for the Monthly Dashboard Updates ##
-## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_04.docx ##
+## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_update_2026_08.docx ##
 ## SCRIPT OUTPUT: rel_assessor_residential_YYYY_MM
 
 #### STEP 1: SET UP (UPDATE year and month) ####
@@ -18,32 +18,33 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2026"
-month <- "04"
+month <- "08"
 
 #### STEP 2: PULL XWALKS AND DATA (UPDATE to latest data and xwalks) ####
 # get for CURRENT MONTH
-xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2026_12_04")
+xwalk <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2026_04_08")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
-assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2026_04") %>%
-  filter(ain %in% xwalk$ain_2026_04)
+assessor_data <- st_read(con_alt, query="SELECT * FROM dashboard.assessor_data_universe_2026_08") %>%
+  filter(ain %in% xwalk$ain_2026_08)
 
 # Check difference between new data and xwalk with jan universe in it
-nrow(assessor_data)-length(unique(xwalk$ain_2026_04))
+nrow(assessor_data)-length(unique(xwalk$ain_2026_08))
 # 1 fewer parcel in assessor data
 
 # Check what's missing in current data
-missing_data <- xwalk %>% filter(!ain_2026_04 %in% assessor_data$ain)
-View(missing_data)
+missing_data <- xwalk %>% filter(!ain_2026_08 %in% assessor_data$ain)
+View(missing_data) # 08/06/2026 5842008017 missing but no usetype or address so fine to drop
 # we'll need the old residential type at minimum for filters to work in dashboard, other fields can stay blank
 # Update code before final steps
 # pull in previous xwalk for reference later
-xwalk_prev <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2025_09_12") %>%
-  filter(ain_2025_12 %in% missing_data$ain_2025_12)
+xwalk_prev <- st_read(con_alt, query="SELECT * FROM dashboard.crosswalk_assessor_2026_12_04") %>%
+  filter(ain_2026_04 %in% missing_data$ain_2026_04)
 
 #### STEP 2A: CHECK IF PADDING IS NEEDED IN USE CODE ####
-unique(nchar(assessor_data$use_code))
+unique(nchar(assessor_data$use_code)) # 4 characters which is expected
 # don't need to pad
 
+# section for if you need to pad - otherwise leave commented out
 # assessor_data <- assessor_data %>%
 #   mutate(use_code_orig = use_code,
 #          use_code=str_pad(use_code_orig, width = 4, side = "left", pad = "0"))
@@ -74,6 +75,9 @@ rel_res_df  <- data_total_units  %>%
 
 # Check - should be 0 NA
 table(rel_res_df$res_type,useNA="always")
+# 08/06/2026
+# Condominium   Multifamily Single-family          <NA> 
+#   64           316          5295             0 
 # Dec
 # Condominium   Multifamily Single-family          <NA> 
 #   64           316          5289             0 
@@ -87,9 +91,11 @@ rel_res_df <- rel_res_df %>%
 
 # Check - should be 0 NA
 table(rel_res_df$residential,useNA="always")
+# Aug 2026- TRUE - 5675 0 NA
 # Dec 2025- TRUE - 5675 0 NA - went up because of the 6 parcels that were missing in 2025-12 data but are not missing now
 table(rel_res_df$mixed_use,useNA="always")
-# Dec 2025- FALSE - 5675 0 NA
+# Aug 2026- FALSE - 5675 0 NA
+# Dec 2025- TRUE - 5675 0 NA
 
 # check for vacant parcels, but okay to keep in data if they change to vacant over time
 vacant <- rel_res_df %>%
@@ -100,8 +106,37 @@ vacant <- rel_res_df %>%
 # Apr 2026 - 2 vacant
 # ain - 5841006015, in dashboard.assessor_data_universe_2025_01 - this parcel was not vacant. important to see how use codes change over time
 # ain - 5842013027 was 5842013003 in jan25 (based on current xwalk) and in dashboard.assessor_data_universe_2025_01 was not vacant
+# Aug 2026 - 347 vacant  #could be a red flag that something is wrong in the code or a massive outflux of residents from Altadena / new building
+# print(unique(vacant$ain)) #still 347; includes the 2 other vacancies from previous years
+  # QAer do you mind double checking this? *************
   
-#### STEP 7: CLEAN UP DF AND ADD PARCELS WITH MISSING DATA: UPDATE ####
+  # 8-7-26: JZ QA of the high number of vacant parcels------------------------------
+  
+  # read in prior assessor universe 
+  
+  assessor_data_04<-dbGetQuery(con, "SELECT * FROM dashboard.assessor_data_universe_2026_04")
+  
+  # Pull out AINs of parcels that are vacant in the August assessor data
+  
+  vacant_08<-vacant$ain
+  
+  # Filter out these vacant AINs in the  April asssesor data
+  
+  assessor_data_04_vacant_08<-assessor_data_04%>%
+    filter(ain %in% vacant_08)%>%
+    select(ain, use_code)
+  
+  # Looking at this, it looks like 2 vacancies from the April data. Remaining just seem like new vacancies. 
+  
+  # Double check use codes in the August vacant data ---they do all accurately have the V flag in the use code for Vacant
+  
+  vacant%>%
+    select(ain, use_code)%>%
+    View()
+  
+  # I think this data is correct and is an interesting finding we should add to our data findings
+  
+  #### STEP 7: CLEAN UP DF AND ADD PARCELS WITH MISSING DATA: UPDATE ####
 final_res_data <- rel_res_df %>% 
   # add address field for dashboard
   mutate(zip=gsub("0000","",zip)) %>%
@@ -116,16 +151,16 @@ final_res_data <- rel_res_df %>%
   mutate(address=gsub("\\s+", " ", address)) %>% 
   mutate(address=ifelse(address=="0 0", NA, address)) %>%
   select(ain, residential, mixed_use, res_type, total_units, landlord_units, total_square_feet, total_bedrooms, address, use_code, zoning_code) %>%
-  rename(ain_2026_04 = ain)
-
+  rename(ain_2026_08 = ain)
+  
 # Add missing parcels (UPDATE)
 final_missing_data <- missing_data %>% select(starts_with("ain"))%>% 
-  left_join(xwalk_prev %>% select(starts_with("ain"), starts_with("use_code")), by=c("ain_2025_12"="ain_2025_12"))
+  left_join(xwalk_prev %>% select(starts_with("ain"), starts_with("use_code")), by=c("ain_2026_04"="ain_2026_04"))
 
 final_missing_data <- final_missing_data %>%
-  mutate(use_code=ifelse(is.na(use_code_2025_12), use_code_2025_09,
-                         use_code_2025_12)) %>%
-  distinct(ain_2026_04,use_code) %>%
+  mutate(use_code=ifelse(is.na(use_code_2026_04), use_code_2025_12,
+                         use_code_2026_04)) %>%
+  distinct(ain_2026_08,use_code) %>%
   # add just some columns we might need, dont assume address, owner, or square feet is the same
   # type of residential property
   mutate(
@@ -144,17 +179,45 @@ final_missing_data <- final_missing_data %>%
 
 final_res_data <- bind_rows(final_res_data,final_missing_data)
 
+# individually update ain 5842008017 (08/06/2026 Update)
+update_row <- final_res_data %>% # replace df with the correct df name
+  filter(ain_2026_08 == '5842008010') %>% 
+  mutate(ain_2026_08 = '5842008017') #needs to be single = to replace
+
+final_res_data <- final_res_data %>%  # replace df with the correct df name
+  rows_update(update_row, by = "ain_2026_08")
+
 # check for duplicates
-nrow(final_res_data)-length(unique(final_res_data$ain_2026_04)) # should be 0 difference
+nrow(final_res_data)-length(unique(final_res_data$ain_2026_08)) # should be 0 difference
 
 # check for same number of rows as xwalk
-nrow(final_res_data)-length(unique(xwalk$ain_2026_04)) # should be 0 difference
+nrow(final_res_data)-length(unique(xwalk$ain_2026_08)) # should be 0 difference
 
 # check for NA res type - should be 0
 table(final_res_data$res_type,useNA='always')
-# April numbers - flag significant changes
+# April numbers - flag significant changes # Aug 2026 exactly the same
 # Condominium   Multifamily Single-family          <NA> 
 #   64           316          5296             0 
+
+# JZ QA-------------------------------
+
+# I see 1 NA value when I run:
+
+table(final_res_data$res_type,useNA='always')
+
+# pull it out
+
+final_res_data%>%
+  filter(is.na(res_type))%>%
+  View()
+# ain == 5842008017
+
+# Check is this AIN is NULL in postgres too by running: select * from dashboard.rel_assessor_residential_2026_08 where ain_2026_08 = '5842008017' --I see it is NA
+
+# Manually looked up this AIN in the assessor data portal: https://portal.assessor.lacounty.gov/parceldetail/5842008017 ---it is marked as single family residence
+
+# Look up this AIN number in the August assessor data universe by running: select * from dashboard.assessor_data_universe_2026_08 where ain= '5842008017'
+## I don't see this AIN in that data universe
 
 #### STEP 8: PUSH TO PGADMIN (NO UPDATES NEEDED) ####
 
@@ -162,8 +225,8 @@ table(final_res_data$res_type,useNA='always')
 table_label <- paste0("rel_assessor_residential_", year, "_", month)
 schema <- "dashboard"
 indicator <- "Relational table with summarized assessor information and flags for current month parcels that were in Altadena in january 2025, selected based on crosswalk and keeping only the january 2025 parcels in Altadena. Only includes properties in either West or East Altadena proper."
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_residential.R "
-qa_filepath<-"  QA_sheet_rel_tables_update_2026_04.docx "
+source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/AB/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_residential.R "
+qa_filepath<-"  QA_sheet_rel_tables_update_2026_08.docx "
 
 # dbWriteTable(con_alt, Id(schema, table_label), final_res_data,
 #              overwrite = FALSE, row.names = FALSE)

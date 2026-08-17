@@ -1,5 +1,5 @@
 ## PURPOSE: The purpose of this script is to produce the rel_assessor_sales table for the Monthly Dashboard Updates ##
-## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_2026_04.docx ##
+## QA DOC: W:\Project\RDA Team\Altadena Recovery and Rebuild\Documentation\QA_Sheet_rel_tables_2026_08.docx ##
 ## SCRIPT OUTPUT: rel_assessor_sales_YYYY_MM
 ## Script combines data from LAC assessor with sales data collected from Altadena Not For Sale
 ## LAC sales data used as base and Altadena not for sale data supplements it
@@ -22,19 +22,19 @@ source("W:\\RDA Team\\R\\credentials_source.R")
 con_alt <- connect_to_db("altadena_recovery_rebuild")
 
 year <- "2026"
-month <- "04"
+month <- "08"
 
 #### STEP 2: *UPDATE* PULL DATA AND FILTER (update to latest data) ####
 # get xwalk for PREVIOUS MONTH and CURRENT MONTH
-xwalk <- dbGetQuery(con_alt, "SELECT * FROM dashboard.crosswalk_assessor_2026_12_04")
+xwalk <- dbGetQuery(con_alt, "SELECT * FROM dashboard.crosswalk_assessor_2026_04_08")
 # get assessor data for CURRENT MONTH and filter with xwalk for just AINs we are evaluating for
-assessor_data <- dbGetQuery(con_alt, "Select * from dashboard.assessor_data_universe_2026_04") %>%
-  filter(ain %in% xwalk$ain_2026_04)
+assessor_data <- dbGetQuery(con_alt, "Select * from dashboard.assessor_data_universe_2026_08") %>%
+  filter(ain %in% xwalk$ain_2026_08)
 
 # get universe of distinct current ains to join assessor data to -- 
 # so we don't drop those without records in the data table 
 # (parcel shapes update faster than parcel data)
-curr_ain_universe <- xwalk %>% distinct(ain_2026_04) %>% rename(ain=ain_2026_04)
+curr_ain_universe <- xwalk %>% distinct(ain_2026_08) %>% rename(ain=ain_2026_08)
 
 lac_sales <- curr_ain_universe %>% 
   left_join(assessor_data) %>% 
@@ -83,12 +83,19 @@ lac_sales <- lac_sales %>%
 # quick check
 lac_sales%>%select(last_sale_char,last_sale_date, sold_after_eaton)%>%View() # Looks good
 table(lac_sales$sold_after_eaton, useNA = "always")
+# Update 08/04/2026
+# FALSE  TRUE  <NA> 
+#   5227   449     0 
+# Update 04/12/2026
 # FALSE  TRUE  <NA> 
 # 5405   383    0 
 
 ##### STEP 5: *UPDATE* CHECK LAC DATA EACH  #####
 # check most recent sales date
 max(lac_sales$last_sale_date,na.rm=TRUE)
+# As of 08/06/2026
+# "2026-04-22"- if this doesnt increase flag to Elycia
+# As of April 12th, 2026
 # "2025-12-31" - if this doesnt increase flag to Elycia
 
 # check for nulls
@@ -97,12 +104,20 @@ check_sales <- lac_sales %>%
   summarise(count=n())
 
 check_sales %>% filter(is.na(last_sale_year))
+# 08/04/2026 Notes: same as April
+# last_sale_year sold_after_eaton count
+# <chr>          <lgl>            <int>
+#   1 NA             FALSE               25
+# Sept 2025 Notes:
 # 30 with NA in check same as last update, assumes not sold in line 81
 # April - 25 with NA, assumes not sold
 
 na_sale_date <- lac_sales %>%
   select(last_sale_date_orig, last_sale_year,recording_date, doc_reason_code, land_reason_key, everything()) %>%
   filter(is.na(last_sale_year))
+
+# 08/06/2026 Notes: 32 obs, similarly ones that sold before Eaton. so assume false for 0 or missing
+# 04/12/2026 Notes:
 # those with a sales date originally have errors in the sales date or are missing a date, but sold prior to 2025
 # looking at recording date, only one had a recording date in 2025, 
 # but the recording was due to perfection of title not a sale, make nulls a FALSE flag
@@ -124,23 +139,25 @@ lac_sales_final <- lac_sales %>%
 
 # check for duplicates or gaps
 nrow(lac_sales_final) - length(unique(lac_sales_final$ain)) # should be 0
-nrow(lac_sales_final) - length(unique(xwalk$ain_2026_04)) # should be 0
+nrow(lac_sales_final) - length(unique(xwalk$ain_2026_08)) # should be 0
 
 # check total sales that it increased - flag to Elycia if it doesn't increase
 table(lac_sales_final$sold_after_eaton_lac, useNA='always')
 # 271 in December 2025
 # 383 in March/April 2026
+# 449 in July/Aug 2026
 
 ### PART 2 - ADD ALTADENA NOT FOR SALE DATA ####
 ##### STEP 6: *UPDATE* Add sales data from "Altadena Not for Sale" database #####
 # first pull most recent sales data and clean up columns to match la county sales data
 # update with most recent dataset
-anfs_sales <- dbGetQuery(con_alt, "SELECT * FROM dashboard.anfs_sales_data_2026_04")
+anfs_sales <- dbGetQuery(con_alt, "SELECT * FROM dashboard.anfs_sales_data_2026_08")
 
 # future check for anymore combined AINs
 check <- anfs_sales %>%
   filter(grepl(",\\s*", parcel))
-# same 1 - 5844012018,19
+# 08/06/2026 same 1 - 5844012018,19
+# 04/12/2026 same 1 - 5844012018,19
 
 anfs_sales <- anfs_sales %>%
   # there's 2 AINs in one sales row - split so each is one row and we can match
@@ -158,6 +175,9 @@ anfs_sales <- anfs_sales %>%
 
 # check for duplicates
 length(unique(anfs_sales$parcel))-nrow(anfs_sales)
+# 08/06/2026
+# 8 duplicates remove by taking latest sale
+# 04/12/2026
 # 3 duplicates remove by taking latest sale
 
 # remove duplicates
@@ -176,32 +196,39 @@ length(unique(anfs_sales$parcel))-nrow(anfs_sales)
 lac_sales_records <- lac_sales_final %>% 
   select(ain, sold_after_eaton_lac) %>% 
   mutate(lac_ain = ain) %>%
-  left_join(xwalk, by = c("ain" = "ain_2026_04")) %>% # merge to get older ains jic anfs data is recording from prior ains
-  select(lac_ain, sold_after_eaton_lac, ain_2025_01, ain_2025_12)
+  left_join(xwalk, by = c("ain" = "ain_2026_08")) %>% # merge to get older ains jic anfs data is recording from prior ains
+  select(lac_ain, sold_after_eaton_lac, ain_2025_01, ain_2026_04, ain)
 
 # check on duplicates after adding crosswalk
 nrow(lac_sales_records) - nrow(lac_sales_final)
 dup_check <- lac_sales_records %>% count(lac_ain) %>% filter(n>1)
 print(dup_check)
 # checked in the xwalk
-xwalk %>% filter(ain_2026_04 %in% dup_check$lac_ain) %>% View()
+xwalk %>% filter(ain_2026_08 %in% dup_check$lac_ain) %>% View()
 # makes sense to have duplicate here, take care of later to ensure no more dups at the end
 
 # check to make sure if any anfs parcels will get dropped and find no match
 anfs_missing <- anfs_sales %>% 
-  filter(!parcel %in% c(lac_sales_records$lac_ain,lac_sales_records$ain_2025_01,lac_sales_records$ain_2025_12))
+  filter(!parcel %in% c(lac_sales_records$lac_ain,lac_sales_records$ain_2025_01,lac_sales_records$ain_2026_08))
 # check against prior damage records
 damage <- dbGetQuery(con_alt, "SELECT * FROM data.rel_assessor_damage_level_sept2025")
-residential <- dbGetQuery(con_alt, "SELECT ain_sept, residential FROM data.rel_assessor_residential_sept2025") 
+residential <- dbGetQuery(con_alt, "SELECT ain_2026_08, residential FROM dashboard.rel_assessor_residential_2026_08") 
 anfs_missing <- anfs_missing %>% 
   left_join(damage,by=c("parcel"="ain_sept")) %>%
-  left_join(residential,by=c("parcel"="ain_sept"))
+  left_join(residential,by=c("parcel"="ain_2026_08"))
 
 ###### *UPDATE running log of ANFS issues to fix #####
 # explore anfs ains that get no match in our crosswalks - 
 # likely commercial or deleted parcels or in some cases typos
 anfs_missing %>% filter(is.na(damage_category)) %>% View() 
+# 8/06/2026
+# 12 came up as missing and when I checked then in the assessor portal, they came up as commercial, institutional, vacant, deleted, shell (like 5842008018), etc. basically not residential and active
+# 5835038003 - commercial (doesn't apply)
+# 5841032019 - commercial (doesn't apply)
+# 5845002015 - commercial (doesn't apply)
+# 5835014001 - Auto service
 
+# 4/12/2026
 # update log of parcels that don't apply (e.g., commercial) or that have typos
 ## Don't apply because commercial or public land or vacant (in jan25) properties
 # 5845002015 - commercial (doesn't apply)
@@ -209,7 +236,7 @@ anfs_missing %>% filter(is.na(damage_category)) %>% View()
 # 5835038003 - commercial (doesn't apply)
 # 5862007300 - public land
 # 5841001014 - vacant land - was vacant in jan 2025 based on 'SELECT * FROM dashboard.assessor_data_universe_2025_01 where ain='5841001014'' so doesn't apply to universe
-
+# 4/12/2026
 ## Don't join because of typo or outdated AIN - All are manually
 ## addressed when loading in anfs in lines 147-152
 # 5843022001 - deleted (old ain from 2021) - should be: 5843022058 (manually fixed)
@@ -218,7 +245,7 @@ anfs_missing %>% filter(is.na(damage_category)) %>% View()
 # 5844012018,19 - 5844012018 - significant damage split (manually fixed)
 # 5844012018,19 - 5844012019 - no damage split (manually fixed)
 # 5482015020 - 5842015020 typo (manually fixed)
-
+# 4/12/2026
 ## Don't apply due to damage level
 # # 5751009007 - residential no damage on CalFire database - unclear why didn't match our september data
 # 5831005008 Some damage (doesn't apply) / Misfortune & Calamity Status: APPROVED (looks ok in photo) https://portal.assessor.lacounty.gov/parceldetail/5831005008
@@ -244,7 +271,8 @@ sales_merged <- lac_sales_records %>%
   # add prior ains from previous xwalks each update
   left_join(anfs_sales_records, by = c("lac_ain" = "anfs_ain")) %>%
   left_join(anfs_sales_records, by = c("ain_2025_01" = "anfs_ain"), suffix = c("", "_b")) %>%
-  left_join(anfs_sales_records, by = c("ain_2025_12" = "anfs_ain"), suffix = c("", "_c")) %>%
+  left_join(anfs_sales_records, by = c("ain_2026_04" = "anfs_ain"), suffix = c("", "_c")) %>%
+
   # coalesce anfs sales columns into one field
   mutate(anfs_sold_combined = coalesce(anfs_sold,
                                  anfs_sold_b,
@@ -259,14 +287,45 @@ sales_merged <- lac_sales_records %>%
     # create final sold after eaton column
     sold_after_eaton=ifelse(sold_source!='neither', TRUE, FALSE))
 
+# manually flag: for merged parcel 5841023022, use the 5841023010 lineage (no sale)
+# instead of the 5841023009 lineage (which picked up an unrelated ANFS land sale)
+correct_row <- sales_merged %>%
+  filter(lac_ain == "5841023022", ain_2025_01 == "5841023010") %>%
+  left_join(lac_sales_clean, by = c("lac_ain" = "ain")) %>%
+  left_join(anfs_sales_clean, by = c("lac_ain" = "parcel")) %>%
+  mutate(
+    last_sale_year = ifelse(sold_source == "anfs", last_sale_year_anfs, last_sale_year_lac),
+    last_sale_month = ifelse(sold_source == "anfs", last_sale_month_anfs, last_sale_month_lac),
+    last_sale_date = if_else(sold_source == "anfs", as.Date(last_sale_date_anfs), as.Date(last_sale_date_lac)),
+    sold_amount = ifelse(sold_source == "anfs", sold_amount_anfs, sold_amount_lac),
+    owner_name = ifelse(sold_source == "anfs", owner_name_anfs, owner_name_lac)
+  ) %>%
+  select(-ain) %>%
+  rename(ain = lac_ain) %>%
+  select(ain, sold_after_eaton, sold_source, last_sale_year, last_sale_month,
+         last_sale_date, sold_amount, owner_name)  # write out final_df's known column names explicitly
+
 # check recoding worked
 sales_merged %>% filter(is.na(anfs_sold) & !is.na(anfs_sold_b)) %>% View()
 table(sales_merged$sold_source)
 table(sales_merged$sold_after_eaton)
+#08/06/2026
+# anfs    both     lac neither 
+# 98     389      60    5130 
+# FALSE  TRUE 
+# 5130   547 
+# 04/12/2026
 # 73 + 340 + 43 = 456
 sales_merged %>% group_by(sold_source,anfs_sold_combined,sold_after_eaton_lac) %>% summarise(count=n())
+#08/06/2026
+# sold_source anfs_sold_combined sold_after_eaton_lac count
+# <chr>       <lgl>              <lgl>                <int>
+#   1 anfs        TRUE               FALSE                   98
+# 2 both        TRUE               TRUE                   389
+# 3 lac         FALSE              TRUE                    60
+# 4 neither     FALSE              FALSE                 5130
 
-# check for dups again
+# check for dupes again
 nrow(sales_merged) - nrow(lac_sales_records)
 # none extra
 
@@ -394,17 +453,26 @@ table(final_df$sold_after_eaton) # sold decreases by 1 because 	5842008010 was d
 final_df <- final_df %>%
   rename(ain=lac_ain)
 
-#### PART 5: PUSH TO PGADMIN ####
+# as a final step apply the rewrite for ain == "5841023022"
+correct_row <- correct_row %>% # was a diff type which caused an error
+  mutate(sold_amount = as.character(sold_amount))
+
+final_df <- final_df %>%
+  rows_update(correct_row, by = "ain")
+
+final_df %>% filter(ain == "5841023022")  # confirm it took
+
+#### PUSH TO PGADMIN ####
 # Export to postgres
 table_label <- paste0("rel_assessor_sales_", year, "_", month) 
 schema <- "dashboard"
 indicator <- "Relational table with information on sales date and owner information using a combination of LAC assessor data and Altadena not for sale data
 We mark a property as sold if sale date was on or after 2-8-25 in either source. In cases where property is only marked as sold in ANFS data then we use the owner information and sales data from that file. In all other cases, we use LAC assessor"
-source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/MK/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_sales.R "
-qa_filepath<-"  QA_Sheet_rel_tables_update_2026_04.docx "
+source <- "Script: W:/Project/RDA Team/Altadena Recovery and Rebuild/GitHub/AB/altadena_recovery_rebuild/altadena_recovery_rebuild/Data Prep/Monthly Updates/rel_assessor_sales.R "
+qa_filepath<-"  QA_Sheet_rel_tables_update_2026_08.docx "
 
-# dbWriteTable(con_alt, Id(schema, table_label), final_df,
-#                          overwrite = FALSE, row.names = FALSE)
+ # dbWriteTable(con_alt, Id(schema, table_label), final_df,
+ #                          overwrite = FALSE, row.names = FALSE)
 
 
 # Add metadata
@@ -422,5 +490,5 @@ column_comments <- c('ain for current month- use to match to other tables',
 # add_table_comments(con_alt, schema, table_label, indicator, source, qa_filepath, column_names, column_comments)
 
 
-#### PART 8: close dbconnection (NO UPDATES NEEDED) ####
+#### close dbconnection (NO UPDATES NEEDED) ####
 dbDisconnect(con_alt)

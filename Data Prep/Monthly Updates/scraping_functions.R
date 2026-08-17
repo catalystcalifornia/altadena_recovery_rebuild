@@ -1,12 +1,36 @@
 library(rvest)
 library(chromote)
+library(jsonlite)
+library(later)
 
-# ===== TEMP FILE MANAGEMENT SETUP =====
+##### Functions to manage temp files #####
 # Helps manage disk space 
 # Create custom directory for Chrome temp files
 custom_chrome_dir <- file.path(getwd(), "chrome_temp")
 dir.create(custom_chrome_dir, showWarnings = FALSE, recursive = TRUE)
-Sys.setenv(CHROMOTE_CHROME_USER_DATA_DIR = custom_chrome_dir)
+# Sys.setenv(CHROMOTE_CHROME_USER_DATA_DIR = custom_chrome_dir)
+
+# add function so that parallel processing workers get distinct chrome browsers
+# if they all try to use the same one it can create conflicts and impact data collection
+get_worker_chrome_dir <- function() {
+  worker_dir <- file.path(custom_chrome_dir, paste0("worker_", Sys.getpid()))
+  dir.create(worker_dir, showWarnings = FALSE, recursive = TRUE)
+  Sys.setenv(CHROMOTE_CHROME_USER_DATA_DIR = worker_dir)
+  worker_dir
+}
+
+# Add function to log messages from all the workers when scraping each AIN
+log_message <- function(...) {
+  msg <- paste(..., collapse = " ")
+  # print message in RStudio console too
+  message(msg)
+  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  log_dir <- file.path(getwd(), paste0("logs_", curr_year, "_", curr_month))
+  dir.create(log_dir, showWarnings = FALSE, recursive = TRUE)
+  log_file <- file.path(log_dir, paste0("scrape_log_worker_", Sys.getpid(), ".txt"))
+  
+  cat(paste0("[", timestamp, "] ", msg, "\n"), file = log_file, append = TRUE)
+}
 
 # Cleanup function
 cleanup_all_temp <- function() {
@@ -36,6 +60,7 @@ check_temp_size <- function() {
   return(total_size)
 }
 
+##### Function to test chromote before starting scrape #####
 # Alternative to RSelenium - much simpler and more reliable
 # test_chromote() confirms we can navigate to a simple, easily accessible page like google.com
 test_chromote <- function() {
@@ -65,252 +90,199 @@ test_chromote <- function() {
 
 
 ##### General permit scraping functions #####
-# The website is a single page application (SPA) will try a longer wait time
-wait_for_spa_load <- function(url, max_wait = 20) {
-  status <- "error"  # Default to error
-  page_source <- NULL
+# Function to check for when the data requested is loaded.
+wait_for_search_response_json <- function(url, max_wait = 20) {
+  status <- "error"
+  search_json <- NULL
   
   tryCatch({
+    get_worker_chrome_dir()
     b <- ChromoteSession$new()
+    b$Network$enable()
+    
+    target_request_id <- NULL
+    response_ready <- FALSE
+    
+    b$Network$responseReceived(callback = function(params) {
+      if(grepl("api/energov/search/search", params$response$url, fixed = TRUE)) {
+        target_request_id <<- params$requestId
+      }
+    })
+    
+    b$Network$loadingFinished(callback = function(params) {
+      if(!is.null(target_request_id) && identical(params$requestId, target_request_id)) {
+        response_ready <<- TRUE
+      }
+    })
+    
     b$Page$navigate(url)
     b$Page$loadEventFired()
     
-    message("Waiting for SPA to fully load...")
+    log_message("Waiting for search API response...")
     
     start_time <- Sys.time()
-    while(difftime(Sys.time(), start_time, units = "secs") < max_wait) {
+    while(!response_ready && difftime(Sys.time(), start_time, units = "secs") < max_wait) {
+      later::run_now(0.5)  # services the event loop AND waits ~0.5s
+    }
+    
+    if(response_ready) {
+      log_message(paste("✓ Search API response received! (", round(difftime(Sys.time(), start_time, units="secs"), 1), "s )"))
       
-      elapsed_time <- difftime(Sys.time(), start_time, units = "secs")
-      
-      # Check if the moduleResultMessage container is visible (page loaded indicator)
-      module_loaded <- tryCatch({
-        b$Runtime$evaluate('document.querySelector("#moduleResultMessage[aria-hidden=\\"false\\"]") !== null')$result$value
+      body_result <- tryCatch({
+        b$Network$getResponseBody(requestId = target_request_id)
       }, error = function(e) {
-        message("Warning: Could not check module loaded status")
-        return(FALSE)
+        log_message(paste("Error getting response body:", e$message))
+        NULL
       })
       
-      message(paste("Waiting for results module... (", round(elapsed_time, 1), "s elapsed)"))
-      
-      if(module_loaded) {
-        message("✓ Results module loaded!")
-        
-        # Now check for actual results
-        results_count <- tryCatch({
-          b$Runtime$evaluate('document.querySelectorAll("div[name=\\"label-SearchResult\\"]").length')$result$value
-        }, error = function(e) {
-          message("Warning: Could not check results count")
-          return(0)
-        })
-        
-        message(paste("Results found:", results_count))
-        
-        if(results_count > 0) {
-          message("✓ Search results loaded!")
-        } else {
-          message("✓ Page loaded - No results found")
-        }
-        
+      if(!is.null(body_result) && !is.null(body_result$body)) {
+        search_json <- body_result$body
         status <- "success"
-        break
+      } else {
+        status <- "error"
       }
-      
-      Sys.sleep(2)
-    }
-    
-    # If we exited loop without confirming page load, mark as timeout
-    if(status != "success") {
-      message("⚠ Timeout: Results module did not load within wait period")
+    } else {
+      log_message("⚠ Timeout: search API response not received within wait period")
       status <- "timeout"
     }
-    
-    # Get final page state
-    page_source <- tryCatch({
-      b$Runtime$evaluate("document.documentElement.outerHTML")$result$value
-    }, error = function(e) {
-      message("Error getting page source")
-      return("")
-    })
     
     b$close()
     
   }, error = function(e) {
-    message(paste("✗ Error during page load:", e$message))
-    status <- "error"
-    page_source <- ""
+    log_message(paste("✗ Error during page load:", e$message))
   })
   
-  return(list(html = page_source, status = status))
+  return(list(json = search_json, status = status))
 }
 
-# Helper Function to extract required permit data from the structured div layout of LAC Portal search result
-extract_permit_data_general <- function(html_content, response_status = "success", ain = NA, retried = FALSE) {
+# Function to map interested fields with their JSON keys, also reformats from JSON to R df
+extract_permit_data_json <- function(json_text, response_status = "success", ain = NA, retried = FALSE) {
   
-  if(is.null(html_content) || html_content == "" || nchar(html_content) < 50) {
-    message("Invalid or empty HTML content received")
-    
-    permit_df <- data.frame(
-      record_id = NA,
-      permit_number = NA,
-      permit_href = NA,
-      applied_date = NA,
+  empty_row <- function() {
+    data.frame(
+      record_id = NA, permit_number = NA, permit_href = NA,
+      applied_date_raw = NA, applied_date = NA,
       type = NA,
-      issued_date = NA,
+      issued_date_raw = NA, issued_date = NA,
       project_name = NA,
-      expiration_date = NA,
+      expiration_date_raw = NA, expiration_date = NA,
       status = NA,
-      finalized_date = NA,
-      main_parcel = NA,
-      address = NA,
-      description = NA,
-      response_status = response_status,
-      ain = ain,
-      retried = retried,
-      stringsAsFactors = FALSE
+      finalized_date_raw = NA, finalized_date = NA,
+      main_parcel = NA, address = NA, description = NA,
+      response_status = response_status, ain = ain,
+      retried = retried, stringsAsFactors = FALSE
     )
-    
-    return(permit_df)
   }
   
-  # Now safe to parse HTML
-  page <- read_html(html_content)
+  if(is.null(json_text) || json_text == "" || nchar(json_text) < 20) {
+    message("Invalid or empty JSON content received")
+    return(empty_row())
+  }
   
-  # Find all search result containers
-  result_containers <- page %>% html_nodes('div[name="label-SearchResult"]')
+  parsed <- tryCatch(jsonlite::fromJSON(json_text, simplifyDataFrame = FALSE), error = function(e) {
+    message("Error parsing JSON: ", e$message)
+    NULL
+  })
   
-  all_permits <- data.frame()
+  if(is.null(parsed) || is.null(parsed$Result)) {
+    return(empty_row())
+  }
   
-  if (length(result_containers)==0) {
+  results <- parsed$Result$EntityResults
+  
+  reformat_date <- function(x) {
+    if(is.null(x) || is.na(x) || x == "") return(NA)
+    d <- tryCatch(as.Date(substr(x, 1, 10), format = "%Y-%m-%d"), error = function(e) NA)
+    if(is.na(d)) return(NA)
+    format(d, "%m/%d/%Y")
+  }
+  
+  safe_field <- function(x) if(is.null(x)) NA else x
+  
+  if(length(results) == 0) {
     message("This address has no associated permits")
+    return(empty_row())
+  }
+  
+  all_permits <- do.call(rbind, lapply(seq_along(results), function(i) {
+    r <- results[[i]]
     
-    # Convert to data frame row with NA
-    permit_df <- data.frame(
-      record_id = NA,
-      permit_number = NA,
-      permit_href = NA,
-      applied_date = NA,
-      type = NA,
-      issued_date = NA,
-      project_name = NA,
-      expiration_date = NA,
-      status = NA,
-      finalized_date = NA,
-      main_parcel = NA,
-      address = NA,
-      description = NA,
+    applied_raw <- safe_field(r$ApplyDate)
+    issued_raw <- safe_field(r$IssueDate)
+    expire_raw <- safe_field(r$ExpireDate)
+    final_raw <- safe_field(r$FinalDate)
+    
+    data.frame(
+      record_id = i,
+      permit_number = safe_field(r$CaseNumber),
+      permit_href = paste0("#/permit/", safe_field(r$CaseId)),
+      applied_date_raw = applied_raw,
+      applied_date = reformat_date(applied_raw),
+      type = safe_field(r$CaseType),
+      issued_date_raw = issued_raw,
+      issued_date = reformat_date(issued_raw),
+      project_name = safe_field(r$ProjectName),
+      expiration_date_raw = expire_raw,
+      expiration_date = reformat_date(expire_raw),
+      status = safe_field(r$CaseStatus),
+      finalized_date_raw = final_raw,
+      finalized_date = reformat_date(final_raw),
+      main_parcel = safe_field(r$MainParcel),
+      address = safe_field(r$AddressDisplay),
+      description = safe_field(r$Description),
       response_status = response_status,
       ain = ain,
       retried = retried,
       stringsAsFactors = FALSE
     )
-    
-    all_permits <- bind_rows(all_permits, permit_df)
-    
-  } else {
-    
-    for(i in 1:length(result_containers)) {
-      container <- result_containers[i]
-      
-      # Define specific extraction for each field
-      permit_data <- list(
-        permit_number = container %>% html_node('div[name="label-CaseNumber"] a') %>% html_text(trim = TRUE),
-        permit_href = container %>% html_node('div[name="label-CaseNumber"] a') %>% html_attr("href"),
-        applied_date = container %>% html_node('div[name="label-ApplyDate"] span.margin-md-left') %>% html_text(trim = TRUE),
-        type = container %>% html_node('div[name="label-CaseType"] tyler-highlight span') %>% html_text(trim = TRUE),
-        issued_date = container %>% html_node('div[name="label-IssuedDate"] span.margin-md-left') %>% html_text(trim = TRUE),
-        project_name = container %>% html_node('div[name="label-Project"] tyler-highlight span') %>% html_text(trim = TRUE),
-        expiration_date = container %>% html_node('div[name="label-ExpiredDate"] span.margin-md-left') %>% html_text(trim = TRUE),
-        status = container %>% html_node('div[name="label-Status"] tyler-highlight span') %>% html_text(trim = TRUE),
-        finalized_date = container %>% html_node('div[name="label-FinalizedDate"] span.margin-md-left') %>% html_text(trim = TRUE),
-        main_parcel = container %>% html_node('div[name="label-MainParcel"] tyler-highlight span') %>% html_text(trim = TRUE),
-        address = container %>% html_node('div[name="label-Address"] tyler-highlight span') %>% html_text(trim = TRUE),
-        description = container %>% html_node('div[name="label-Description"] tyler-highlight span') %>% html_text(trim = TRUE)
-      )
-      
-      # Convert to data frame row
-      permit_df <- data.frame(
-        record_id = i,
-        permit_number = ifelse(is.na(permit_data$permit_number), NA, permit_data$permit_number),
-        permit_href = ifelse(is.na(permit_data$permit_href), NA, permit_data$permit_href),
-        applied_date = ifelse(is.na(permit_data$applied_date), NA, permit_data$applied_date),
-        type = ifelse(is.na(permit_data$type), NA, permit_data$type),
-        issued_date = ifelse(is.na(permit_data$issued_date), NA, permit_data$issued_date),
-        project_name = ifelse(is.na(permit_data$project_name), NA, permit_data$project_name),
-        expiration_date = ifelse(is.na(permit_data$expiration_date), NA, permit_data$expiration_date),
-        status = ifelse(is.na(permit_data$status), NA, permit_data$status),
-        finalized_date = ifelse(is.na(permit_data$finalized_date), NA, permit_data$finalized_date),
-        main_parcel = ifelse(is.na(permit_data$main_parcel), NA, permit_data$main_parcel),
-        address = ifelse(is.na(permit_data$address), NA, permit_data$address),
-        description = ifelse(is.na(permit_data$description), NA, permit_data$description),
-        response_status = response_status,
-        ain = ain,
-        retried = retried,
-        stringsAsFactors = FALSE
-      )
-      
-      all_permits <- bind_rows(all_permits, permit_df)
-    }
-  }
+  }))
   
-  return(all_permits)
+  all_permits
 }
 
-# Function to receive a portal url (configured to start a search for permits based on provided address)
-# and return a data frame of permits
-# Now includes automatic retry logic and tracking
-scrape_permits_chromote <- function(url, ain = NA, wait_time = 30, max_retries = 1, retry_wait_time = 60) {
-  message(paste("Scraping:", url))
+# Function to orchestrate workflow for general permit scrape (e.g., wait for response, extract, return as df)
+scrape_permits_chromote_json <- function(url, ain = NA, wait_time = 30, max_retries = 1, retry_wait_time = 60) {
+  log_message(paste("Scraping:", url))
   
-  # First attempt
-  result <- wait_for_spa_load(url, max_wait = wait_time)
+  result <- wait_for_search_response_json(url, max_wait = wait_time)
   
-  # Check if retry is needed
   is_retry <- FALSE
   if(result$status %in% c("timeout", "error") && max_retries > 0) {
-    message(paste("⚠ First attempt failed with status:", result$status))
-    message(paste("🔄 Retrying with longer wait time (", retry_wait_time, "seconds)..."))
-    
-    Sys.sleep(5)  # Brief pause before retry
-    
-    # Retry with longer wait time
-    result <- wait_for_spa_load(url, max_wait = retry_wait_time)
+    log_message(paste("⚠ First attempt failed with status:", result$status))
+    log_message(paste("🔄 Retrying with longer wait time (", retry_wait_time, "seconds)..."))
+    Sys.sleep(5)
+    result <- wait_for_search_response_json(url, max_wait = retry_wait_time)
     is_retry <- TRUE
-    
-    if(result$status == "success") {
-      message("✓ Retry successful!")
-    } else {
-      message(paste("✗ Retry also failed with status:", result$status))
-    }
+    log_message(if(result$status == "success") "✓ Retry successful!" else paste("✗ Retry also failed with status:", result$status))
   }
   
-  # Use custom function to get general data fields, passing all tracking info
-  permits <- extract_permit_data_general(html_content = result$html, 
-                                         response_status = result$status,
-                                         ain = ain,
-                                         retried = is_retry)
-  
+  permits <- extract_permit_data_json(json_text = result$json,
+                                      response_status = result$status,
+                                      ain = ain,
+                                      retried = is_retry)
   return(permits)
 }
 
 
-
-##### Detailed permit scraping functions #####
+##### Functions for detailed scraping #####
+# Function to gauge when the webpage has finished loading and html is ready to be scraped from site
 wait_for_permit_detail_load <- function(url, max_wait = 20) {
   status <- "error"  # Default to error
   page_source <- NULL
-  
+
   tryCatch({
+    get_worker_chrome_dir()
     b <- ChromoteSession$new()
     b$Page$navigate(url)
     b$Page$loadEventFired()
-    
-    message("Waiting for permit detail page to fully load...")
-    
+
+    log_message("Waiting for permit detail page to fully load...")
+
     start_time <- Sys.time()
     while(difftime(Sys.time(), start_time, units = "secs") < max_wait) {
-      
+
       elapsed_time <- difftime(Sys.time(), start_time, units = "secs")
-      
+
       # Check if the permit number container has actual content
       permit_loaded <- tryCatch({
         b$Runtime$evaluate('
@@ -318,60 +290,61 @@ wait_for_permit_detail_load <- function(url, max_wait = 20) {
           elem !== null && elem.textContent.trim().length > 0
         ')$result$value
       }, error = function(e) {
-        message("Warning: Could not check permit detail loaded status")
+        log_message("Warning: Could not check permit detail loaded status")
         return(FALSE)
       })
-      
-      message(paste("Waiting for permit detail... (", round(elapsed_time, 1), "s elapsed)"))
-      
+
+      log_message(paste("Waiting for permit detail... (", round(elapsed_time, 1), "s elapsed)"))
+
       if(permit_loaded) {
-        message("✓ Permit detail page loaded!")
-        
+        log_message("✓ Permit detail page loaded!")
+
         # Give Angular time to finish rendering
         Sys.sleep(2)
-        
+
         status <- "success"
         break
       }
-      
+
       Sys.sleep(2)
     }
-    
+
     # If we exited loop without confirming page load, mark as timeout
     if(status != "success") {
-      message("⚠ Timeout: Permit detail did not load within wait period")
+      log_message("⚠ Timeout: Permit detail did not load within wait period")
       status <- "timeout"
     }
-    
+
     # Get final page state
     page_source <- tryCatch({
       b$Runtime$evaluate("document.documentElement.outerHTML")$result$value
     }, error = function(e) {
-      message("Error getting page source")
+      log_message("Error getting page source")
       return("")
     })
-    
+
     b$close()
-    
+
   }, error = function(e) {
-    message(paste("✗ Error during page load:", e$message))
+    log_message(paste("✗ Error during page load:", e$message))
     status <- "error"
     page_source <- ""
   })
-  
+
   # ALWAYS return a list
   return(list(html = page_source, status = status))
 }
 
-
-# scrape detailed permit data
-extract_permit_data_detailed <- function(html_content_main, 
-                                         html_content_locations = NULL, 
-                                         response_status = "success", 
+# Function that maps the fields we want to scrape to their location in the html
+# And converts from HTML to an R dataframe 
+# Includes fields for permit level data and workflow item data
+extract_permit_data_detailed <- function(html_content_main,
+                                         html_content_locations = NULL,
+                                         response_status = "success",
                                          permit_number = NA,
                                          ain=NA,
                                          retried = FALSE) {
-  
+
   # Initialize empty return structure
   empty_details <- data.frame(
     permit_number = permit_number, ain=ain,
@@ -383,7 +356,7 @@ extract_permit_data_detailed <- function(html_content_main,
     response_status = response_status, retried = retried,
     stringsAsFactors = FALSE
   )
-  
+
   empty_workflow <- data.frame(
     permit_number = character(0),
     ain=character(0),
@@ -392,13 +365,13 @@ extract_permit_data_detailed <- function(html_content_main,
     status_date = character(0),
     stringsAsFactors = FALSE
   )
-  
+
   # Check for invalid HTML
   if(is.null(html_content_main) || html_content_main == "" || nchar(html_content_main) < 50) {
     message("Invalid or empty HTML content received for main page")
     return(list(permit_details = empty_details, workflow = empty_workflow))
   }
-  
+
   # Parse main HTML
   page_main <- tryCatch({
     read_html(html_content_main)
@@ -406,11 +379,11 @@ extract_permit_data_detailed <- function(html_content_main,
     message("Error parsing main HTML: ", e$message)
     return(NULL)
   })
-  
+
   if(is.null(page_main)) {
     return(list(permit_details = empty_details, workflow = empty_workflow))
   }
-  
+
   # ===== SECTION 1: Extract Permit Details =====
   extract_safe <- function(node, selector, attr = NULL) {
     tryCatch({
@@ -425,7 +398,7 @@ extract_permit_data_detailed <- function(html_content_main,
       return(NA)
     })
   }
-  
+
   type <- extract_safe(page_main, '#label-PermitDetail-Type p.form-control-static')
   status <- extract_safe(page_main, '#label-PermitDetail-Status p.form-control-static')
   project_name <- extract_safe(page_main, '#label-PermitDetail-ProjectName a')
@@ -438,21 +411,21 @@ extract_permit_data_detailed <- function(html_content_main,
   valuation <- extract_safe(page_main, '#label-PermitDetail-Valuation p.form-control-static')
   finalized_date <- extract_safe(page_main, '#label-PermitDetail-FinalizedDate p.form-control-static')
   description <- extract_safe(page_main, '#label-PermitDetail-Description')
-  
+
   # ===== SECTION 2: Extract Progress Chart Data =====
   completed_pct <- NA
   in_progress_pct <- NA
   not_started_pct <- NA
-  
+
   tryCatch({
     chart_paths <- page_main %>% html_nodes('#Donut-chart-render path[aria-label]')
     if(length(chart_paths) >= 3) {
       labels <- chart_paths %>% html_attr('aria-label')
-      
+
       # Extract percentages from aria-labels
       for(label in labels) {
         if(grepl("Completed", label)) {
-          completed_pct <- stringr::str_extract(label, "\\d+") 
+          completed_pct <- stringr::str_extract(label, "\\d+")
         } else if(grepl("Active", label)) {
           in_progress_pct <- stringr::str_extract(label, "\\d+")
         } else if(grepl("Remaining", label)) {
@@ -463,31 +436,31 @@ extract_permit_data_detailed <- function(html_content_main,
   }, error = function(e) {
     message("Could not extract progress chart data: ", e$message)
   })
-  
+
   # ===== SECTION 3: Extract Workflow Items =====
   workflow_df <- empty_workflow
-  
+
   tryCatch({
     workflow_divs <- page_main %>% html_nodes('div[ng-repeat="activity in vm.workflowActivities"]')
-    
+
     if(length(workflow_divs) > 0) {
       workflow_list <- list()
-      
+
       for(i in 1:length(workflow_divs)) {
         div <- workflow_divs[i]
-        
+
         # Check icon class to determine if active
         icon_class <- div %>% html_node('i') %>% html_attr('class')
-        
+
         if(is.na(icon_class) || grepl('wf-activity-NotStarted', icon_class)) {
           next  # Skip not started items
         }
-        
+
         # Extract workflow item name
-        workflow_item <- div %>% 
-          html_node('span[ng-class*="vm.getActivityCssClass"]') %>% 
+        workflow_item <- div %>%
+          html_node('span[ng-class*="vm.getActivityCssClass"]') %>%
           html_text(trim = TRUE)
-        
+
         # Extract status text
         status_span <- div %>% html_node('span.wf-summaryLabels')
         status_text <- if(!is.na(status_span)) {
@@ -495,7 +468,7 @@ extract_permit_data_detailed <- function(html_content_main,
         } else {
           ""
         }
-        
+
         # Determine status (check "Not Passed" before "Passed")
         item_status <- NA
         if(grepl("Not Passed", status_text)) {
@@ -512,14 +485,14 @@ extract_permit_data_detailed <- function(html_content_main,
         } else if(grepl("Scheduled for", status_text)) {
           item_status <- "Scheduled"
         }
-        
+
         # Extract date
         item_date <- NA
-        
+
         if(!is.na(status_span)) {
           # Get all text from the status span
           full_status_text <- status_span %>% html_text(trim = TRUE)
-          
+
           # Try to extract date from the ng-binding span first (for Passed/Not Passed)
           date_span <- status_span %>% html_node('span.ng-binding')
           if(!is.na(date_span)) {
@@ -532,11 +505,11 @@ extract_permit_data_detailed <- function(html_content_main,
             }
           }
         }
-        
+
         # If no date yet, look for scheduled date in ALL wf-summaryLabels spans in this div
         if(is.na(item_date) || item_date == "") {
           all_status_spans <- div %>% html_nodes('span.wf-summaryLabels')
-          
+
           for(span in all_status_spans) {
             span_text <- span %>% html_text(trim = TRUE)
             if(grepl("Scheduled for", span_text)) {
@@ -549,7 +522,7 @@ extract_permit_data_detailed <- function(html_content_main,
             }
           }
         }
-        
+
         # Add to list if we have a workflow item name
         if(!is.na(workflow_item) && workflow_item != "") {
           workflow_list[[length(workflow_list) + 1]] <- data.frame(
@@ -562,7 +535,7 @@ extract_permit_data_detailed <- function(html_content_main,
           )
         }
       }
-      
+
       # Combine all workflow items
       if(length(workflow_list) > 0) {
         workflow_df <- bind_rows(workflow_list)
@@ -571,44 +544,44 @@ extract_permit_data_detailed <- function(html_content_main,
   }, error = function(e) {
     message("Error extracting workflow data: ", e$message)
   })
-  
+
   # ===== SECTION 4: Extract Location Data =====
   address <- NA
   main_address <- NA
   parcel_number <- NA
   main_parcel <- NA
-  
+
   if(!is.null(html_content_locations) && html_content_locations != "") {
     tryCatch({
       page_locations <- read_html(html_content_locations)
-      
+
       # Extract address
-      address <- page_locations %>% 
-        html_node('p[id^="Address_State_Info"]') %>% 
+      address <- page_locations %>%
+        html_node('p[id^="Address_State_Info"]') %>%
         html_text(trim = TRUE)
-      
+
       # Check if main address
-      main_address_input <- page_locations %>% 
+      main_address_input <- page_locations %>%
         html_node('input[id^="chk_address_main"]')
-      main_address <- !is.na(main_address_input) && 
+      main_address <- !is.na(main_address_input) &&
         !is.na(html_attr(main_address_input, 'checked'))
-      
+
       # Extract parcel number
-      parcel_number <- page_locations %>% 
-        html_node('div[id^="Parcel_Number"] p') %>% 
+      parcel_number <- page_locations %>%
+        html_node('div[id^="Parcel_Number"] p') %>%
         html_text(trim = TRUE)
-      
+
       # Check if main parcel
-      main_parcel_input <- page_locations %>% 
+      main_parcel_input <- page_locations %>%
         html_node('input[id^="chk_parcel_main"]')
-      main_parcel <- !is.na(main_parcel_input) && 
+      main_parcel <- !is.na(main_parcel_input) &&
         !is.na(html_attr(main_parcel_input, 'checked'))
-      
+
     }, error = function(e) {
       message("Error extracting location data: ", e$message)
     })
   }
-  
+
   # ===== Build permit_details data frame =====
   permit_details <- data.frame(
     permit_number = permit_number,
@@ -636,7 +609,7 @@ extract_permit_data_detailed <- function(html_content_main,
     retried = retried,
     stringsAsFactors = FALSE
   )
-  
+
   # Return list with both data frames
   return(list(
     permit_details = permit_details,
@@ -644,35 +617,37 @@ extract_permit_data_detailed <- function(html_content_main,
   ))
 }
 
+# function to orchestrate the whole workflow of going to permit page, waiting for
+# data to fully load, scraping and reformatting data into R dataframes
 scrape_permits_detailed <- function(url, url_suffix, ain = NA, permit_number=NA, wait_time = 30, max_retries = 1, retry_wait_time = 60) {
-  message(paste("Scraping:", url))
-  
+  log_message(paste("Scraping:", url))
+
   # First attempt
   result1 <- wait_for_permit_detail_load(url, max_wait = wait_time)
   Sys.sleep(2)
   result2 <- wait_for_permit_detail_load(url=paste0(url,url_suffix), max_wait = wait_time)
-  
+
   # Check if retry is needed
   is_retry <- FALSE
   if(result1$status %in% c("timeout", "error") && max_retries > 0) {
-    message(paste("⚠ First attempt failed with status:", result1$status))
-    message(paste("🔄 Retrying with longer wait time (", retry_wait_time, "seconds)..."))
-    
+    log_message(paste("⚠ First attempt failed with status:", result1$status))
+    log_message(paste("🔄 Retrying with longer wait time (", retry_wait_time, "seconds)..."))
+
     Sys.sleep(1)  # Brief pause before retry
-    
+
     # Retry with longer wait time
     result1 <- wait_for_permit_detail_load(url, max_wait = retry_wait_time)
     Sys.sleep(1)
     result2 <- wait_for_permit_detail_load(url=paste0(url,url_suffix), max_wait=retry_wait_time)
     is_retry <- TRUE
-    
+
     if(result1$status == "success") {
-      message("✓ Retry successful!")
+      log_message("✓ Retry successful!")
     } else {
-      message(paste("✗ Retry also failed with status:", result1$status))
+      log_message(paste("✗ Retry also failed with status:", result1$status))
     }
   }
-  
+
   # Use custom function to get general data fields, passing all tracking info
   permits_detailed <- extract_permit_data_detailed(
     html_content_main = result1$html,
@@ -681,7 +656,6 @@ scrape_permits_detailed <- function(url, url_suffix, ain = NA, permit_number=NA,
     ain = ain,
     permit_number=permit_number,
     retried = is_retry)
-  
+
   return(permits_detailed)
 }
-
