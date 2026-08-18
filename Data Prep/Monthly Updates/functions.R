@@ -24,4 +24,5 @@ transform_ain_to_curr <- function(ain_vector, xwalk_df, curr_ain) {
 }
 
 # # Usage:
+# source("Data Prep\\Monthly Updates\\functions.R")
 # mutate(transformed_ain = transform_ain_to_curr(ain, xwalk_df=xwalk_parcels, curr_ain = "ain_YYYY_MM"))

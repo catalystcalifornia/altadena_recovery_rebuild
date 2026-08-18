@@ -3,12 +3,12 @@ title: "Commercial-Multiuse-Exploration"
 output: html_document
 ---
 
-# Step 0: Setup
 ```{r, include=FALSE}
 #load libraries
 library(dplyr)
 library(sf)
 library(mapview)
+library(here)
 
 #Add database connection and source script with functions for pushing to postgres
 source("W:\\RDA Team\\R\\credentials_source.R")
@@ -17,7 +17,7 @@ options(scipen = 999)
 ```
 
 # Step 1a: Review use codes in the January 2025 Assessor data against April 2026 use codes
-```{r}
+```{r, include=FALSE}
 # Get the observed use codes in the Jan 2025 assessor data and April 2026
 # Note: these have already been filtered for AINs in Altadena
 get_use_code_query1 <- "SELECT 
@@ -53,6 +53,7 @@ assessor_use_codes_apr_2026
 ```
 
 Based on the property use classification chart commercial use codes are 4 characters and generally start with a 1 or 2. Based on the data dictionary there are specific codes to note residential units on the property. In addition to this, the code can end in "C" to represent "condominiums." Here are the specific codes that site residential units:
+
 - 111C
 - 121*
 - 1**C
@@ -68,6 +69,7 @@ Based on the property use classification chart commercial use codes are 4 charac
 
 
 Use codes related to residence but not included:
+
 - Artist in residence: 102*
 - Hotel under 50 rooms: 180*
 - Hotel 50 rooms and over: 181*
@@ -75,7 +77,7 @@ Use codes related to residence but not included:
 - Motel 50 rooms and over: 183*
 
 # Step 1b: Identify commercial and residential parcels in January 2025 and April 2026 data
-```{r}
+```{r, include=FALSE}
 # get commerical use codes of interest in jan 2025 and apr 2026
 # use the codes to filter the data and parcel tables
 
@@ -210,7 +212,7 @@ Common to both
 
 Decision: Combine these lists excluding the code for Pasadena. Will keep LCM codes even though they suggest manufacturing is the primary use.
 
-```{r}
+```{r, include=FALSE}
 # Get zoning codes to try and identify which commercial use codes are also zoned
 # for residential (mixed-use) purposes.
 
@@ -266,7 +268,17 @@ zoning_codes <- unique(c(
 
 ```
 
-Will only review with Apr 2026 data:
+Will only review with Apr 2026 Assessor data before filtering to dashboard parcels:
+
+There are a tremendous number of LCR175	(n=7809 ) which seems primarily a residential zone. Reviewing the use codes these are overwhelmingly residential. Will exclude it from the list of zoning codes.
+
+The map shows all properties zoned for commercial and residential mixed use (n = 518) and is categorized by whether or not the current use code of that property:
+
+- Commercial only: 212
+- Residential only: 226
+- Mixed use (comm and res): 41  
+- Another use (not comm or res): 39
+
 ```{r}
 apr_2026_zoned <- apr_2026_data %>% filter(zoning_code %in% zoning_codes)
 zoning_freq <- as.data.frame(table(apr_2026_zoned$zoning_code, useNA="ifany"))
@@ -280,16 +292,117 @@ table(apr_2026_lcr175$use_code, useNA = "ifany")
 # https://portal.assessor.lacounty.gov/parceldetail/5823020021
 # Split residential, commercial - there is 1
 
-zoning_codes_final <- Filter(function(x) !any(grepl("^LCR175", x)), zoning_codes)
+zoning_codes_final <- Filter(function(x) !any(grepl("^LCR175|^PSC-", x)), zoning_codes)
 
-apr_2026_zoned_final <- apr_2026_data %>% filter(zoning_code %in% zoning_codes_final) # 532
+apr_2026_zoned_final <- apr_2026_data %>% filter(zoning_code %in% zoning_codes_final) # 518
+
+apr_2026_res_codes <- commercial_codes_apr_2026 %>% filter(residential==TRUE) %>% select(use_code) %>% pull()
+
+apr_2026_comm_codes <- commercial_codes_apr_2026 %>% filter(commercial==TRUE) %>% select(use_code) %>% pull()
+
+apr_2026_zoned_shapes <- apr_2026_shapes %>% filter(ain %in% apr_2026_zoned_final$ain) %>%
+  left_join(apr_2026_data, by="ain") %>%
+  mutate(
+    use_commercial = ifelse(use_code %in% apr_2026_comm_codes, TRUE, FALSE),
+    use_residential = ifelse(grepl("^0|^1210|^1270", use_code), TRUE, FALSE),
+    zone_mixed = ifelse(zoning_code %in% zoning_codes, TRUE, FALSE)) %>%
+  mutate(
+    use_mixed = ifelse(use_commercial==TRUE & use_residential==TRUE, TRUE, FALSE),
+    flag_ = ifelse(zone_mixed==FALSE & use_mixed==FALSE, TRUE, FALSE)
+  ) %>%
+  mutate(
+    summary = case_when(
+      zone_mixed==TRUE & use_mixed==TRUE ~ "Comm and Res use",
+      zone_mixed==TRUE & use_mixed==FALSE & use_commercial==TRUE & use_residential==FALSE ~ "Commercial only",
+      zone_mixed==TRUE & use_mixed==FALSE & use_commercial==FALSE & use_residential==TRUE ~ "Residential only",
+      zone_mixed==TRUE & use_mixed==FALSE & use_commercial==FALSE & use_residential==FALSE ~ "Not comm or res",
+      zone_mixed==FALSE ~ "Error: wrong zone",
+      .default = "Error: something else"
+      
+    )
+  )
+
+table(apr_2026_zoned_shapes$mixed_use, useNA="ifany")
+table(apr_2026_zoned_shapes$flag_, useNA="ifany")
+
+flagged <- apr_2026_zoned_shapes %>% filter(flag_ == TRUE) # 0
+
+mapview(apr_2026_zoned_shapes, zcol="summary")
+
+table(apr_2026_zoned_shapes$summary, useNA="ifany")
 
 ```
 
 
-There are a tremendous number of LCR175	(n=7809 ) which seems primarily a residential zone. Reviewing the use codes these are overwhelmingly residential. Will exclude it from the list of zoning codes.
+
 
 # Step 3: With the broad list of properties zoned for comm/res mixed use, vet data availability across sources
 
+- Lead soil: Ok - it's averaged by grids and results are assigned by spatial intersect 
+- Fire Hazard Severity Zones: Ok - similar to above - assigned by spatial intersect
+- CalFire DINS
+- Sales data
+  - Assessor
+  - ANFS
+- Crosswalk - checked just to confirm that we do track properties with mixed use zoning but they are currently residential only in use code.
+
+```{r}
+df <- apr_2026_zoned_shapes %>% st_drop_geometry() %>%
+  select(ain, zoning_code, use_code, summary)
+
+# identify if any are already in our crosswalk
+xwalk <- dbGetQuery(con, "SELECT * FROM dashboard.crosswalk_assessor_2026_04_08;")
+
+check_xwalk <- df %>% left_join(xwalk, by=c("ain"="ain_2026_04")) %>% filter(!is.na(ain_2026_08))
+
+df <- df %>%
+  mutate(xwalk_coverage = ifelse(ain %in% check_xwalk$ain, TRUE, FALSE))
+
+# identify what has calfire data
+source(here("Data Prep", "Monthly Updates", "functions.R"))
+calfire <- dbGetQuery(con, "SELECT * FROM data.rel_assessor_damage_level;") %>%
+  mutate(transformed_ain = transform_ain_to_curr(ain, xwalk_df=xwalk, curr_ain = "ain_2026_04"))
+
+check_calfire <- df %>% left_join(calfire, by=c("ain"="transformed_ain")) %>% filter(!is.na(damage_category))
+check_calfire_sigdmg <- check_calfire %>% filter(damage_category=="Significant Damage")
+
+df <- df %>%
+  mutate(calfire_coverage = ifelse(ain %in% check_calfire$ain, TRUE, FALSE),
+         calfire_sigdmg = ifelse(ain %in% check_calfire_sigdmg$ain, TRUE, FALSE))
+
+map_df <- apr_2026_zoned_shapes %>% left_join(df, by="ain")
+# mapview(map_df, zcol="xwalk_coverage")
+
+mapview(map_df) + mapview(map_df, zcol="calfire_sigdmg")
+
+table(Sig_damage = df$calfire_sigdmg, Summary = df$summary)
+
+# spot check permits
+# look at the properties that are significantly damaged and currently mixed use
+spot1 <- map_df %>% filter(summary.y == "Comm and Res use" & calfire_sigdmg==TRUE)
+
+# 5835031003 - county classifies as destroyed, commercial use type and nonresidential commercial structure type (not in commercial corridor)
+# 5845018015 - county classifies as destroyed, commercial use type but single residence structure type
+# 5845024018 - county classifies as destroyed, commercial use type and nonresidential commercial structure type
+
+# spot check Lake Ave properties
+spot2 <- map_df %>% filter(grepl("^LAKE AVE", street_name)) # 86
+
+table(summary=spot2$summary.x, calfire= spot2$calfire_coverage)
+table(summary=spot2$summary.x)
+
+spot2 %>% filter(summary.x=="Commercial only")
+
+# 5841032021  - not on county dash
+# 5845002006  - not on county dash
+
+# Second source check has more coverage
+# https://data.lacounty.gov/datasets/lacounty::2025-parcels-with-dins-data/explore?location=34.139707%2C-118.361483%2C10
+
+# 5841032021 - 2605 LAKE AVE ALTADENA CA - destroyed - permit results show up under 5841032017, CREB non like for like museum rebuild
+# 5845002006 - 2528 Lake Avenue, Altadena, CA - no damage
+# 5845002015 - 2490 Lake Avenue, Altadena, CA - destroyed
+# 5845003001 - 2472 Lake Ave, Altadena, CA - no damage
+```
 
 
