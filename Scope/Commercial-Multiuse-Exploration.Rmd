@@ -30,21 +30,35 @@ GROUP BY
 ORDER BY 
     frequency DESC;"
 
-assessor_use_codes_jan_2025 <- dbGetQuery(con, get_use_code_query1) # 266
-assessor_use_codes_jan_2025
+assessor_use_codes_2025_01 <- dbGetQuery(con, get_use_code_query1) %>% # 266
+  mutate(vtg = "2025_01")
+assessor_use_codes_2025_01
 
 get_use_code_query2 <- "SELECT 
     use_code, 
     COUNT(*) AS frequency
 FROM 
-    dashboard.assessor_data_universe_2026_04
+    dashboard.assessor_data_universe_2026_08
 GROUP BY 
     use_code
 ORDER BY 
     frequency DESC;"
 
-assessor_use_codes_apr_2026 <- dbGetQuery(con, get_use_code_query2) # 101
-assessor_use_codes_apr_2026
+assessor_use_codes_2026_08 <- dbGetQuery(con, get_use_code_query2) %>% # 103
+  mutate(vtg = "2026_08")
+assessor_use_codes_2026_08
+
+use_codes <- rbind(assessor_use_codes_2025_01,
+                   assessor_use_codes_2026_08) %>%
+  select(use_code, vtg) %>%
+  group_by(use_code) %>%
+  summarize(vintage = paste(vtg, collapse = ", ")) %>%
+  ungroup() %>%
+  select(use_code, vintage) %>%
+  unique() %>% # 272
+  mutate(
+    vintage = ifelse(vintage=="2025_01, 2026_08", "both", vintage)
+  )
 
 
 # Data dictionary is here:W:\\Project\\RDA Team\\Altadena Recovery and Rebuild\\Data\\Assessor Data Extract\\FIELD DEF -- SBF.html
@@ -76,14 +90,13 @@ Use codes related to residence but not included:
 - Motel under 50 rooms: 182*
 - Motel 50 rooms and over: 183*
 
-# Step 1b: Identify commercial and residential parcels in January 2025 and April 2026 data
+# Step 1b: Identify commercial and residential parcels in January 2025 data
 ```{r, include=FALSE}
-# get commerical use codes of interest in jan 2025 and apr 2026
-# use the codes to filter the data and parcel tables
+# get commercial use codes and flag whether the commercial code also allows for residential use
 
-### jan 2025
-commercial_codes_jan_2025 <- assessor_use_codes_jan_2025 %>% 
+commercial_use_codes <- use_codes %>%
   filter( 
+    # commercial properties start with a 1 or 2 code
     grepl("^1|^2", use_code)) %>% # 113
   mutate(
     commercial = TRUE,
@@ -97,80 +110,44 @@ commercial_codes_jan_2025 <- assessor_use_codes_jan_2025 %>%
 
 # get all AINs 
 get_jan_2025_data_query <- "SELECT * FROM dashboard.assessor_data_universe_2025_01;"
-jan_2025_data <- dbGetQuery(con, get_jan_2025_data_query)
+data_2025_01 <- dbGetQuery(con, get_jan_2025_data_query)
 
-jan_2025_data_filtered <- commercial_codes_jan_2025 %>%
-  left_join(jan_2025_data, by = "use_code") # 2629
+data_filtered_2025_01 <- data_2025_01 %>%
+  filter(use_code %in% commercial_use_codes$use_code) %>% #2629
+  left_join(commercial_use_codes, by="use_code")
 
-# get shapes for these AINS
+# get shapes for these AINS with commercial and/or commercial and residential use codes
 get_jan_2025_shapes_query <- "SELECT ain, matched_name, geom FROM dashboard.assessor_parcels_universe_2025_01;"
-jan_2025_shapes <- st_read(con, query=get_jan_2025_shapes_query)
+shapes_2025_01 <- st_read(con, query=get_jan_2025_shapes_query)
 
-jan_2025_shapes_filtered <- jan_2025_shapes %>% 
-  filter(ain %in% jan_2025_data_filtered$ain) %>% # 292
-  filter(matched_name == "Altadena" | matched_name=="Pasadena; Altadena") %>% # 319
-  left_join(jan_2025_data_filtered, by = c("ain"))
+shapes_filtered_2025_01 <- shapes_2025_01 %>% 
+  filter(ain %in% data_filtered_2025_01$ain)
 
-m_0125 <- jan_2025_shapes_filtered
+altadena_perimeter <- st_read(con, query="SELECT * FROM data.tl_2023_places WHERE name = 'Altadena';")
+st_crs(altadena_perimeter)$epsg == st_crs(shapes_2025_01)$epsg
 
-# get list of ains to compare against apr 2026 vintage
-jan_2025_ains <- jan_2025_data_filtered %>% filter(ain %in% jan_2025_shapes_filtered$ain)
+dena_comm_parcels <- shapes_filtered_2025_01 %>%
+    filter(st_intersects(., altadena_perimeter, sparse = FALSE)[,1]) %>%
+  left_join(data_filtered_2025_01, by = "ain") # 319
 
-### apr 2026
-commercial_codes_apr_2026 <- assessor_use_codes_apr_2026 %>% 
-  filter( 
-    grepl("^1|^2", use_code)) %>% # 113
-  mutate(
-    commercial = TRUE,
-    residential = case_when(
-      grepl("C$", use_code) ~ TRUE,
-      grepl("^121", use_code) ~ TRUE,
-      grepl("^172", use_code) ~ TRUE,
-      grepl("^184", use_code) ~ TRUE,
-      grepl("^185", use_code) ~ TRUE,
-      .default = FALSE
-  ))
+mapview(dena_comm_parcels)
 
-# get all AINs 
-get_apr_2026_data_query <- "SELECT * FROM dashboard.assessor_data_universe_2026_04;"
-apr_2026_data <- dbGetQuery(con, get_apr_2026_data_query)
-
-apr_2026_data_filtered <- commercial_codes_apr_2026 %>%
-  left_join(apr_2026_data, by = "use_code") # 2629
-
-# get shapes for these AINS
-get_apr_2026_shapes_query <- "SELECT ain, matched_name, geom FROM dashboard.assessor_parcels_universe_2026_04;"
-apr_2026_shapes <- st_read(con, query=get_apr_2026_shapes_query)
-
-apr_2026_shapes_filtered <- apr_2026_shapes %>% 
-  filter(ain %in% apr_2026_data_filtered$ain) %>% # 47
-  filter(matched_name == "Altadena" | matched_name=="Pasadena; Altadena") %>% # 315
-  left_join(apr_2026_data_filtered, by = c("ain"))
-
-m_0426 <- apr_2026_shapes_filtered
-
-# get list of ains to compare against jan 2025 vintage
-apr_2026_ains <- apr_2026_data_filtered %>% filter(ain %in% apr_2026_shapes_filtered$ain)
-
-
-table(jan_2025_ains$residential, useNA="ifany")
-  
-table(apr_2026_ains$residential, useNA="ifany")
-
+table(residential = dena_comm_parcels$residential)
 ```
-In January 2025, there were 319 significantly damaged parcels with commercial use codes. Of those, 48 were also residential.
-
-In April 2026, there were 315 significantly damage parcels with commercial use codes. Of those, 47 were also residential.
+In January 2025, there were 319 parcels with either commercial use codes. 271 were commercial only and 48 were mixed use as commercial and residential.
 
 
-# Step 1C: View January 2025 and Apr 2026 Commercial Properties
+# Step 1C: View January 2025 commercial use properties against current dashboard parcels
 ```{r}
-mapview(m_0125, zcol="residential") 
+# get current dashboard parcels
+dashboard_parcels <- st_read(con, query="SELECT * FROM dashboard.dashboard_2026_08;") %>%
+  st_transform(3310)
 
-mapview(m_0426, zcol="residential") 
+mapview(altadena_perimeter, alpha.regions=0.2, color="red", col.regions="white") + mapview(dashboard_parcels, col.regions = "green") + mapview(dena_comm_parcels, zcol="residential") 
+
 ```
 
-# Step 2a: Identify which properties are also zoned for and residential and commercial mixed-use purposes
+# Step 2a: Identify which properties are also zoned for and commercial and commercial mixed-use purposes
 
 In January 2025 there are two zoning codes that appear in comm/res mixed-use coded properties that don't appear in other use code types: 
 
@@ -191,65 +168,28 @@ Common zoning codes in both lists:
 - LCR3YY
 - PSC- (should exclude, specific to Pasadena)
 
-Repeating for April 2026 - again, two zoning codes in our filtered list of comm/res mixed use properties
-
-- LCC2
-- LCC3 R2-P
-
-Common to both
-
-- LCC2*
-- LCC2YY
-- LCC3*
-- LCC3VV
-- LCC3YY
-- LCM1*
-- LCM1YY
-- LCR175
-- LCR2VV
-- LCR3YY
-- PSC- (should exclude, specific to Pasadena)
-
-Decision: Combine these lists excluding the code for Pasadena. Will keep LCM codes even though they suggest manufacturing is the primary use.
+Decision: Excluding zoning codes for Pasadena. Will keep LCM codes even though they suggest industrial" use.
 
 ```{r, include=FALSE}
 # Get zoning codes to try and identify which commercial use codes are also zoned
 # for residential (mixed-use) purposes.
 
 # January 2025
-zoning_codes_0125 <- jan_2025_data %>% filter(!(ain %in% jan_2025_ains$ain)) %>% select(zoning_code)
-zoning_codes_0125_df <- as.data.frame(table(zoning_codes_0125$zoning_code))
+zoning_codes_2025_01 <- data_2025_01 %>% filter(!(ain %in% dena_comm_parcels$ain)) %>% select(zoning_code)
+zoning_codes_df_2025_01 <- as.data.frame(table(zoning_codes_2025_01$zoning_code)) # 235
 
-zoning_codes_0125_filtered <- jan_2025_shapes_filtered %>% st_drop_geometry() %>% 
-  filter(commercial==TRUE & residential == TRUE) %>% 
-  select(zoning_code)
+zoning_codes_filtered_2025_01 <- dena_comm_parcels %>% st_drop_geometry() %>% 
+  filter(commercial==TRUE) %>% 
+  select(zoning_code) 
 
-zoning_codes_0125_filtered_df <- as.data.frame(table(zoning_codes_0125_filtered$zoning_code))
-
-# Review all observed zoning codes against those associated with residential and commercial mixed use properties
-setdiff(as.character(zoning_codes_0125_df$Var1), as.character(zoning_codes_0125_filtered_df$Var1))
-setdiff(as.character(zoning_codes_0125_filtered_df$Var1), as.character(zoning_codes_0125_df$Var1))
-intersect(as.character(zoning_codes_0125_filtered_df$Var1), as.character(zoning_codes_0125_df$Var1))
-
-
-# April 2026
-zoning_codes_0426 <- apr_2026_data %>% filter(!(ain %in% apr_2026_ains$ain)) %>% select(zoning_code)
-zoning_codes_0426_df <- as.data.frame(table(zoning_codes_0426$zoning_code))
-
-zoning_codes_0426_filtered <- apr_2026_shapes_filtered %>% st_drop_geometry() %>% 
-  filter(commercial==TRUE & residential == TRUE) %>% 
-  select(zoning_code)
-
-zoning_codes_0426_filtered_df <- as.data.frame(table(zoning_codes_0426_filtered$zoning_code))
+zoning_codes_filtered_df_2025_01 <- as.data.frame(table(zoning_codes_filtered_2025_01$zoning_code)) # 42
 
 # Review all observed zoning codes against those associated with residential and commercial mixed use properties
-setdiff(as.character(zoning_codes_0426_df$Var1), as.character(zoning_codes_0426_filtered_df$Var1))
-setdiff(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_codes_0426_df$Var1))
-intersect(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_codes_0426_df$Var1))
+setdiff(as.character(zoning_codes_df_2025_01$Var1), as.character(zoning_codes_filtered_df_2025_01$Var1)) # 193
+setdiff(as.character(zoning_codes_filtered_df_2025_01$Var1), as.character(zoning_codes_df_2025_01$Var1)) # 14
+intersect(as.character(zoning_codes_filtered_df_2025_01$Var1), as.character(zoning_codes_df_2025_01$Var1)) # 28
 
-
-# Same universe of zoning codes are available. Will review individually.
-# Reference data dictionary
+# Referenced in data dictionary
 ## First two characters are place (LC: LA County; PS: Pasadena)
 ## 3rd character: can be (A)gricultural, (C)ommercial, (M) Industrial, R(esidential)
 ## 4th character: alphanumeric and generally represents either the intensity or limit of a property's use;
@@ -260,41 +200,40 @@ intersect(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_
 # What do asterisks mean? (still not sure)
 
 zoning_codes <- unique(c(
-  setdiff(as.character(zoning_codes_0125_filtered_df$Var1), as.character(zoning_codes_0125_df$Var1)),
-  intersect(as.character(zoning_codes_0125_filtered_df$Var1), as.character(zoning_codes_0125_df$Var1)),
-  setdiff(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_codes_0426_df$Var1)),
-  intersect(as.character(zoning_codes_0426_filtered_df$Var1), as.character(zoning_codes_0426_df$Var1))
+  setdiff(as.character(zoning_codes_filtered_df_2025_01$Var1), as.character(zoning_codes_df_2025_01$Var1)), 
+  intersect(as.character(zoning_codes_filtered_df_2025_01$Var1), as.character(zoning_codes_df_2025_01$Var1))
   ))
 
-```
-
-Will only review with Apr 2026 Assessor data before filtering to dashboard parcels:
-
-There are a tremendous number of LCR175	(n=7809 ) which seems primarily a residential zone. Reviewing the use codes these are overwhelmingly residential. Will exclude it from the list of zoning codes.
-
-The map shows all properties zoned for commercial and residential mixed use (n = 518) and is categorized by whether or not the current use code of that property:
-
-- Commercial only: 212
-- Residential only: 226
-- Mixed use (comm and res): 41  
-- Another use (not comm or res): 39
-
-```{r}
-apr_2026_zoned <- apr_2026_data %>% filter(zoning_code %in% zoning_codes)
-zoning_freq <- as.data.frame(table(apr_2026_zoned$zoning_code, useNA="ifany"))
+zoned_2025_01 <- data_2025_01 %>% filter(zoning_code %in% zoning_codes)
+zoning_freq <- as.data.frame(table(zoned_2025_01$zoning_code, useNA="ifany"))
 zoning_freq
 
-apr_2026_lcr175 <- apr_2026_zoned %>% filter(grepl("^LCR175", zoning_code))
-table(apr_2026_lcr175$use_code, useNA = "ifany")
+zoned_2025_01_lcr175 <- zoned_2025_01 %>% filter(grepl("^LCR175", zoning_code))
+table(zoned_2025_01_lcr175$use_code, useNA = "ifany")
 # https://portal.assessor.lacounty.gov/parceldetail/5827013902
 # 2700 is a parking lot - there are 4
 
 # https://portal.assessor.lacounty.gov/parceldetail/5823020021
 # Split residential, commercial - there is 1
 
-zoning_codes_final <- Filter(function(x) !any(grepl("^LCR175|^PSC-", x)), zoning_codes)
+zoning_codes_final <- Filter(function(x) !any(grepl("^PSC", x)), zoning_codes)
 
-apr_2026_zoned_final <- apr_2026_data %>% filter(zoning_code %in% zoning_codes_final) # 518
+zoned_final_2025_01 <- data_2025_01 %>% filter(zoning_code %in% zoning_codes_final) %>%
+  # filter out residential exclusive use codes
+  filter(!grepl("^0", use_code)) # 537
+
+zoned_shapes_2025_01 <- shapes_2025_01 %>% filter(ain %in% zoned_final_2025_01$ain)
+
+dena_comm_zoned_parcels <- zoned_shapes_2025_01 %>%
+    filter(st_intersects(., altadena_perimeter, sparse = FALSE)[,1]) %>%
+  left_join(data_filtered_2025_01, by = "ain") # 500
+
+mapview(dena_comm_zoned_parcels)
+
+table(residential = dena_comm_parcels$residential)
+
+
+
 
 apr_2026_res_codes <- commercial_codes_apr_2026 %>% filter(residential==TRUE) %>% select(use_code) %>% pull()
 
@@ -330,6 +269,21 @@ flagged <- apr_2026_zoned_shapes %>% filter(flag_ == TRUE) # 0
 mapview(apr_2026_zoned_shapes, zcol="summary")
 
 table(apr_2026_zoned_shapes$summary, useNA="ifany")
+
+```
+
+
+There are a tremendous number of LCR175	(n=7809 ) which seems primarily a residential zone. Reviewing the use codes these are overwhelmingly residential. Will exclude it from the list of zoning codes.
+
+The map shows all properties zoned for commercial and residential mixed use (n = 518) and is categorized by whether or not the current use code of that property:
+
+- Commercial only: 212
+- Residential only: 226
+- Mixed use (comm and res): 41  
+- Another use (not comm or res): 39
+
+```{r}
+
 
 ```
 
